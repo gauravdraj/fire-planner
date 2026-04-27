@@ -6,6 +6,21 @@ const IRS_REV_PROC_2025_32 =
   'IRS Rev. Proc. 2025-32, 2026 inflation-adjusted tax items, https://www.irs.gov/pub/irs-drop/rp-25-32.pdf';
 const IRS_NIIT =
   'IRS Net Investment Income Tax guidance, https://www.irs.gov/individuals/net-investment-income-tax';
+// IRS FS-2025-03 summarizes the OBBBA senior deduction amount, eligibility window, and MAGI thresholds.
+const IRS_OBBBA_SENIOR_DEDUCTION =
+  'IRS FS-2025-03, OBBBA tax deductions for workers and seniors, https://www.irs.gov/newsroom/one-big-beautiful-bill-act-tax-deductions-for-working-americans-and-seniors';
+// 26 U.S.C. § 151(d)(5)(C) supplies the senior deduction phaseout rate, MAGI addbacks, and joint-return rule.
+const IRC_151_SENIOR_DEDUCTION =
+  '26 U.S.C. § 151(d)(5)(C), senior deduction, https://uscode.house.gov/view.xhtml?req=(title:26%20section:151%20edition:prelim)';
+// 26 U.S.C. § 199A supplies the QBI deduction rate and W-2/UBIA cap percentages.
+const IRC_199A =
+  '26 U.S.C. § 199A, qualified business income deduction, https://uscode.house.gov/view.xhtml?req=(title:26%20section:199A%20edition:prelim)';
+// Schedule SE lines 4a, 10-13 pin the 92.35% net-earnings adjustment, OASDI/Medicare rates, and deductible half.
+const IRS_SCHEDULE_SE_2025 =
+  'IRS Schedule SE (Form 1040) 2025, https://www.irs.gov/pub/irs-pdf/f1040sse.pdf';
+// IRS Additional Medicare Tax guidance pins the statutory filing-status thresholds.
+const IRS_ADDITIONAL_MEDICARE =
+  'IRS Additional Medicare Tax guidance, https://www.irs.gov/businesses/small-businesses-self-employed/self-employment-tax-social-security-and-medicare-taxes';
 const SSA_2026_COLA =
   'Social Security Administration 2026 COLA Fact Sheet, https://www.ssa.gov/cola/factsheets/2026.html';
 const HHS_FPL_2026 =
@@ -47,6 +62,42 @@ export const CONSTANTS_2026 = deepFreeze({
       hoh: 24_150,
       mfs: 16_100,
     } satisfies Record<FilingStatus, number>,
+    // 26 U.S.C. § 151(d)(5)(C) and IRS FS-2025-03: temporary OBBBA senior deduction for 2025-2028.
+    seniorDeduction: {
+      source: `${IRS_OBBBA_SENIOR_DEDUCTION}; ${IRC_151_SENIOR_DEDUCTION}`,
+      retrievedAt: RETRIEVED_AT,
+      availableTaxYears: { from: 2025, through: 2028 },
+      minimumAge: 65,
+      perQualifiedIndividual: 6_000,
+      eligibleFilingStatuses: {
+        single: true,
+        mfj: true,
+        hoh: true,
+        mfs: false,
+      } satisfies Record<FilingStatus, boolean>,
+      maxQualifiedIndividuals: {
+        single: 1,
+        mfj: 2,
+        hoh: 1,
+        mfs: 0,
+      } satisfies Record<FilingStatus, number>,
+      magiPhaseout: {
+        rate: 0.06,
+        thresholds: {
+          single: 75_000,
+          mfj: 150_000,
+          hoh: 75_000,
+          mfs: null,
+        } satisfies Record<FilingStatus, number | null>,
+        completeAt: {
+          single: 175_000,
+          mfj: 250_000,
+          hoh: 175_000,
+          mfs: null,
+        } satisfies Record<FilingStatus, number | null>,
+        addbackSections: ['911', '931', '933'],
+      },
+    },
     ordinaryBrackets: {
       single: [
         { from: 0, rate: 0.1 },
@@ -115,6 +166,7 @@ export const CONSTANTS_2026 = deepFreeze({
   niit: {
     source: IRS_NIIT,
     retrievedAt: RETRIEVED_AT,
+    // IRS NIIT guidance: 3.8% on the lesser of net investment income or MAGI over the statutory threshold.
     rate: 0.038,
     magiThresholds: {
       single: 200_000,
@@ -124,13 +176,16 @@ export const CONSTANTS_2026 = deepFreeze({
     } satisfies Record<FilingStatus, number>,
   },
   seTax: {
-    source: SSA_2026_COLA,
+    source: `${SSA_2026_COLA}; ${IRS_SCHEDULE_SE_2025}; ${IRS_ADDITIONAL_MEDICARE}`,
     retrievedAt: RETRIEVED_AT,
+    // SSA 2026 COLA Fact Sheet gives the OASDI wage base; Schedule SE gives the SE adjustment and component rates.
     ssWageBase: 184_500,
+    netEarningsMultiplier: 0.9235,
     selfEmploymentRate: 0.153,
     oasdiRate: 0.124,
     medicareRate: 0.029,
     additionalMedicareRate: 0.009,
+    deductiblePortionRate: 0.5,
     additionalMedicareThresholds: {
       single: 200_000,
       mfj: 250_000,
@@ -139,8 +194,20 @@ export const CONSTANTS_2026 = deepFreeze({
     } satisfies Record<FilingStatus, number>,
   },
   qbi: {
-    source: IRS_REV_PROC_2025_32,
+    source: `${IRS_REV_PROC_2025_32}; ${IRC_199A}`,
     retrievedAt: RETRIEVED_AT,
+    // 26 U.S.C. § 199A uses a 20% deduction rate and W-2/UBIA caps of 50%, or 25% plus 2.5%.
+    deductionRate: 0.2,
+    w2WageLimitRate: 0.5,
+    w2WageWithUbiaWageRate: 0.25,
+    ubiaLimitRate: 0.025,
+    // Rev. Proc. 2025-32 §4.26 gives the 2026 threshold and phase-in range amounts by filing status.
+    phaseoutRangeAmounts: {
+      single: 75_000,
+      mfj: 150_000,
+      hoh: 75_000,
+      mfs: 75_000,
+    } satisfies Record<FilingStatus, number>,
     phaseouts: {
       single: { start: 201_750, end: 276_750 },
       mfj: { start: 403_500, end: 553_500 },

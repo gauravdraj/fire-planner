@@ -37,6 +37,7 @@ describe('CONSTANTS_2026', () => {
 
     expect(Object.isFrozen(CONSTANTS_2026)).toBe(true);
     expect(Object.isFrozen(CONSTANTS_2026.federal.standardDeduction)).toBe(true);
+    expect(Object.isFrozen(CONSTANTS_2026.federal.seniorDeduction)).toBe(true);
     expect(Object.isFrozen(CONSTANTS_2026.federal.ordinaryBrackets.single)).toBe(true);
     expect(Object.isFrozen(CONSTANTS_2026.ltcg.brackets.single)).toBe(true);
     expect(Object.isFrozen(CONSTANTS_2026.fpl.contiguous)).toBe(true);
@@ -50,10 +51,19 @@ describe('CONSTANTS_2026', () => {
       expect(CONSTANTS_2026[section].retrievedAt).toMatch(/^\d{4}-\d{2}-\d{2}$/);
       expect(CONSTANTS_2026[section].retrievedAt).toBe(CONSTANTS_2026.retrievedAt);
     }
+    expect(CONSTANTS_2026.federal.seniorDeduction.source).toEqual(expect.stringMatching(/\S/));
+    expect(CONSTANTS_2026.federal.seniorDeduction.retrievedAt).toBe(CONSTANTS_2026.retrievedAt);
   });
 
   it('contains no unresolved TBD-VERIFY markers in the sealed constants source', () => {
     expect(constantsSource).not.toMatch(/TBD-VERIFY/);
+  });
+
+  it('keeps primary-source citations near Gate 1 tax constants', () => {
+    expect(constantsSource).toMatch(/26 U\.S\.C\. § 151\(d\)\(5\)\(C\)/);
+    expect(constantsSource).toMatch(/IRS Schedule SE \(Form 1040\) 2025/);
+    expect(constantsSource).toMatch(/26 U\.S\.C\. § 199A/);
+    expect(constantsSource).toMatch(/IRS Net Investment Income Tax guidance/);
   });
 
   it('pins federal standard deductions and ordinary brackets', () => {
@@ -72,6 +82,38 @@ describe('CONSTANTS_2026', () => {
     expect(CONSTANTS_2026.federal.ordinaryBrackets.single.at(-1)).toEqual({ from: 640_600, rate: 0.37 });
     expect(CONSTANTS_2026.federal.ordinaryBrackets.mfj.at(-1)).toEqual({ from: 768_700, rate: 0.37 });
     expect(CONSTANTS_2026.federal.ordinaryBrackets.mfs.at(-1)).toEqual({ from: 384_350, rate: 0.37 });
+  });
+
+  it('pins OBBBA senior deduction amount and MAGI phaseout rules', () => {
+    expect(CONSTANTS_2026.federal.seniorDeduction.availableTaxYears).toEqual({ from: 2025, through: 2028 });
+    expect(CONSTANTS_2026.federal.seniorDeduction.minimumAge).toBe(65);
+    expect(CONSTANTS_2026.federal.seniorDeduction.perQualifiedIndividual).toBe(6_000);
+    expect(CONSTANTS_2026.federal.seniorDeduction.eligibleFilingStatuses).toEqual({
+      single: true,
+      mfj: true,
+      hoh: true,
+      mfs: false,
+    });
+    expect(CONSTANTS_2026.federal.seniorDeduction.maxQualifiedIndividuals).toEqual({
+      single: 1,
+      mfj: 2,
+      hoh: 1,
+      mfs: 0,
+    });
+    expect(CONSTANTS_2026.federal.seniorDeduction.magiPhaseout.rate).toBe(0.06);
+    expect(CONSTANTS_2026.federal.seniorDeduction.magiPhaseout.thresholds).toEqual({
+      single: 75_000,
+      mfj: 150_000,
+      hoh: 75_000,
+      mfs: null,
+    });
+    expect(CONSTANTS_2026.federal.seniorDeduction.magiPhaseout.completeAt).toEqual({
+      single: 175_000,
+      mfj: 250_000,
+      hoh: 175_000,
+      mfs: null,
+    });
+    expect(CONSTANTS_2026.federal.seniorDeduction.magiPhaseout.addbackSections).toEqual(['911', '931', '933']);
   });
 
   it('pins LTCG brackets for every filing status', () => {
@@ -102,10 +144,33 @@ describe('CONSTANTS_2026', () => {
     });
 
     expect(CONSTANTS_2026.seTax.ssWageBase).toBe(184_500);
+    expect(CONSTANTS_2026.seTax.netEarningsMultiplier).toBe(0.9235);
     expect(CONSTANTS_2026.seTax.selfEmploymentRate).toBe(0.153);
+    expect(CONSTANTS_2026.seTax.oasdiRate).toBe(0.124);
+    expect(CONSTANTS_2026.seTax.medicareRate).toBe(0.029);
+    expect(CONSTANTS_2026.seTax.additionalMedicareRate).toBe(0.009);
+    expect(CONSTANTS_2026.seTax.deductiblePortionRate).toBe(0.5);
+    expect(CONSTANTS_2026.seTax.additionalMedicareThresholds).toEqual({
+      single: 200_000,
+      mfj: 250_000,
+      hoh: 200_000,
+      mfs: 125_000,
+    });
 
+    expect(CONSTANTS_2026.qbi.deductionRate).toBe(0.2);
+    expect(CONSTANTS_2026.qbi.w2WageLimitRate).toBe(0.5);
+    expect(CONSTANTS_2026.qbi.w2WageWithUbiaWageRate).toBe(0.25);
+    expect(CONSTANTS_2026.qbi.ubiaLimitRate).toBe(0.025);
+    expect(CONSTANTS_2026.qbi.phaseoutRangeAmounts).toEqual({
+      single: 75_000,
+      mfj: 150_000,
+      hoh: 75_000,
+      mfs: 75_000,
+    });
     expect(CONSTANTS_2026.qbi.phaseouts.single).toEqual({ start: 201_750, end: 276_750 });
     expect(CONSTANTS_2026.qbi.phaseouts.mfj).toEqual({ start: 403_500, end: 553_500 });
+    expect(CONSTANTS_2026.qbi.phaseouts.hoh).toEqual({ start: 201_750, end: 276_750 });
+    expect(CONSTANTS_2026.qbi.phaseouts.mfs).toEqual({ start: 201_775, end: 276_775 });
     for (const status of filingStatuses) {
       expect(CONSTANTS_2026.qbi.phaseouts[status].start).toBeGreaterThan(0);
       expect(CONSTANTS_2026.qbi.phaseouts[status].end).toBeGreaterThan(CONSTANTS_2026.qbi.phaseouts[status].start);
@@ -152,12 +217,21 @@ describe('CONSTANTS_2026', () => {
     expectPositiveValues(Object.values(CONSTANTS_2026.niit.magiThresholds));
     expectPositiveValues(Object.values(CONSTANTS_2026.seTax.additionalMedicareThresholds));
     expectPositiveValues([
+      CONSTANTS_2026.federal.seniorDeduction.minimumAge,
+      CONSTANTS_2026.federal.seniorDeduction.perQualifiedIndividual,
+      CONSTANTS_2026.federal.seniorDeduction.magiPhaseout.rate,
       CONSTANTS_2026.niit.rate,
       CONSTANTS_2026.seTax.ssWageBase,
+      CONSTANTS_2026.seTax.netEarningsMultiplier,
       CONSTANTS_2026.seTax.selfEmploymentRate,
       CONSTANTS_2026.seTax.oasdiRate,
       CONSTANTS_2026.seTax.medicareRate,
       CONSTANTS_2026.seTax.additionalMedicareRate,
+      CONSTANTS_2026.seTax.deductiblePortionRate,
+      CONSTANTS_2026.qbi.deductionRate,
+      CONSTANTS_2026.qbi.w2WageLimitRate,
+      CONSTANTS_2026.qbi.w2WageWithUbiaWageRate,
+      CONSTANTS_2026.qbi.ubiaLimitRate,
       CONSTANTS_2026.irmaa.standardPartBPremium,
     ]);
 
@@ -180,6 +254,7 @@ describe('CONSTANTS_2026', () => {
 
       expect(CONSTANTS_2026.qbi.phaseouts[status].start).toBeGreaterThan(0);
       expect(CONSTANTS_2026.qbi.phaseouts[status].end).toBeGreaterThan(0);
+      expect(CONSTANTS_2026.qbi.phaseoutRangeAmounts[status]).toBeGreaterThan(0);
     }
 
     for (const table of [CONSTANTS_2026.fpl, CONSTANTS_2026.fpl2025]) {
