@@ -9,7 +9,10 @@ export type QbiInput = {
   filingStatus: FilingStatus;
   w2WagesAggregated?: number;
   ubiaAggregated?: number;
+  phaseouts?: QbiPhaseoutTable;
 };
+
+export type QbiPhaseoutTable = Record<FilingStatus, { start: number; end: number }>;
 
 // Simplified Gate 1 scope: the caller supplies already-aggregated QBI, W-2 wages,
 // and UBIA. v1 does not model aggregation elections, QBI loss carryovers, patron
@@ -45,7 +48,7 @@ export function computeQbi(input: QbiInput): number {
     return 0;
   }
 
-  const phaseout = qbi.phaseouts[input.filingStatus];
+  const phaseout = (input.phaseouts ?? qbi.phaseouts)[input.filingStatus];
   const baseQbiDeduction = qbiNetIncome * qbi.deductionRate;
   let qbiComponent = baseQbiDeduction;
 

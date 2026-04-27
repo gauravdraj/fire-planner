@@ -1,10 +1,11 @@
 import { CONSTANTS_2026 } from '../constants/2026';
-import type { FilingStatus } from '../types';
+import type { FilingStatus, LtcgBracketTable } from '../types';
 
 export type LtcgTaxInput = {
   ordinaryTaxableIncome: number;
   ltcgAndQdiv: number;
   filingStatus: FilingStatus;
+  brackets?: LtcgBracketTable;
 };
 
 export type LtcgBracketBreakdown = {
@@ -33,7 +34,7 @@ export function computeLtcgTax(input: LtcgTaxInput): LtcgTaxResult {
   const ordinaryTaxableIncome = Math.max(0, input.ordinaryTaxableIncome);
   const ltcgAndQdiv = Math.max(0, input.ltcgAndQdiv);
   const totalIncomeWithPreferentialIncome = ordinaryTaxableIncome + ltcgAndQdiv;
-  const brackets = CONSTANTS_2026.ltcg.brackets[input.filingStatus];
+  const brackets = (input.brackets ?? CONSTANTS_2026.ltcg.brackets)[input.filingStatus];
   let ltcgTax = 0;
 
   const bracketBreakdown = brackets.map((bracket, index): LtcgBracketBreakdown => {
