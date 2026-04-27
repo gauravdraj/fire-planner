@@ -16,6 +16,7 @@ import { installMemoryLocalStorage } from '../store/memoryStorage';
 
 const ZERO_BALANCES: AccountBalances = {
   cash: 0,
+  hsa: 0,
   taxableBrokerage: 0,
   traditional: 0,
   roth: 0,
@@ -25,6 +26,7 @@ const CHART_FIXTURE: readonly YearBreakdown[] = [
   buildYearBreakdown({
     closingBalances: {
       cash: 10_000,
+      hsa: 15_000,
       taxableBrokerage: 20_000,
       traditional: 30_000,
       roth: 40_000,
@@ -34,6 +36,7 @@ const CHART_FIXTURE: readonly YearBreakdown[] = [
   buildYearBreakdown({
     closingBalances: {
       cash: 10_300,
+      hsa: 15_450,
       taxableBrokerage: 20_600,
       traditional: 30_900,
       roth: 41_200,
@@ -109,20 +112,20 @@ describe('BalancesChart', () => {
     cleanup();
   });
 
-  it('renders a stacked Recharts area chart for only engine-supported account balances', () => {
+  it('renders a stacked Recharts area chart for engine-supported account balances', () => {
     const { container } = render(<BalancesChart now={dateAtTaxDataAge(0)} />);
 
     expect(screen.getByRole('heading', { name: 'Account balances' })).toBeInTheDocument();
     expect(screen.getByRole('img', { name: /stacked account balances/i })).toBeInTheDocument();
-    expect(container.querySelectorAll('.recharts-area')).toHaveLength(4);
+    expect(container.querySelectorAll('.recharts-area')).toHaveLength(5);
     expect(screen.getByText('Traditional')).toBeInTheDocument();
     expect(screen.getByText('Roth')).toBeInTheDocument();
+    expect(screen.getByText('HSA')).toBeInTheDocument();
     expect(screen.getByText('Taxable brokerage')).toBeInTheDocument();
     expect(screen.getByText('Cash')).toBeInTheDocument();
-    expect(screen.queryByText(/hsa/i)).not.toBeInTheDocument();
   });
 
-  it('builds nominal and real chart points without adding unsupported series', () => {
+  it('builds nominal and real chart points with all supported series', () => {
     const state = useScenarioStore.getState();
 
     const nominal = buildBalancesChartData({
@@ -137,21 +140,23 @@ describe('BalancesChart', () => {
     });
 
     expect(Object.keys(nominal[0] ?? {}).sort()).toEqual(
-      ['cash', 'roth', 'taxableBrokerage', 'total', 'traditional', 'year'].sort(),
+      ['cash', 'hsa', 'roth', 'taxableBrokerage', 'total', 'traditional', 'year'].sort(),
     );
     expect(nominal[1]).toMatchObject({
       cash: 10_300,
+      hsa: 15_450,
       roth: 41_200,
       taxableBrokerage: 20_600,
-      total: 103_000,
+      total: 118_450,
       traditional: 30_900,
       year: 2027,
     });
     expect(real[1]).toMatchObject({
       cash: 10_000,
+      hsa: 15_000,
       roth: 40_000,
       taxableBrokerage: 20_000,
-      total: 100_000,
+      total: 115_000,
       traditional: 30_000,
       year: 2027,
     });
@@ -170,6 +175,7 @@ describe('BalancesChart', () => {
         label={2027}
         payload={[
           { dataKey: 'cash', value: 10_000 },
+          { dataKey: 'hsa', value: 15_000 },
           { dataKey: 'taxableBrokerage', value: 20_000 },
           { dataKey: 'traditional', value: 30_000 },
           { dataKey: 'roth', value: 40_000 },
@@ -180,11 +186,11 @@ describe('BalancesChart', () => {
     expect(screen.getByText('2027')).toBeInTheDocument();
     expect(screen.getByText('Traditional')).toBeInTheDocument();
     expect(screen.getByText('Roth')).toBeInTheDocument();
+    expect(screen.getByText('HSA')).toBeInTheDocument();
     expect(screen.getByText('Taxable brokerage')).toBeInTheDocument();
     expect(screen.getByText('Cash')).toBeInTheDocument();
     expect(screen.getByText('Total')).toBeInTheDocument();
-    expect(screen.getByText('$100,000')).toBeInTheDocument();
-    expect(screen.queryByText(/hsa/i)).not.toBeInTheDocument();
+    expect(screen.getByText('$115,000')).toBeInTheDocument();
   });
 
   it('marks the chart container stale for soft and hard tax-data staleness', () => {

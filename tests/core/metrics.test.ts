@@ -13,6 +13,7 @@ import {
   computeWithdrawalRateBand,
   computeYearDisplayMetrics,
   computeYearsFundedFromRetirement,
+  pAndIBeforePayoff,
   pickFplHouseholdSize,
   selectBridgeWindow,
   summarizeProjectionRunChanges,
@@ -218,6 +219,64 @@ describe('projection metric helpers', () => {
     expect(computeWithdrawalRate(currentYear, null)).toBeNull();
     expect(computeWithdrawalRate(currentYear, makeBreakdown({ closingBalances: makeBalances({}) }))).toBeNull();
     expect(computeWithdrawalRate(currentYear, priorYear)).toBe(0.05);
+  });
+
+  it('excludes qualified HSA withdrawals from the withdrawal rate numerator', () => {
+    const priorYear = makeBreakdown({ closingBalances: makeBalances({ taxableBrokerage: 100_000 }) });
+    const currentYear = makeBreakdown({
+      withdrawals: makeBalances({ hsa: 12_000, taxableBrokerage: 4_000 }),
+    });
+
+    expect(computeWithdrawalRate(currentYear, priorYear)).toBe(0.04);
+  });
+
+  it('can exclude mortgage P&I from the withdrawal rate numerator', () => {
+    const priorYear = makeBreakdown({ closingBalances: makeBalances({ taxableBrokerage: 100_000 }) });
+    const currentYear = makeBreakdown({
+      year: 2027,
+      withdrawals: makeBalances({ taxableBrokerage: 52_000 }),
+    });
+    const baseScenario = makeScenario({
+      mortgage: {
+        annualPI: 12_000,
+        payoffYear: 2030,
+      },
+    });
+    const includedMortgageScenario = makeScenario({
+      ...baseScenario,
+      autoDepleteBrokerage: {
+        enabled: true,
+        yearsToDeplete: 10,
+        annualScaleUpFactor: 0,
+        excludeMortgageFromRate: false,
+      },
+    });
+    const excludedMortgageScenario = makeScenario({
+      ...baseScenario,
+      autoDepleteBrokerage: {
+        enabled: true,
+        yearsToDeplete: 10,
+        annualScaleUpFactor: 0,
+        excludeMortgageFromRate: true,
+      },
+    });
+
+    expect(computeWithdrawalRate(currentYear, priorYear, includedMortgageScenario)).toBe(0.52);
+    expect(computeWithdrawalRate(currentYear, priorYear, excludedMortgageScenario)).toBe(0.4);
+  });
+
+  it('returns mortgage P&I only through the configured payoff year', () => {
+    const scenario = makeScenario({
+      mortgage: {
+        annualPI: 18_000.126,
+        payoffYear: 2028,
+      },
+    });
+
+    expect(pAndIBeforePayoff(makeScenario(), 2026)).toBe(0);
+    expect(pAndIBeforePayoff(scenario, 2026)).toBe(18_000.13);
+    expect(pAndIBeforePayoff(scenario, 2028)).toBe(18_000.13);
+    expect(pAndIBeforePayoff(scenario, 2029)).toBe(0);
   });
 
   it('classifies exact withdrawal-rate band boundaries', () => {
@@ -461,6 +520,7 @@ function makeScenario(overrides: Partial<Scenario> = {}): Scenario {
 function makeBalances(overrides: Partial<AccountBalances>): AccountBalances {
   return {
     cash: 0,
+    hsa: 0,
     taxableBrokerage: 0,
     traditional: 0,
     roth: 0,

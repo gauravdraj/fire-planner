@@ -16,6 +16,8 @@ const STORED_FORM_VALUES: BasicFormValues = {
   retirementYear: 2030,
   planEndAge: 80,
   annualSpendingToday: 80_000,
+  annualMortgagePAndI: 0,
+  mortgagePayoffYear: 0,
   annualW2Income: 140_000,
   annualConsultingIncome: 0,
   annualRentalIncome: 0,
@@ -24,8 +26,18 @@ const STORED_FORM_VALUES: BasicFormValues = {
   annualPensionOrAnnuityIncome: 0,
   brokerageAndCashBalance: 300_000,
   taxableBrokerageBasis: 250_000,
+  hsaBalance: 40_000,
   traditionalBalance: 500_000,
   rothBalance: 100_000,
+  autoDepleteBrokerageEnabled: false,
+  autoDepleteBrokerageYears: 10,
+  autoDepleteBrokerageAnnualScaleUpFactor: 0.02,
+  expectedReturnTraditional: 0.05,
+  expectedReturnRoth: 0.05,
+  expectedReturnBrokerage: 0.05,
+  expectedReturnHsa: 0.05,
+  brokerageDividendYield: 0,
+  brokerageQdiPercentage: 0.95,
   healthcarePhase: 'none',
 };
 
@@ -38,6 +50,8 @@ const HASH_FORM_VALUES: BasicFormValues = {
   retirementYear: 2029,
   planEndAge: 92,
   annualSpendingToday: 135_000,
+  annualMortgagePAndI: 24_000,
+  mortgagePayoffYear: 2036,
   annualW2Income: 220_000,
   annualConsultingIncome: 20_000,
   annualRentalIncome: 12_000,
@@ -46,8 +60,18 @@ const HASH_FORM_VALUES: BasicFormValues = {
   annualPensionOrAnnuityIncome: 18_000,
   brokerageAndCashBalance: 950_000,
   taxableBrokerageBasis: 700_000,
+  hsaBalance: 75_000,
   traditionalBalance: 1_200_000,
   rothBalance: 320_000,
+  autoDepleteBrokerageEnabled: true,
+  autoDepleteBrokerageYears: 12,
+  autoDepleteBrokerageAnnualScaleUpFactor: 0.02,
+  expectedReturnTraditional: 0.06,
+  expectedReturnRoth: 0.07,
+  expectedReturnBrokerage: 0.04,
+  expectedReturnHsa: 0.03,
+  brokerageDividendYield: 0.02,
+  brokerageQdiPercentage: 0.9,
   healthcarePhase: 'aca',
 };
 
@@ -81,7 +105,7 @@ describe('scenarioStore', () => {
     expect(state.customLaw).toBeUndefined();
     expect(state.customLawActive).toBe(false);
     expect(state.projectionResults).toHaveLength(41);
-    expect(state.scenario.balances).not.toHaveProperty('hsa');
+    expect(state.scenario.balances.hsa).toBe(0);
     expect(state).not.toHaveProperty('hasRunProjection');
   });
 
@@ -98,8 +122,8 @@ describe('scenarioStore', () => {
     };
 
     expect(persisted.formValues).toEqual(STORED_FORM_VALUES);
-    expect(persisted.formValues).not.toHaveProperty('hsa');
-    expect(persisted.formValues).not.toHaveProperty('hsaBalance');
+    expect(persisted.formValues?.hsaBalance).toBe(40_000);
+    expect(persisted.scenario?.balances).toMatchObject({ hsa: 40_000 });
     expect(persisted.scenario?.state).toBeDefined();
     expect(persisted.plan?.endYear).toBe(2056);
     expect(persisted.customLawActive).toBe(false);
@@ -112,6 +136,7 @@ describe('scenarioStore', () => {
     const reloadedState = reloadedScenarioStore.getState();
 
     expect(reloadedState.formValues).toEqual(STORED_FORM_VALUES);
+    expect(reloadedState.scenario.balances.hsa).toBe(40_000);
     expect(reloadedState.scenario.state.incomeTaxLaw.stateCode).toBe('FL');
     expect(reloadedState.customLawActive).toBe(false);
     expect(reloadedState.customLaw).toBeUndefined();
@@ -143,8 +168,37 @@ describe('scenarioStore', () => {
     expect(state.formValues.stateCode).toBe('PA');
     expect(state.formValues.annualSpendingToday).toBe(HASH_FORM_VALUES.annualSpendingToday);
     expect(state.formValues.annualW2Income).toBe(HASH_FORM_VALUES.annualW2Income);
+    expect(state.formValues.hsaBalance).toBe(HASH_FORM_VALUES.hsaBalance);
+    expect(state.formValues.annualMortgagePAndI).toBe(HASH_FORM_VALUES.annualMortgagePAndI);
+    expect(state.formValues.expectedReturnTraditional).toBe(HASH_FORM_VALUES.expectedReturnTraditional);
+    expect(state.formValues.autoDepleteBrokerageEnabled).toBe(true);
+    expect(state.formValues.autoDepleteBrokerageYears).toBe(HASH_FORM_VALUES.autoDepleteBrokerageYears);
+    expect(state.formValues.autoDepleteBrokerageAnnualScaleUpFactor).toBe(
+      HASH_FORM_VALUES.autoDepleteBrokerageAnnualScaleUpFactor,
+    );
+    expect(state.formValues.expectedReturnRoth).toBe(HASH_FORM_VALUES.expectedReturnRoth);
+    expect(state.formValues.expectedReturnBrokerage).toBe(HASH_FORM_VALUES.expectedReturnBrokerage);
+    expect(state.formValues.expectedReturnHsa).toBe(HASH_FORM_VALUES.expectedReturnHsa);
+    expect(state.formValues.brokerageDividendYield).toBe(HASH_FORM_VALUES.brokerageDividendYield);
+    expect(state.formValues.brokerageQdiPercentage).toBe(HASH_FORM_VALUES.brokerageQdiPercentage);
     expect(state.plan).toEqual(sharedPlan);
     expect(state.scenario.state.incomeTaxLaw.stateCode).toBe('PA');
+    expect(state.scenario.mortgage).toEqual({ annualPI: 24_000, payoffYear: 2036 });
+    expect(state.scenario.expectedReturns).toEqual({
+      cash: 0,
+      hsa: 0.03,
+      taxableBrokerage: 0.04,
+      traditional: 0.06,
+      roth: 0.07,
+    });
+    expect(state.scenario.brokerageDividends).toEqual({ annualYield: 0.02, qdiPercentage: 0.9 });
+    expect(state.scenario.autoDepleteBrokerage).toEqual({
+      enabled: true,
+      yearsToDeplete: 12,
+      annualScaleUpFactor: 0.02,
+      excludeMortgageFromRate: false,
+      retirementYear: 2029,
+    });
     expect(state.customLawActive).toBe(false);
     expect(state.customLaw).toBeUndefined();
     expect(state.projectionResults[0]?.conversions).toBe(50_000);
@@ -155,7 +209,19 @@ describe('scenarioStore', () => {
       formValues?: Record<string, unknown>;
     };
     expect(persisted.formValues?.stateCode).toBe('PA');
-    expect(persisted.formValues).not.toHaveProperty('hsaBalance');
+    expect(persisted.formValues?.hsaBalance).toBe(HASH_FORM_VALUES.hsaBalance);
+    expect(persisted.formValues?.annualMortgagePAndI).toBe(HASH_FORM_VALUES.annualMortgagePAndI);
+    expect(persisted.formValues?.expectedReturnTraditional).toBe(HASH_FORM_VALUES.expectedReturnTraditional);
+    expect(persisted.formValues?.autoDepleteBrokerageEnabled).toBe(true);
+    expect(persisted.formValues?.autoDepleteBrokerageYears).toBe(HASH_FORM_VALUES.autoDepleteBrokerageYears);
+    expect(persisted.formValues?.autoDepleteBrokerageAnnualScaleUpFactor).toBe(
+      HASH_FORM_VALUES.autoDepleteBrokerageAnnualScaleUpFactor,
+    );
+    expect(persisted.formValues?.expectedReturnRoth).toBe(HASH_FORM_VALUES.expectedReturnRoth);
+    expect(persisted.formValues?.expectedReturnBrokerage).toBe(HASH_FORM_VALUES.expectedReturnBrokerage);
+    expect(persisted.formValues?.expectedReturnHsa).toBe(HASH_FORM_VALUES.expectedReturnHsa);
+    expect(persisted.formValues?.brokerageDividendYield).toBe(HASH_FORM_VALUES.brokerageDividendYield);
+    expect(persisted.formValues?.brokerageQdiPercentage).toBe(HASH_FORM_VALUES.brokerageQdiPercentage);
   });
 
   it('hydrates active custom-law state from URL hashes and persists it locally', async () => {

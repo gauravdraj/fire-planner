@@ -33,6 +33,8 @@ export const DEFAULT_BASIC_FORM_VALUES = Object.freeze({
   retirementYear: 2035,
   planEndAge: 95,
   annualSpendingToday: 100_000,
+  annualMortgagePAndI: 0,
+  mortgagePayoffYear: 0,
   annualW2Income: 0,
   annualConsultingIncome: 0,
   annualRentalIncome: 0,
@@ -41,8 +43,18 @@ export const DEFAULT_BASIC_FORM_VALUES = Object.freeze({
   annualPensionOrAnnuityIncome: 0,
   brokerageAndCashBalance: 0,
   taxableBrokerageBasis: 0,
+  hsaBalance: 0,
   traditionalBalance: 0,
   rothBalance: 0,
+  autoDepleteBrokerageEnabled: false,
+  autoDepleteBrokerageYears: 10,
+  autoDepleteBrokerageAnnualScaleUpFactor: 0.02,
+  expectedReturnTraditional: 0.05,
+  expectedReturnRoth: 0.05,
+  expectedReturnBrokerage: 0.05,
+  expectedReturnHsa: 0.05,
+  brokerageDividendYield: 0,
+  brokerageQdiPercentage: 0.95,
   healthcarePhase: 'none',
 } satisfies BasicFormValues);
 
@@ -152,7 +164,9 @@ function readInitialScenarioState(): ScenarioStoreState {
 
 function buildScenarioState(values: unknown, projectionInputs?: ProjectionInputState): ScenarioStoreState {
   const formValues = sanitizeBasicFormValues(values);
-  const mappedInputs = projectionInputs ?? mapBasicFormToProjectionInputs(formValues);
+  const mappedInputs = projectionInputs === undefined
+    ? mapBasicFormToProjectionInputs(formValues)
+    : normalizeProjectionInputState(projectionInputs);
   const customLaw = projectionInputs?.customLaw ?? projectionInputs?.scenario.customLaw;
   const customLawActive = projectionInputs?.customLawActive === true && isCustomLawActive(customLaw);
   const scenario =
@@ -214,6 +228,16 @@ function inferBasicFormValuesFromHashPayload(payload: ScenarioHashPayload): Basi
     planEndAge: primaryAge + (endYear - startYear),
     annualSpendingToday:
       annualAmountForYear(payload.plan.annualSpending, startYear) ?? DEFAULT_BASIC_FORM_VALUES.annualSpendingToday,
+    annualMortgagePAndI: nonnegativeNumber(
+      payload.scenario.mortgage?.annualPI,
+      DEFAULT_BASIC_FORM_VALUES.annualMortgagePAndI,
+    ),
+    mortgagePayoffYear: boundedInteger(
+      payload.scenario.mortgage?.payoffYear,
+      DEFAULT_BASIC_FORM_VALUES.mortgagePayoffYear,
+      0,
+      2300,
+    ),
     annualW2Income: annualAmountForYear(payload.scenario.w2Income, startYear) ?? DEFAULT_BASIC_FORM_VALUES.annualW2Income,
     annualConsultingIncome:
       annualAmountForYear(payload.scenario.consultingIncome, startYear) ??
@@ -239,11 +263,47 @@ function inferBasicFormValuesFromHashPayload(payload: ScenarioHashPayload): Basi
       payload.scenario.basis?.taxableBrokerage,
       DEFAULT_BASIC_FORM_VALUES.taxableBrokerageBasis,
     ),
+    hsaBalance: nonnegativeNumber(payload.scenario.balances?.hsa, DEFAULT_BASIC_FORM_VALUES.hsaBalance),
     traditionalBalance: nonnegativeNumber(
       payload.scenario.balances?.traditional,
       DEFAULT_BASIC_FORM_VALUES.traditionalBalance,
     ),
     rothBalance: nonnegativeNumber(payload.scenario.balances?.roth, DEFAULT_BASIC_FORM_VALUES.rothBalance),
+    autoDepleteBrokerageEnabled: payload.scenario.autoDepleteBrokerage?.enabled === true,
+    autoDepleteBrokerageYears: boundedInteger(
+      payload.scenario.autoDepleteBrokerage?.yearsToDeplete,
+      DEFAULT_BASIC_FORM_VALUES.autoDepleteBrokerageYears,
+      1,
+      120,
+    ),
+    autoDepleteBrokerageAnnualScaleUpFactor: percentageNumber(
+      payload.scenario.autoDepleteBrokerage?.annualScaleUpFactor,
+      DEFAULT_BASIC_FORM_VALUES.autoDepleteBrokerageAnnualScaleUpFactor,
+    ),
+    expectedReturnTraditional: percentageNumber(
+      payload.scenario.expectedReturns?.traditional,
+      DEFAULT_BASIC_FORM_VALUES.expectedReturnTraditional,
+    ),
+    expectedReturnRoth: percentageNumber(
+      payload.scenario.expectedReturns?.roth,
+      DEFAULT_BASIC_FORM_VALUES.expectedReturnRoth,
+    ),
+    expectedReturnBrokerage: percentageNumber(
+      payload.scenario.expectedReturns?.taxableBrokerage,
+      DEFAULT_BASIC_FORM_VALUES.expectedReturnBrokerage,
+    ),
+    expectedReturnHsa: percentageNumber(
+      payload.scenario.expectedReturns?.hsa,
+      DEFAULT_BASIC_FORM_VALUES.expectedReturnHsa,
+    ),
+    brokerageDividendYield: percentageNumber(
+      payload.scenario.brokerageDividends?.annualYield,
+      DEFAULT_BASIC_FORM_VALUES.brokerageDividendYield,
+    ),
+    brokerageQdiPercentage: percentageNumber(
+      payload.scenario.brokerageDividends?.qdiPercentage,
+      DEFAULT_BASIC_FORM_VALUES.brokerageQdiPercentage,
+    ),
     healthcarePhase: healthcarePhaseForYear(payload.scenario, startYear),
   };
 }
@@ -400,6 +460,85 @@ function scenarioWithoutCustomLaw(scenario: Scenario): Scenario {
   return scenarioWithoutOverride;
 }
 
+function normalizeProjectionInputState(input: ProjectionInputState): ProjectionInputState {
+  const scenario = normalizeScenario(input.scenario);
+
+  return {
+    ...input,
+    scenario,
+  };
+}
+
+function normalizeScenario(scenario: Scenario): Scenario {
+  const mortgage = normalizedMortgage(scenario);
+  const brokerageDividends = normalizedBrokerageDividends(scenario);
+  const autoDepleteBrokerage = normalizedAutoDepleteBrokerage(scenario);
+  const {
+    autoDepleteBrokerage: _ignoredAutoDepleteBrokerage,
+    brokerageDividends: _ignoredBrokerageDividends,
+    mortgage: _ignoredMortgage,
+    ...scenarioWithoutMortgage
+  } = scenario;
+
+  return {
+    ...scenarioWithoutMortgage,
+    balances: {
+      cash: nonnegativeNumber(scenario.balances?.cash, 0),
+      hsa: nonnegativeNumber(scenario.balances?.hsa, 0),
+      taxableBrokerage: nonnegativeNumber(scenario.balances?.taxableBrokerage, 0),
+      traditional: nonnegativeNumber(scenario.balances?.traditional, 0),
+      roth: nonnegativeNumber(scenario.balances?.roth, 0),
+    },
+    ...(mortgage === undefined ? {} : { mortgage }),
+    ...(brokerageDividends === undefined ? {} : { brokerageDividends }),
+    ...(autoDepleteBrokerage === undefined ? {} : { autoDepleteBrokerage }),
+  };
+}
+
+function normalizedMortgage(scenario: Scenario): Scenario['mortgage'] | undefined {
+  const annualPI = nonnegativeNumberOrNull(scenario.mortgage?.annualPI);
+  const payoffYear = finiteIntegerOrNull(scenario.mortgage?.payoffYear);
+
+  if (annualPI === null || annualPI <= 0 || payoffYear === null || payoffYear <= 0) {
+    return undefined;
+  }
+
+  return { annualPI, payoffYear };
+}
+
+function normalizedBrokerageDividends(scenario: Scenario): Scenario['brokerageDividends'] | undefined {
+  const annualYield = nonnegativeNumberOrNull(scenario.brokerageDividends?.annualYield);
+  const qdiPercentage = percentageNumberOrNull(scenario.brokerageDividends?.qdiPercentage);
+
+  if (annualYield === null || annualYield <= 0 || qdiPercentage === null) {
+    return undefined;
+  }
+
+  return { annualYield, qdiPercentage };
+}
+
+function normalizedAutoDepleteBrokerage(scenario: Scenario): Scenario['autoDepleteBrokerage'] | undefined {
+  if (scenario.autoDepleteBrokerage?.enabled !== true) {
+    return undefined;
+  }
+
+  const yearsToDeplete = finiteIntegerOrNull(scenario.autoDepleteBrokerage.yearsToDeplete);
+  const annualScaleUpFactor = percentageNumberOrNull(scenario.autoDepleteBrokerage.annualScaleUpFactor);
+  const retirementYear = finiteIntegerOrNull(scenario.autoDepleteBrokerage.retirementYear);
+
+  if (yearsToDeplete === null || yearsToDeplete <= 0 || annualScaleUpFactor === null) {
+    return undefined;
+  }
+
+  return {
+    enabled: true,
+    yearsToDeplete,
+    annualScaleUpFactor,
+    excludeMortgageFromRate: scenario.autoDepleteBrokerage.excludeMortgageFromRate === true,
+    ...(retirementYear === null ? {} : { retirementYear }),
+  };
+}
+
 function sanitizeBasicFormValues(value: unknown): BasicFormValues {
   const candidate = isRecord(value) ? value : {};
   const primaryAge = boundedInteger(candidate.primaryAge, DEFAULT_BASIC_FORM_VALUES.primaryAge, 0, 120);
@@ -414,6 +553,11 @@ function sanitizeBasicFormValues(value: unknown): BasicFormValues {
     retirementYear: boundedInteger(candidate.retirementYear, DEFAULT_BASIC_FORM_VALUES.retirementYear, 1900, 2300),
     planEndAge,
     annualSpendingToday: nonnegativeNumber(candidate.annualSpendingToday, DEFAULT_BASIC_FORM_VALUES.annualSpendingToday),
+    annualMortgagePAndI: nonnegativeNumber(
+      candidate.annualMortgagePAndI,
+      DEFAULT_BASIC_FORM_VALUES.annualMortgagePAndI,
+    ),
+    mortgagePayoffYear: boundedInteger(candidate.mortgagePayoffYear, DEFAULT_BASIC_FORM_VALUES.mortgagePayoffYear, 0, 2300),
     annualW2Income: nonnegativeNumber(candidate.annualW2Income, DEFAULT_BASIC_FORM_VALUES.annualW2Income),
     annualConsultingIncome: nonnegativeNumber(
       candidate.annualConsultingIncome,
@@ -442,8 +586,41 @@ function sanitizeBasicFormValues(value: unknown): BasicFormValues {
       candidate.taxableBrokerageBasis,
       DEFAULT_BASIC_FORM_VALUES.taxableBrokerageBasis,
     ),
+    hsaBalance: nonnegativeNumber(candidate.hsaBalance, DEFAULT_BASIC_FORM_VALUES.hsaBalance),
     traditionalBalance: nonnegativeNumber(candidate.traditionalBalance, DEFAULT_BASIC_FORM_VALUES.traditionalBalance),
     rothBalance: nonnegativeNumber(candidate.rothBalance, DEFAULT_BASIC_FORM_VALUES.rothBalance),
+    autoDepleteBrokerageEnabled:
+      typeof candidate.autoDepleteBrokerageEnabled === 'boolean'
+        ? candidate.autoDepleteBrokerageEnabled
+        : DEFAULT_BASIC_FORM_VALUES.autoDepleteBrokerageEnabled,
+    autoDepleteBrokerageYears: boundedInteger(
+      candidate.autoDepleteBrokerageYears,
+      DEFAULT_BASIC_FORM_VALUES.autoDepleteBrokerageYears,
+      1,
+      120,
+    ),
+    autoDepleteBrokerageAnnualScaleUpFactor: percentageNumber(
+      candidate.autoDepleteBrokerageAnnualScaleUpFactor,
+      DEFAULT_BASIC_FORM_VALUES.autoDepleteBrokerageAnnualScaleUpFactor,
+    ),
+    expectedReturnTraditional: percentageNumber(
+      candidate.expectedReturnTraditional,
+      DEFAULT_BASIC_FORM_VALUES.expectedReturnTraditional,
+    ),
+    expectedReturnRoth: percentageNumber(candidate.expectedReturnRoth, DEFAULT_BASIC_FORM_VALUES.expectedReturnRoth),
+    expectedReturnBrokerage: percentageNumber(
+      candidate.expectedReturnBrokerage,
+      DEFAULT_BASIC_FORM_VALUES.expectedReturnBrokerage,
+    ),
+    expectedReturnHsa: percentageNumber(candidate.expectedReturnHsa, DEFAULT_BASIC_FORM_VALUES.expectedReturnHsa),
+    brokerageDividendYield: percentageNumber(
+      candidate.brokerageDividendYield,
+      DEFAULT_BASIC_FORM_VALUES.brokerageDividendYield,
+    ),
+    brokerageQdiPercentage: percentageNumber(
+      candidate.brokerageQdiPercentage,
+      DEFAULT_BASIC_FORM_VALUES.brokerageQdiPercentage,
+    ),
     healthcarePhase: isHealthcarePhase(candidate.healthcarePhase)
       ? candidate.healthcarePhase
       : DEFAULT_BASIC_FORM_VALUES.healthcarePhase,
@@ -486,6 +663,18 @@ function nonnegativeNumber(value: unknown, fallback: number): number {
 
 function nonnegativeNumberOrNull(value: unknown): number | null {
   return typeof value === 'number' && Number.isFinite(value) ? Math.max(0, value) : null;
+}
+
+function percentageNumber(value: unknown, fallback: number): number {
+  return percentageNumberOrNull(value) ?? fallback;
+}
+
+function percentageNumberOrNull(value: unknown): number | null {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return null;
+  }
+
+  return Math.min(1, Math.max(0, value));
 }
 
 function isStarterStateCode(value: unknown): value is BasicStarterStateCode {

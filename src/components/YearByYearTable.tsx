@@ -106,6 +106,12 @@ const TABLE_COLUMNS: readonly TableColumn[] = [
     getCell: (row, context) => moneyCell(row.breakdown.closingBalances.roth, row.breakdown.year, context),
   },
   {
+    id: 'hsaBalance',
+    band: 'Balances',
+    label: 'HSA',
+    getCell: (row, context) => moneyCell(row.breakdown.closingBalances.hsa, row.breakdown.year, context),
+  },
+  {
     id: 'taxableBrokerageBalance',
     band: 'Balances',
     label: 'Taxable',
@@ -130,9 +136,14 @@ const TABLE_COLUMNS: readonly TableColumn[] = [
     getCell: (row, context) => moneyCell(row.breakdown.brokerageBasis.closing, row.breakdown.year, context),
   },
   {
-    id: 'wages',
+    id: 'spending',
     band: 'Income',
     dividerBefore: true,
+    getCell: (row, context) => moneyCell(row.breakdown.spending, row.breakdown.year, context),
+  },
+  {
+    id: 'wages',
+    band: 'Income',
     getCell: (row, context) => optionalMoneyCell(row.metrics.wages, row.breakdown.year, context),
   },
   {

@@ -17,6 +17,7 @@ const DOLLAR_FORMATTER = new Intl.NumberFormat('en-US', {
 
 const ZERO_BALANCES: AccountBalances = {
   cash: 0,
+  hsa: 0,
   taxableBrokerage: 0,
   traditional: 0,
   roth: 0,
@@ -128,8 +129,8 @@ describe('LiveStatsStrip', () => {
       });
     });
 
-    expect(within(statCell('net-worth-at-retirement')).getByText('$150,000')).toBeInTheDocument();
-    expect(within(statCell('plan-end-balance')).getByText('$150,000')).toBeInTheDocument();
+    expect(within(statCell('net-worth-at-retirement')).getByText('$165,375')).toBeInTheDocument();
+    expect(within(statCell('plan-end-balance')).getByText('$182,326')).toBeInTheDocument();
     expect(within(statCell('years-funded')).getByText('2 years')).toBeInTheDocument();
     expect(statCell('net-worth-at-retirement')).toHaveClass('bg-yellow-100', 'transition-colors', 'duration-700');
     expect(screen.queryByText(/\+|\u2212|delta/i)).not.toBeInTheDocument();
@@ -144,7 +145,7 @@ describe('LiveStatsStrip', () => {
       useUiStore.getState().setDisplayUnit('real');
     });
 
-    const expectedRealRetirementBalance = DOLLAR_FORMATTER.format(toReal(150_000, 2028, 2026, 0.03));
+    const expectedRealRetirementBalance = DOLLAR_FORMATTER.format(toReal(165_375, 2028, 2026, 0.03));
 
     expect(within(statCell('net-worth-at-retirement')).getByText(expectedRealRetirementBalance)).toBeInTheDocument();
     expect(statCell('net-worth-at-retirement')).not.toHaveClass('bg-yellow-100');
@@ -175,12 +176,14 @@ describe('LiveStatsStrip', () => {
           agi: 65_000,
           closingBalances: {
             cash: 45_000,
+            hsa: 0,
             taxableBrokerage: 50_000,
             traditional: 0,
             roth: 0,
           },
           openingBalances: {
             cash: 50_000,
+            hsa: 0,
             taxableBrokerage: 50_000,
             traditional: 0,
             roth: 0,
@@ -188,6 +191,7 @@ describe('LiveStatsStrip', () => {
           totalTax: 4_000,
           withdrawals: {
             cash: 5_000,
+            hsa: 0,
             taxableBrokerage: 0,
             traditional: 0,
             roth: 0,

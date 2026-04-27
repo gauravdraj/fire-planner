@@ -11,6 +11,7 @@ import { installMemoryLocalStorage } from '../store/memoryStorage';
 
 const ZERO_BALANCES: AccountBalances = {
   cash: 0,
+  hsa: 0,
   taxableBrokerage: 0,
   traditional: 0,
   roth: 0,
@@ -23,6 +24,7 @@ const TABLE_FIXTURE = [
     acaMagi: 55_000,
     closingBalances: {
       cash: 20_000,
+      hsa: 0,
       taxableBrokerage: 80_000,
       traditional: 60_000,
       roth: 40_000,
@@ -56,6 +58,7 @@ const TABLE_FIXTURE = [
     },
     closingBalances: {
       cash: 5_000,
+      hsa: 15_000,
       taxableBrokerage: 55_000,
       traditional: 90_000,
       roth: 40_000,
@@ -63,11 +66,13 @@ const TABLE_FIXTURE = [
     conversions: 12_000,
     federalTax: 5_000,
     ltcgTax: 100,
+    spending: 70_000,
     stateTax: 900,
     taxableSocialSecurity: 8_000,
     totalTax: 6_000,
     withdrawals: {
       cash: 0,
+      hsa: 0,
       taxableBrokerage: 4_000,
       traditional: 6_000,
       roth: 0,
@@ -80,6 +85,7 @@ const TABLE_FIXTURE = [
     acaMagi: 80_000,
     closingBalances: {
       cash: 0,
+      hsa: 20_000,
       taxableBrokerage: 40_000,
       traditional: 80_000,
       roth: 45_000,
@@ -98,6 +104,7 @@ const TABLE_FIXTURE = [
     totalTax: 10_000,
     withdrawals: {
       cash: 0,
+      hsa: 0,
       taxableBrokerage: 8_000,
       traditional: 8_000,
       roth: 0,
@@ -212,7 +219,7 @@ describe('YearByYearTable', () => {
 
     const bandHeaders = Array.from(container.querySelectorAll('thead tr:first-child th'));
     expect(bandHeaders.map((header) => header.textContent)).toEqual(['Identity', 'Balances', 'Income', 'Tax', 'KPIs']);
-    expect(bandHeaders.map((header) => header.getAttribute('colspan'))).toEqual(['3', '6', '7', '6', '6']);
+    expect(bandHeaders.map((header) => header.getAttribute('colspan'))).toEqual(['3', '7', '8', '6', '6']);
 
     expect(screen.getByRole('columnheader', { name: 'Year' })).toHaveClass('sticky', 'left-0');
     expect(screen.getByRole('columnheader', { name: 'Age' })).toHaveClass('sticky', 'left-20');
@@ -220,6 +227,7 @@ describe('YearByYearTable', () => {
     expect(screen.getByRole('columnheader', { name: 'Age' })).toBeInTheDocument();
     expect(headerFor('Trad')).toHaveClass('border-l');
     expect(headerFor('Roth')).toBeInTheDocument();
+    expect(headerFor('HSA')).toBeInTheDocument();
     expect(headerFor('Taxable')).toBeInTheDocument();
     expect(headerFor('Cash')).toBeInTheDocument();
     expect(headerFor('Total')).toBeInTheDocument();
@@ -247,7 +255,7 @@ describe('YearByYearTable', () => {
     const secondHeaderRow = container.querySelector('thead tr:nth-child(2)');
 
     expect(secondHeaderRow).not.toBeNull();
-    expect(within(secondHeaderRow as HTMLElement).getAllByRole('button', { name: /About / })).toHaveLength(28);
+    expect(within(secondHeaderRow as HTMLElement).getAllByRole('button', { name: /About / })).toHaveLength(30);
 
     fireEvent.focus(screen.getByRole('button', { name: 'About ACA MAGI' }));
     expect(
@@ -268,10 +276,12 @@ describe('YearByYearTable', () => {
     expect(cellFor(2027, 'phase')).toHaveTextContent('Bridge');
     expect(cellFor(2027, 'traditionalBalance')).toHaveTextContent('$90,000');
     expect(cellFor(2027, 'rothBalance')).toHaveTextContent('$40,000');
+    expect(cellFor(2027, 'hsaBalance')).toHaveTextContent('$15,000');
     expect(cellFor(2027, 'taxableBrokerageBalance')).toHaveTextContent('$55,000');
     expect(cellFor(2027, 'cashBalance')).toHaveTextContent('$5,000');
-    expect(cellFor(2027, 'endingBalance')).toHaveTextContent('$190,000');
+    expect(cellFor(2027, 'endingBalance')).toHaveTextContent('$205,000');
     expect(cellFor(2027, 'brokerageBasisRemaining')).toHaveTextContent('$45,000');
+    expect(cellFor(2027, 'spending')).toHaveTextContent('$70,000');
     expect(cellFor(2027, 'wages')).toHaveTextContent('$45,000');
     expect(cellFor(2027, 'taxableSocialSecurity')).toHaveTextContent('$8,000');
     expect(cellFor(2027, 'traditionalWithdrawals')).toHaveTextContent('$6,000');
@@ -312,7 +322,7 @@ describe('YearByYearTable', () => {
 
     expect(cellFor(2027, 'traditionalBalance')).toHaveTextContent('$87,379');
     expect(cellFor(2027, 'agi')).toHaveTextContent('$63,107');
-    expect(cellFor(2027, 'endingBalance')).toHaveTextContent('$184,466');
+    expect(cellFor(2027, 'endingBalance')).toHaveTextContent('$199,029');
 
     cleanup();
     useUiStore.getState().setDisplayUnit('nominal');
@@ -321,7 +331,7 @@ describe('YearByYearTable', () => {
 
     expect(cellFor(2027, 'traditionalBalance')).toHaveTextContent('$90,000');
     expect(cellFor(2027, 'agi')).toHaveTextContent('$65,000');
-    expect(cellFor(2027, 'endingBalance')).toHaveTextContent('$190,000');
+    expect(cellFor(2027, 'endingBalance')).toHaveTextContent('$205,000');
   });
 
   it('colors threshold KPI cells, highlights the retirement row, and marks near federal brackets', () => {

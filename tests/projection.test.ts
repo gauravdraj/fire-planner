@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
+import { computeAutoDepleteSchedule } from '@/core/autoDepleteBrokerage';
 import { CONSTANTS_2026 } from '@/core/constants/2026';
 import { FLORIDA_STATE_TAX } from '@/core/constants/states/florida';
+import { PENNSYLVANIA_STATE_TAX } from '@/core/constants/states/pennsylvania';
 import { indexBracketsForYear, runProjection, type Scenario, type WithdrawalPlan } from '@/core/projection';
 import { getFPLForCoverageYear } from '@/core/tax/aca';
 
@@ -18,6 +20,7 @@ function makeScenario(overrides: Partial<Scenario> = {}): Scenario {
     state: { incomeTaxLaw: FLORIDA_STATE_TAX },
     balances: {
       cash: 0,
+      hsa: 0,
       taxableBrokerage: 0,
       traditional: 0,
       roth: 0,
@@ -126,6 +129,7 @@ describe('Gate 2 multi-year projection engine', () => {
         ],
         balances: {
           cash: 5_000,
+          hsa: 0,
           taxableBrokerage: 100_000,
           traditional: 0,
           roth: 0,
@@ -141,6 +145,7 @@ describe('Gate 2 multi-year projection engine', () => {
 
     expect(year?.withdrawals).toMatchObject({
       cash: 5_000,
+      hsa: 0,
       taxableBrokerage: 5_000,
       traditional: 0,
       roth: 0,
@@ -158,6 +163,7 @@ describe('Gate 2 multi-year projection engine', () => {
     const scenario = makeScenario({
       balances: {
         cash: 5_000,
+        hsa: 0,
         taxableBrokerage: 100_000,
         traditional: 50_000,
         roth: 25_000,
@@ -186,6 +192,7 @@ describe('Gate 2 multi-year projection engine', () => {
       makeScenario({
         balances: {
           cash: 0,
+          hsa: 0,
           taxableBrokerage: 100_000,
           traditional: 50_000,
           roth: 0,
@@ -202,6 +209,7 @@ describe('Gate 2 multi-year projection engine', () => {
 
     expect(year?.withdrawals).toEqual({
       cash: 0,
+      hsa: 0,
       taxableBrokerage: 0,
       traditional: 0,
       roth: 0,
@@ -217,11 +225,344 @@ describe('Gate 2 multi-year projection engine', () => {
     });
     expect(year?.closingBalances).toEqual({
       cash: 0,
+      hsa: 0,
       taxableBrokerage: 100_000,
       traditional: 40_000,
       roth: 10_000,
     });
     expect(year?.ltcgTax).toBe(0);
+  });
+
+  it('treats HSA withdrawals as qualified tax-free withdrawals with expected returns', () => {
+    const [year] = runProjection(
+      makeScenario({
+        balances: {
+          cash: 0,
+          hsa: 50_000,
+          taxableBrokerage: 0,
+          traditional: 0,
+          roth: 0,
+        },
+        expectedReturns: {
+          hsa: 0.05,
+        },
+      }),
+      makePlan({
+        annualSpending: [{ year: 2026, amount: 20_000 }],
+      }),
+    );
+
+    expect(year?.withdrawals).toEqual({
+      cash: 0,
+      hsa: 20_000,
+      taxableBrokerage: 0,
+      traditional: 0,
+      roth: 0,
+    });
+    expect(year?.gainsOrLosses.hsa).toBe(2_500);
+    expect(year?.closingBalances.hsa).toBe(32_500);
+    expect(year?.agi).toBe(0);
+    expect(year?.acaMagi).toBe(0);
+    expect(year?.irmaaMagi).toBe(0);
+    expect(year?.totalTax).toBe(0);
+  });
+
+  it('adds mortgage P&I as fixed spending through payoff year without inflating it', () => {
+    const results = runProjection(
+      makeScenario({
+        mortgage: {
+          annualPI: 12_000,
+          payoffYear: 2027,
+        },
+        balances: {
+          cash: 500_000,
+          hsa: 0,
+          taxableBrokerage: 0,
+          traditional: 0,
+          roth: 0,
+        },
+      }),
+      makePlan({
+        endYear: 2028,
+        annualSpending: [
+          { year: 2026, amount: 100_000 },
+          { year: 2027, amount: 103_000 },
+          { year: 2028, amount: 106_090 },
+        ],
+      }),
+    );
+
+    expect(results.map((year) => year.spending)).toEqual([112_000, 115_000, 106_090]);
+    expect(results.map((year) => year.withdrawals.cash)).toEqual([112_000, 115_000, 106_090]);
+  });
+
+  it('generates brokerage dividends from opening taxable brokerage and splits qualified dividends', () => {
+    const [year] = runProjection(
+      makeScenario({
+        balances: {
+          cash: 0,
+          hsa: 0,
+          taxableBrokerage: 100_000,
+          traditional: 0,
+          roth: 0,
+        },
+        basis: {
+          taxableBrokerage: 100_000,
+        },
+        brokerageDividends: {
+          annualYield: 0.02,
+          qdiPercentage: 0.95,
+        },
+      }),
+      makePlan(),
+    );
+
+    expect(year?.brokerageDividends).toEqual({
+      ordinary: 100,
+      qualified: 1_900,
+      total: 2_000,
+      afterTaxReinvested: 2_000,
+    });
+    expect(year?.agi).toBe(2_000);
+    expect(year?.closingBalances.taxableBrokerage).toBe(102_000);
+    expect(year?.brokerageBasis.closing).toBe(102_000);
+  });
+
+  it('treats brokerage expected return as price appreciation when dividend yield is modeled', () => {
+    const [year] = runProjection(
+      makeScenario({
+        balances: {
+          cash: 0,
+          hsa: 0,
+          taxableBrokerage: 100_000,
+          traditional: 0,
+          roth: 0,
+        },
+        basis: {
+          taxableBrokerage: 100_000,
+        },
+        expectedReturns: {
+          taxableBrokerage: 0.05,
+        },
+        brokerageDividends: {
+          annualYield: 0.02,
+          qdiPercentage: 0.95,
+        },
+      }),
+      makePlan(),
+    );
+
+    expect(year?.gainsOrLosses.taxableBrokerage).toBe(5_000);
+    expect(year?.brokerageDividends?.afterTaxReinvested).toBe(2_000);
+    expect(year?.closingBalances.taxableBrokerage).toBe(107_000);
+    expect(year?.brokerageBasis.closing).toBe(102_000);
+  });
+
+  it('applies auto-deplete brokerage draws as forced taxable brokerage withdrawals before HSA allocation', () => {
+    const expectedDraw = computeAutoDepleteSchedule(400_000, 10, 0.02, 0.05)[0]!;
+    const [year] = runProjection(
+      makeScenario({
+        balances: {
+          cash: 0,
+          hsa: 100_000,
+          taxableBrokerage: 400_000,
+          traditional: 0,
+          roth: 0,
+        },
+        basis: {
+          taxableBrokerage: 400_000,
+        },
+        expectedReturns: {
+          taxableBrokerage: 0.05,
+        },
+        autoDepleteBrokerage: {
+          enabled: true,
+          yearsToDeplete: 10,
+          annualScaleUpFactor: 0.02,
+          excludeMortgageFromRate: false,
+          retirementYear: 2026,
+        },
+      }),
+      makePlan({
+        annualSpending: [{ year: 2026, amount: 60_000 }],
+      }),
+    );
+
+    expect(year?.withdrawals.taxableBrokerage).toBeCloseTo(expectedDraw, 2);
+    expect(year?.withdrawals.hsa).toBeCloseTo(60_000 - expectedDraw, 2);
+    expect(year?.withdrawals.traditional).toBe(0);
+    expect(year?.agi).toBe(0);
+  });
+
+  it('keeps unused auto-deplete brokerage proceeds in cash', () => {
+    const [year] = runProjection(
+      makeScenario({
+        balances: {
+          cash: 0,
+          hsa: 100_000,
+          taxableBrokerage: 400_000,
+          traditional: 0,
+          roth: 0,
+        },
+        basis: {
+          taxableBrokerage: 400_000,
+        },
+        expectedReturns: {
+          taxableBrokerage: 0.05,
+        },
+        autoDepleteBrokerage: {
+          enabled: true,
+          yearsToDeplete: 10,
+          annualScaleUpFactor: 0.02,
+          excludeMortgageFromRate: false,
+          retirementYear: 2026,
+        },
+      }),
+      makePlan({
+        annualSpending: [{ year: 2026, amount: 10_000 }],
+      }),
+    );
+
+    expect(year?.withdrawals.taxableBrokerage).toBeGreaterThan(40_000);
+    expect(year?.withdrawals.hsa).toBe(0);
+    expect(year?.closingBalances.cash).toBeGreaterThan(30_000);
+  });
+
+  it('starts auto-deplete brokerage at retirement year when the scenario starts earlier', () => {
+    const results = runProjection(
+      makeScenario({
+        startYear: 2026,
+        balances: {
+          cash: 0,
+          hsa: 0,
+          taxableBrokerage: 400_000,
+          traditional: 0,
+          roth: 0,
+        },
+        basis: {
+          taxableBrokerage: 400_000,
+        },
+        expectedReturns: {
+          taxableBrokerage: 0.05,
+        },
+        autoDepleteBrokerage: {
+          enabled: true,
+          yearsToDeplete: 10,
+          annualScaleUpFactor: 0.02,
+          excludeMortgageFromRate: false,
+          retirementYear: 2028,
+        },
+      }),
+      makePlan({ endYear: 2028 }),
+    );
+
+    expect(results.map((year) => year.withdrawals.taxableBrokerage)).toEqual([0, 0, expect.any(Number)]);
+    expect(results[2]?.withdrawals.taxableBrokerage).toBeGreaterThan(0);
+  });
+
+  it('depletes brokerage near zero around the tenth auto-deplete year', () => {
+    const results = runProjection(
+      makeScenario({
+        startYear: 2026,
+        balances: {
+          cash: 0,
+          hsa: 0,
+          taxableBrokerage: 400_000,
+          traditional: 0,
+          roth: 0,
+        },
+        basis: {
+          taxableBrokerage: 400_000,
+        },
+        expectedReturns: {
+          taxableBrokerage: 0.05,
+        },
+        autoDepleteBrokerage: {
+          enabled: true,
+          yearsToDeplete: 10,
+          annualScaleUpFactor: 0.02,
+          excludeMortgageFromRate: false,
+          retirementYear: 2026,
+        },
+      }),
+      makePlan({ endYear: 2035 }),
+    );
+
+    expect(results).toHaveLength(10);
+    expect(results[0]?.withdrawals.taxableBrokerage).toBeGreaterThan(0);
+    expect(results[0]?.warnings).toEqual([]);
+    expect(results[9]?.closingBalances.taxableBrokerage).toBeLessThan(1);
+  });
+
+  it('adds generated qualified dividends to the static qualified-dividend schedule', () => {
+    const [year] = runProjection(
+      makeScenario({
+        w2Income: [{ year: 2026, amount: 80_000 }],
+        qualifiedDividends: [{ year: 2026, amount: 1_000 }],
+        balances: {
+          cash: 0,
+          hsa: 0,
+          taxableBrokerage: 100_000,
+          traditional: 0,
+          roth: 0,
+        },
+        basis: {
+          taxableBrokerage: 100_000,
+        },
+        brokerageDividends: {
+          annualYield: 0.02,
+          qdiPercentage: 0.5,
+        },
+      }),
+      makePlan(),
+    );
+
+    expect(year?.brokerageDividends).toMatchObject({
+      ordinary: 1_000,
+      qualified: 1_000,
+      total: 2_000,
+    });
+    expect(year?.agi).toBe(83_000);
+    expect(year?.ltcgTax).toBe(300);
+  });
+
+  it.each([
+    ['AGI', (year: NonNullable<ReturnType<typeof runProjection>[number]>) => year.agi],
+    ['ACA MAGI', (year: NonNullable<ReturnType<typeof runProjection>[number]>) => year.acaMagi],
+    ['IRMAA MAGI', (year: NonNullable<ReturnType<typeof runProjection>[number]>) => year.irmaaMagi],
+    ['taxable Social Security', (year: NonNullable<ReturnType<typeof runProjection>[number]>) => year.taxableSocialSecurity],
+    ['federal tax', (year: NonNullable<ReturnType<typeof runProjection>[number]>) => year.federalTax],
+    ['state tax', (year: NonNullable<ReturnType<typeof runProjection>[number]>) => year.stateTax],
+    ['LTCG tax', (year: NonNullable<ReturnType<typeof runProjection>[number]>) => year.ltcgTax],
+    ['NIIT', (year: NonNullable<ReturnType<typeof runProjection>[number]>) => year.niit],
+    ['SE tax', (year: NonNullable<ReturnType<typeof runProjection>[number]>) => year.seTax],
+    ['QBI deduction', (year: NonNullable<ReturnType<typeof runProjection>[number]>) => year.qbiDeduction],
+    ['total tax', (year: NonNullable<ReturnType<typeof runProjection>[number]>) => year.totalTax],
+    ['brokerage realized gain', (year: NonNullable<ReturnType<typeof runProjection>[number]>) => year.brokerageBasis.realizedGainOrLoss],
+    ['brokerage basis sold', (year: NonNullable<ReturnType<typeof runProjection>[number]>) => year.brokerageBasis.sold],
+  ])('keeps qualified HSA withdrawals out of %s', (_label, getValue) => {
+    const hsaScenario = makeScenario({
+      consultingIncome: [{ year: 2026, amount: 10_000, sstb: false }],
+      socialSecurity: { claimYear: 2026, annualBenefit: 18_000 },
+      state: { incomeTaxLaw: PENNSYLVANIA_STATE_TAX },
+      taxableInterest: [{ year: 2026, amount: 20_000 }],
+    });
+    const [baselineYear] = runProjection(hsaScenario, makePlan());
+    const [hsaWithdrawalYear] = runProjection(
+      {
+        ...hsaScenario,
+        balances: {
+          ...hsaScenario.balances,
+          hsa: 100_000,
+        },
+      },
+      makePlan({
+        annualSpending: [{ year: 2026, amount: 100_000 }],
+      }),
+    );
+
+    expect(hsaWithdrawalYear?.withdrawals.hsa).toBeGreaterThan(0);
+    expect(getValue(hsaWithdrawalYear!)).toBe(getValue(baselineYear!));
   });
 
   it('appends annual IRMAA MAGI so later Medicare years use lagged projection history', () => {

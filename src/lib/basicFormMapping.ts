@@ -26,6 +26,8 @@ export type BasicFormValues = Readonly<{
   retirementYear: number;
   planEndAge: number;
   annualSpendingToday: number;
+  annualMortgagePAndI: number;
+  mortgagePayoffYear: number;
   annualW2Income: number;
   annualConsultingIncome: number;
   annualRentalIncome: number;
@@ -34,8 +36,18 @@ export type BasicFormValues = Readonly<{
   annualPensionOrAnnuityIncome: number;
   brokerageAndCashBalance: number;
   taxableBrokerageBasis: number;
+  hsaBalance: number;
   traditionalBalance: number;
   rothBalance: number;
+  autoDepleteBrokerageEnabled: boolean;
+  autoDepleteBrokerageYears: number;
+  autoDepleteBrokerageAnnualScaleUpFactor: number;
+  expectedReturnTraditional: number;
+  expectedReturnRoth: number;
+  expectedReturnBrokerage: number;
+  expectedReturnHsa: number;
+  brokerageDividendYield: number;
+  brokerageQdiPercentage: number;
   healthcarePhase: BasicHealthcarePhase;
 }>;
 
@@ -48,11 +60,18 @@ export const BASIC_FORM_MAPPING_DEFAULTS = Object.freeze({
   inflationRate: 0.03,
   expectedReturns: Object.freeze({
     cash: 0,
-    taxableBrokerage: 0,
-    traditional: 0,
-    roth: 0,
+    hsa: 0.05,
+    taxableBrokerage: 0.05,
+    traditional: 0.05,
+    roth: 0.05,
   } satisfies AccountReturns),
   acaAnnualBenchmarkPremium: 0,
+  brokerageQdiPercentage: 0.95,
+  autoDepleteBrokerage: Object.freeze({
+    yearsToDeplete: 10,
+    annualScaleUpFactor: 0.02,
+    excludeMortgageFromRate: false,
+  }),
   magiHistory: Object.freeze([] as MagiYear[]),
 });
 
@@ -74,6 +93,8 @@ const STATE_LAWS = Object.freeze({
  *   flags; the engine does not yet model a per-year age schedule.
  * - spending starts in today's dollars and is inflated annually at the scenario
  *   inflation rate.
+ * - mortgage principal and interest maps to scenario mortgage assumptions; the
+ *   engine adds it separately as fixed nominal spending through payoff year.
  * - W-2 and consulting income run through the year before retirement, then zero.
  * - consulting defaults to non-SSTB with zero W-2 wages and UBIA.
  * - rental income is treated as materially participating because the engine uses
@@ -81,7 +102,13 @@ const STATE_LAWS = Object.freeze({
  * - the combined pension/annuity field maps to pension income; annuity stays zero.
  * - brokerage plus cash maps to taxable brokerage; engine cash starts at zero.
  * - taxable basis maps to taxable brokerage basis.
- * - HSA is deliberately absent because the engine has no HSA balance bucket.
+ * - HSA maps to the qualified-withdrawal HSA balance bucket.
+ * - visible expected-return fields map directly to modeled buckets; cash return
+ *   stays internal because basic mode starts with zero engine cash.
+ * - auto-deplete brokerage maps to a forced taxable brokerage draw schedule that
+ *   starts in the entered retirement year and runs before default allocation.
+ * - brokerage dividend yield is generated from opening taxable brokerage; when
+ *   it is non-zero, taxable brokerage expected return is price appreciation.
  */
 export function mapBasicFormToProjectionInputs(values: BasicFormValues): ProjectionInputs {
   const startYear = values.currentYear;
@@ -104,6 +131,7 @@ export function mapBasicFormToProjectionInputs(values: BasicFormValues): Project
     },
     balances: {
       cash: 0,
+      hsa: values.hsaBalance,
       taxableBrokerage: values.brokerageAndCashBalance,
       traditional: values.traditionalBalance,
       roth: values.rothBalance,
@@ -112,7 +140,40 @@ export function mapBasicFormToProjectionInputs(values: BasicFormValues): Project
       taxableBrokerage: values.taxableBrokerageBasis,
     },
     inflationRate,
-    expectedReturns: BASIC_FORM_MAPPING_DEFAULTS.expectedReturns,
+    expectedReturns: {
+      cash: BASIC_FORM_MAPPING_DEFAULTS.expectedReturns.cash,
+      hsa: values.expectedReturnHsa,
+      taxableBrokerage: values.expectedReturnBrokerage,
+      traditional: values.expectedReturnTraditional,
+      roth: values.expectedReturnRoth,
+    },
+    ...(values.brokerageDividendYield > 0
+      ? {
+          brokerageDividends: {
+            annualYield: values.brokerageDividendYield,
+            qdiPercentage: values.brokerageQdiPercentage,
+          },
+        }
+      : {}),
+    ...(values.annualMortgagePAndI > 0 && values.mortgagePayoffYear > 0
+      ? {
+          mortgage: {
+            annualPI: values.annualMortgagePAndI,
+            payoffYear: values.mortgagePayoffYear,
+          },
+        }
+      : {}),
+    ...(values.autoDepleteBrokerageEnabled
+      ? {
+          autoDepleteBrokerage: {
+            enabled: true,
+            yearsToDeplete: values.autoDepleteBrokerageYears,
+            annualScaleUpFactor: values.autoDepleteBrokerageAnnualScaleUpFactor,
+            excludeMortgageFromRate: BASIC_FORM_MAPPING_DEFAULTS.autoDepleteBrokerage.excludeMortgageFromRate,
+            retirementYear: values.retirementYear,
+          },
+        }
+      : {}),
     magiHistory: BASIC_FORM_MAPPING_DEFAULTS.magiHistory,
     age65Plus: values.primaryAge >= 65,
     ...(values.filingStatus === 'mfj' ? { partnerAge65Plus: values.partnerAge >= 65 } : {}),

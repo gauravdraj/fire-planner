@@ -43,6 +43,7 @@ function fillRealisticMfjScenario() {
   changeField('Roth balance', '750000');
   changeField('Brokerage plus cash balance', '1600000');
   changeField('Weighted-average taxable basis', '1200000');
+  changeField('HSA balance', '85000');
   changeField('W-2 income', '240000');
   changeField('Net consulting income', '20000');
   changeField('Net rental income', '18000');
@@ -229,6 +230,17 @@ describe('basic Gate 3 app flow', () => {
     expect(liveStats.some((stat) => stat.classList.contains('bg-yellow-100'))).toBe(true);
   }, 10_000);
 
+  it('updates plan-end balance after editing traditional expected return', async () => {
+    await renderFilledRealisticPlannerWithFakeTimers();
+
+    const planEndBalanceBefore = numericMoney(liveStatValue('plan-end-balance'));
+
+    changeField('Traditional expected return', '0');
+    advanceLiveDebounce();
+
+    expect(numericMoney(liveStatValue('plan-end-balance'))).toBeLessThan(planEndBalanceBefore);
+  }, 10_000);
+
   it('updates the retirement target derived chip after typing into the field', async () => {
     await renderFilledRealisticPlannerWithFakeTimers();
 
@@ -273,16 +285,25 @@ describe('basic Gate 3 app flow', () => {
     expect(bridgeFplMetric).toHaveClass(...expectedFplClassForPercent(bridgeFplValue));
   }, 10_000);
 
-  it('renders six basic-form fieldsets with the expected legends', async () => {
+  it('renders basic-form fieldsets with the expected legends', async () => {
     const { form } = await renderFilledRealisticPlanner();
     const fieldsets = Array.from(form.querySelectorAll('fieldset')) as HTMLElement[];
 
-    expect(fieldsets).toHaveLength(6);
+    expect(fieldsets).toHaveLength(8);
     expect(
       fieldsets.map((fieldset) =>
         within(fieldset).getByRole('button', { name: /About / }).getAttribute('aria-label')?.replace('About ', ''),
       ),
-    ).toEqual(['Household', 'Timeline', 'Spending', 'Accounts', 'Income', 'Healthcare']);
+    ).toEqual([
+      'Household',
+      'Timeline',
+      'Spending & debt',
+      'Accounts',
+      'Growth & dividends',
+      'Withdrawal strategy',
+      'Income',
+      'Healthcare',
+    ]);
   }, 10_000);
 
   it('renders at least twenty info tooltip glyphs across the planner page', async () => {

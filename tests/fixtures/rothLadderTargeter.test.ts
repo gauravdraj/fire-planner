@@ -56,6 +56,7 @@ function makeScenario(overrides: Partial<Scenario> = {}): Scenario {
     state: { incomeTaxLaw: FLORIDA_STATE_TAX },
     balances: {
       cash: 100_000,
+      hsa: 0,
       taxableBrokerage: 0,
       traditional: 250_000,
       roth: 0,

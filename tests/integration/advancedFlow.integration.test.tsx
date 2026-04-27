@@ -27,8 +27,11 @@ const OPERATOR_BASE_VALUES: BasicFormValues = {
   annualPensionOrAnnuityIncome: 0,
   brokerageAndCashBalance: 300_000,
   taxableBrokerageBasis: 250_000,
+  hsaBalance: 0,
   traditionalBalance: 800_000,
   rothBalance: 100_000,
+  brokerageDividendYield: 0,
+  brokerageQdiPercentage: 0.95,
   healthcarePhase: 'aca',
 };
 

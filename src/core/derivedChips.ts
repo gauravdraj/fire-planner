@@ -1,6 +1,7 @@
+import { computeAutoDepleteSchedule } from './autoDepleteBrokerage';
 import type { HealthcarePhase, Scenario, YearBreakdown } from './projection';
 import { getFPLForCoverageYear } from './tax/aca';
-import { computeFplBand, computeFplPercentage, type FplBand } from './metrics';
+import { computeFplBand, computeFplPercentage, pAndIBeforePayoff, type FplBand } from './metrics';
 
 type DerivedChipFormValues = Readonly<{
   currentYear: number;
@@ -8,12 +9,20 @@ type DerivedChipFormValues = Readonly<{
   retirementYear: number;
   planEndAge: number;
   annualSpendingToday: number;
+  annualMortgagePAndI: number;
+  mortgagePayoffYear: number;
+  brokerageAndCashBalance: number;
+  autoDepleteBrokerageEnabled: boolean;
+  autoDepleteBrokerageYears: number;
+  autoDepleteBrokerageAnnualScaleUpFactor: number;
+  expectedReturnBrokerage: number;
   socialSecurityClaimAge: number;
 }>;
 
 export type DerivedInputChips = Readonly<{
   retirementTarget: string;
   annualSpending: string;
+  mortgagePAndI: string;
   brokeragePlusCash: string;
   w2Income: string;
   socialSecurity: string;
@@ -30,6 +39,7 @@ export function deriveInputChips(input: DerivedInputChipInput): DerivedInputChip
   return {
     retirementTarget: deriveRetirementTargetChip(input.formValues),
     annualSpending: deriveAnnualSpendingChip(input.formValues, input.scenario),
+    mortgagePAndI: deriveMortgagePAndIChip(input.formValues, input.scenario),
     brokeragePlusCash: deriveBrokeragePlusCashChip(input.formValues, input.projectionResults),
     w2Income: deriveW2IncomeChip(input.formValues),
     socialSecurity: deriveSocialSecurityChip(input.formValues, input.scenario),
@@ -60,10 +70,43 @@ export function deriveAnnualSpendingChip(formValues: DerivedChipFormValues, scen
   return `Year 1 ${formatDollars(formValues.annualSpendingToday)} -> ${planEndYear} ${formatDollars(planEndSpending)}`;
 }
 
+export function deriveMortgagePAndIChip(formValues: DerivedChipFormValues, scenario: Scenario): string {
+  if (formValues.annualMortgagePAndI <= 0) {
+    return 'No mortgage modeled';
+  }
+
+  if (formValues.mortgagePayoffYear <= 0) {
+    return 'Set payoff year to model mortgage';
+  }
+
+  const currentYearPayment = pAndIBeforePayoff(scenario, formValues.currentYear);
+  if (currentYearPayment <= 0) {
+    return `Paid off in ${formValues.mortgagePayoffYear}`;
+  }
+
+  const remainingYears = formValues.mortgagePayoffYear - formValues.currentYear + 1;
+
+  return `${formatYears(remainingYears)} of payments through ${formValues.mortgagePayoffYear}`;
+}
+
 export function deriveBrokeragePlusCashChip(
   formValues: DerivedChipFormValues,
   projectionResults: readonly YearBreakdown[] | null | undefined,
 ): string {
+  if (formValues.autoDepleteBrokerageEnabled && formValues.autoDepleteBrokerageYears > 0) {
+    const schedule = computeAutoDepleteSchedule(
+      formValues.brokerageAndCashBalance,
+      formValues.autoDepleteBrokerageYears,
+      formValues.autoDepleteBrokerageAnnualScaleUpFactor,
+      formValues.expectedReturnBrokerage,
+    );
+    const firstWithdrawal = schedule[0] ?? 0;
+
+    return `Auto-depletes over ${formatYears(formValues.autoDepleteBrokerageYears)}; year-one draw ~${formatDollars(
+      firstWithdrawal,
+    )}`;
+  }
+
   if (projectionResults === null || projectionResults === undefined || projectionResults.length === 0) {
     return 'Years funded unavailable';
   }
@@ -95,7 +138,7 @@ export function deriveBrokeragePlusCashChip(
 
   return fundedThroughYear === null
     ? 'Years funded unavailable'
-    : `Lasts ~${formatYears(fundedYears)} at 0% growth (through ${fundedThroughYear})`;
+    : `Lasts ~${formatYears(fundedYears)} (through ${fundedThroughYear})`;
 }
 
 export function deriveW2IncomeChip(formValues: DerivedChipFormValues): string {

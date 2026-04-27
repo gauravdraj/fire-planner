@@ -21,12 +21,13 @@ type BalancesChartProps = {
   now?: Date | string;
 };
 
-type BalanceSeriesKey = 'traditional' | 'roth' | 'taxableBrokerage' | 'cash';
+type BalanceSeriesKey = 'traditional' | 'roth' | 'hsa' | 'taxableBrokerage' | 'cash';
 
 type BalanceChartPoint = Readonly<{
   year: number;
   traditional: number;
   roth: number;
+  hsa: number;
   taxableBrokerage: number;
   cash: number;
   total: number;
@@ -45,6 +46,7 @@ const BALANCE_SERIES: ReadonlyArray<{
 }> = [
   { key: 'traditional', label: 'Traditional', stroke: '#0f172a', fill: '#334155' },
   { key: 'roth', label: 'Roth', stroke: '#4338ca', fill: '#4f46e5' },
+  { key: 'hsa', label: 'HSA', stroke: '#047857', fill: '#10b981' },
   { key: 'taxableBrokerage', label: 'Taxable brokerage', stroke: '#64748b', fill: '#94a3b8' },
   { key: 'cash', label: 'Cash', stroke: '#94a3b8', fill: '#cbd5e1' },
 ];
@@ -136,6 +138,7 @@ export function buildBalancesChartData({
   return projectionResults.map((breakdown) => {
     const traditional = displayBalance(breakdown.closingBalances.traditional, breakdown.year, scenario, displayUnit);
     const roth = displayBalance(breakdown.closingBalances.roth, breakdown.year, scenario, displayUnit);
+    const hsa = displayBalance(breakdown.closingBalances.hsa, breakdown.year, scenario, displayUnit);
     const taxableBrokerage = displayBalance(
       breakdown.closingBalances.taxableBrokerage,
       breakdown.year,
@@ -148,9 +151,10 @@ export function buildBalancesChartData({
       year: breakdown.year,
       traditional,
       roth,
+      hsa,
       taxableBrokerage,
       cash,
-      total: traditional + roth + taxableBrokerage + cash,
+      total: traditional + roth + hsa + taxableBrokerage + cash,
     };
   });
 }

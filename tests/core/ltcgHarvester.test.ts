@@ -26,6 +26,7 @@ function makeScenario(overrides: Partial<Scenario> = {}): Scenario {
     state: { incomeTaxLaw: FLORIDA_STATE_TAX },
     balances: {
       cash: 100_000,
+      hsa: 0,
       taxableBrokerage: 200_000,
       traditional: 0,
       roth: 0,
@@ -88,6 +89,7 @@ describe('LTCG harvester core', () => {
     const scenario = makeScenario({
       balances: {
         cash: 0,
+        hsa: 0,
         taxableBrokerage: 200_000,
         traditional: 0,
         roth: 0,

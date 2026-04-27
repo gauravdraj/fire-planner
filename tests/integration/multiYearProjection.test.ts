@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { CALIFORNIA_STATE_TAX } from '@/core/constants/states/california';
+import { FLORIDA_STATE_TAX } from '@/core/constants/states/florida';
 import { runProjection, type Scenario, type WithdrawalPlan, type YearBreakdown } from '@/core/projection';
 
 const scenario: Scenario = {
@@ -62,6 +63,7 @@ const scenario: Scenario = {
   },
   balances: {
     cash: 150_000,
+    hsa: 0,
     taxableBrokerage: 1_850_000,
     traditional: 1_000_000,
     roth: 200_000,
@@ -137,6 +139,7 @@ describe('multi-year projection integration', () => {
 
     expect(yearOne.openingBalances).toEqual({
       cash: 150_000,
+      hsa: 0,
       taxableBrokerage: 1_850_000,
       traditional: 1_000_000,
       roth: 200_000,
@@ -202,6 +205,7 @@ describe('multi-year projection integration', () => {
       taxableSocialSecurity: 46_750,
       withdrawals: {
         cash: 13_199.84,
+        hsa: 0,
         taxableBrokerage: 73_310.69,
         traditional: 0,
         roth: 0,
@@ -235,6 +239,7 @@ describe('multi-year projection integration', () => {
     expectWithinProjectionTolerance(yearFive.irmaaMagi, expectedYearFive.irmaaMagi);
     expectWithinProjectionTolerance(yearFive.taxableSocialSecurity, expectedYearFive.taxableSocialSecurity);
     expectWithinProjectionTolerance(yearFive.withdrawals.cash, expectedYearFive.withdrawals.cash);
+    expectWithinProjectionTolerance(yearFive.withdrawals.hsa, expectedYearFive.withdrawals.hsa);
     expectWithinProjectionTolerance(yearFive.withdrawals.taxableBrokerage, expectedYearFive.withdrawals.taxableBrokerage);
     expectWithinProjectionTolerance(yearFive.withdrawals.traditional, expectedYearFive.withdrawals.traditional);
     expectWithinProjectionTolerance(yearFive.withdrawals.roth, expectedYearFive.withdrawals.roth);
@@ -248,5 +253,85 @@ describe('multi-year projection integration', () => {
     expectWithinProjectionTolerance(yearFive.niit, expectedYearFive.niit);
     expectWithinProjectionTolerance(yearFive.stateTax, expectedYearFive.stateTax);
     expectWithinProjectionTolerance(yearFive.totalTax, expectedYearFive.totalTax);
+  });
+
+  it('keeps qualified HSA withdrawals out of AGI and MAGI in a full projection scenario', () => {
+    const baselineScenario: Scenario = {
+      ...scenario,
+      filingStatus: 'single',
+      healthcare: [],
+      rentalIncome: [],
+      state: { incomeTaxLaw: FLORIDA_STATE_TAX },
+      balances: {
+        cash: 0,
+        hsa: 40_000,
+        taxableBrokerage: 0,
+        traditional: 0,
+        roth: 0,
+      },
+      basis: { taxableBrokerage: 0 },
+      taxableInterest: [{ year: 2026, amount: 12_000 }],
+      qualifiedDividends: [],
+      w2Income: [],
+    };
+    const [year] = runProjection(
+      baselineScenario,
+      {
+        endYear: 2026,
+        annualSpending: [{ year: 2026, amount: 25_000 }],
+      },
+    );
+
+    expect(year?.withdrawals.hsa).toBe(13_000);
+    expect(year?.agi).toBe(12_000);
+    expect(year?.acaMagi).toBe(12_000);
+    expect(year?.irmaaMagi).toBe(12_000);
+  });
+
+  it('runs a ten-year auto-deplete brokerage bridge without first-year failure', () => {
+    const { socialSecurity: _ignoredSocialSecurity, ...scenarioWithoutSocialSecurity } = scenario;
+    const results = runProjection(
+      {
+        ...scenarioWithoutSocialSecurity,
+        startYear: 2026,
+        healthcare: [],
+        pensionIncome: [],
+        annuityIncome: [],
+        rentalIncome: [],
+        state: { incomeTaxLaw: FLORIDA_STATE_TAX },
+        balances: {
+          cash: 0,
+          hsa: 0,
+          taxableBrokerage: 400_000,
+          traditional: 0,
+          roth: 0,
+        },
+        basis: {
+          taxableBrokerage: 400_000,
+        },
+        expectedReturns: {
+          taxableBrokerage: 0.05,
+        },
+        magiHistory: [],
+        taxableInterest: [],
+        qualifiedDividends: [],
+        autoDepleteBrokerage: {
+          enabled: true,
+          yearsToDeplete: 10,
+          annualScaleUpFactor: 0.02,
+          excludeMortgageFromRate: false,
+          retirementYear: 2026,
+        },
+      },
+      {
+        endYear: 2035,
+        annualSpending: [],
+      },
+    );
+
+    expect(results).toHaveLength(10);
+    expect(results[0]?.withdrawals.taxableBrokerage).toBeGreaterThan(40_000);
+    expect(results[0]?.closingBalances.cash).toBeGreaterThan(40_000);
+    expect(results[9]?.closingBalances.taxableBrokerage).toBeLessThan(1);
   });
 });

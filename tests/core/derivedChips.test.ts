@@ -51,7 +51,8 @@ describe('derived input chips', () => {
     ).toEqual({
       retirementTarget: 'Age 65 in 5 yrs',
       annualSpending: 'Year 1 $80,000 -> 2036 $107,513',
-      brokeragePlusCash: 'Lasts ~3 yrs at 0% growth (through 2033)',
+      mortgagePAndI: 'No mortgage modeled',
+      brokeragePlusCash: 'Lasts ~3 yrs (through 2033)',
       w2Income: 'Stops in 2031',
       socialSecurity: 'Claims in 2033 at age 67',
       healthcare: 'Subsidy band: 200-400% FPL',
@@ -81,7 +82,8 @@ describe('derived input chips', () => {
     ).toMatchObject({
       retirementTarget: 'Age 60 this year',
       annualSpending: 'Year 1 $50,000 -> 2028 $50,000',
-      brokeragePlusCash: 'Lasts ~3 yrs at 0% growth (through 2028)',
+      mortgagePAndI: 'No mortgage modeled',
+      brokeragePlusCash: 'Lasts ~3 yrs (through 2028)',
       healthcare: 'Subsidy band: 138-200% FPL',
     });
   });
@@ -95,6 +97,7 @@ describe('derived input chips', () => {
 
     expect(chips).toMatchObject({
       annualSpending: 'Year 1 $60,000 -> 2036 $73,140',
+      mortgagePAndI: 'No mortgage modeled',
       brokeragePlusCash: 'Years funded unavailable',
       healthcare: 'Subsidy band unavailable',
     });
@@ -123,8 +126,73 @@ describe('derived input chips', () => {
       }),
     ).toMatchObject({
       retirementTarget: 'Age 60, 3 yrs ago',
-      brokeragePlusCash: 'Lasts ~2 yrs at 0% growth (through 2030)',
+      brokeragePlusCash: 'Lasts ~2 yrs (through 2030)',
       w2Income: 'Already retired',
+    });
+  });
+
+  it('does not count HSA balance in brokerage-plus-cash years funded', () => {
+    const projectionResults = [
+      makeBreakdown({ year: 2028, closingBalances: makeBalances({ hsa: 500_000 }) }),
+      makeBreakdown({ year: 2029, closingBalances: makeBalances({ hsa: 500_000 }) }),
+    ];
+
+    expect(deriveBrokeragePlusCashChip(makeFormValues({ retirementYear: 2028 }), projectionResults)).toBe(
+      'Lasts ~1 yr (through 2028)',
+    );
+  });
+
+  it('previews auto-deplete duration and year-one brokerage draw when enabled', () => {
+    expect(
+      deriveBrokeragePlusCashChip(
+        makeFormValues({
+          brokerageAndCashBalance: 400_000,
+          autoDepleteBrokerageEnabled: true,
+          autoDepleteBrokerageYears: 10,
+          autoDepleteBrokerageAnnualScaleUpFactor: 0.02,
+          expectedReturnBrokerage: 0.05,
+        }),
+        [],
+      ),
+    ).toBe('Auto-depletes over 10 yrs; year-one draw ~$45,416');
+  });
+
+  it('derives mortgage P&I chips from form values and payoff helper behavior', () => {
+    expect(
+      deriveInputChips({
+        formValues: makeFormValues({
+          annualMortgagePAndI: 24_000,
+          mortgagePayoffYear: 2030,
+        }),
+        scenario: makeScenario({
+          mortgage: {
+            annualPI: 24_000,
+            payoffYear: 2030,
+          },
+        }),
+        projectionResults: [],
+      }),
+    ).toMatchObject({
+      mortgagePAndI: '5 yrs of payments through 2030',
+    });
+
+    expect(
+      deriveInputChips({
+        formValues: makeFormValues({
+          currentYear: 2031,
+          annualMortgagePAndI: 24_000,
+          mortgagePayoffYear: 2030,
+        }),
+        scenario: makeScenario({
+          mortgage: {
+            annualPI: 24_000,
+            payoffYear: 2030,
+          },
+        }),
+        projectionResults: [],
+      }),
+    ).toMatchObject({
+      mortgagePAndI: 'Paid off in 2030',
     });
   });
 });
@@ -136,6 +204,13 @@ function makeFormValues(overrides: Partial<ChipFormValues> = {}): ChipFormValues
     retirementYear: 2028,
     planEndAge: 70,
     annualSpendingToday: 60_000,
+    annualMortgagePAndI: 0,
+    mortgagePayoffYear: 0,
+    brokerageAndCashBalance: 0,
+    autoDepleteBrokerageEnabled: false,
+    autoDepleteBrokerageYears: 10,
+    autoDepleteBrokerageAnnualScaleUpFactor: 0.02,
+    expectedReturnBrokerage: 0.05,
     socialSecurityClaimAge: 67,
     ...overrides,
   };
@@ -203,6 +278,7 @@ function makeBreakdown(overrides: Partial<YearBreakdown> = {}): YearBreakdown {
 function makeBalances(overrides: Partial<AccountBalances>): AccountBalances {
   return {
     cash: 0,
+    hsa: 0,
     taxableBrokerage: 0,
     traditional: 0,
     roth: 0,

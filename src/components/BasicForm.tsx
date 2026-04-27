@@ -47,15 +47,27 @@ const HEALTHCARE_PHASE_OPTIONS: ReadonlyArray<{ label: string; value: BasicHealt
 
 const MONEY_FIELDS = [
   'annualSpendingToday',
+  'annualMortgagePAndI',
   'traditionalBalance',
   'rothBalance',
   'brokerageAndCashBalance',
   'taxableBrokerageBasis',
+  'hsaBalance',
   'annualW2Income',
   'annualConsultingIncome',
   'annualRentalIncome',
   'annualSocialSecurityBenefit',
   'annualPensionOrAnnuityIncome',
+] as const;
+
+const PERCENT_FIELDS = [
+  'autoDepleteBrokerageAnnualScaleUpFactor',
+  'expectedReturnTraditional',
+  'expectedReturnRoth',
+  'expectedReturnBrokerage',
+  'expectedReturnHsa',
+  'brokerageDividendYield',
+  'brokerageQdiPercentage',
 ] as const;
 
 const LIVE_UPDATE_DELAY_MS = 150;
@@ -106,6 +118,10 @@ export function BasicForm() {
 
   function handleInputChange(field: keyof BasicFormDraft) {
     return (event: ChangeEvent<HTMLInputElement>) => updateField(field, event.target.value);
+  }
+
+  function handleCheckboxChange(field: keyof BasicFormDraft) {
+    return (event: ChangeEvent<HTMLInputElement>) => updateField(field, String(event.target.checked));
   }
 
   return (
@@ -172,9 +188,18 @@ export function BasicForm() {
           handleInputChange,
           chips.annualSpending,
         )}
+        {renderNumberField(
+          'annualMortgagePAndI',
+          'Annual mortgage P&I',
+          draft,
+          errors,
+          handleInputChange,
+          chips.mortgagePAndI,
+        )}
+        {renderNumberField('mortgagePayoffYear', 'Mortgage payoff year', draft, errors, handleInputChange)}
       </SectionFieldset>
 
-      <SectionFieldset sectionId="balances" title="Accounts">
+      <SectionFieldset sectionId="balances">
         {renderNumberField('traditionalBalance', 'Traditional balance', draft, errors, handleInputChange)}
         {renderNumberField('rothBalance', 'Roth balance', draft, errors, handleInputChange)}
         {renderNumberField(
@@ -188,6 +213,45 @@ export function BasicForm() {
         {renderNumberField(
           'taxableBrokerageBasis',
           'Weighted-average taxable basis',
+          draft,
+          errors,
+          handleInputChange,
+        )}
+        {renderNumberField('hsaBalance', 'HSA balance', draft, errors, handleInputChange)}
+      </SectionFieldset>
+
+      <SectionFieldset sectionId="growthDividends">
+        <p className="sm:col-span-2 text-sm text-slate-600">
+          Expected returns are annual decimals for each modeled account bucket. Brokerage expected return is price
+          appreciation when dividend yield is modeled; price return plus after-tax reinvested dividends make up modeled
+          brokerage growth.
+        </p>
+        {renderNumberField('expectedReturnTraditional', 'Traditional expected return', draft, errors, handleInputChange)}
+        {renderNumberField('expectedReturnRoth', 'Roth expected return', draft, errors, handleInputChange)}
+        {renderNumberField('expectedReturnBrokerage', 'Brokerage expected return', draft, errors, handleInputChange)}
+        {renderNumberField('expectedReturnHsa', 'HSA expected return', draft, errors, handleInputChange)}
+        {renderNumberField('brokerageDividendYield', 'Brokerage dividend yield', draft, errors, handleInputChange)}
+        {renderNumberField('brokerageQdiPercentage', 'Qualified dividend percentage', draft, errors, handleInputChange)}
+      </SectionFieldset>
+
+      <SectionFieldset sectionId="withdrawalStrategy">
+        {renderCheckboxField(
+          'autoDepleteBrokerageEnabled',
+          'Auto-deplete brokerage',
+          draft,
+          errors,
+          handleCheckboxChange,
+        )}
+        {renderNumberField(
+          'autoDepleteBrokerageYears',
+          'Brokerage depletion years',
+          draft,
+          errors,
+          handleInputChange,
+        )}
+        {renderNumberField(
+          'autoDepleteBrokerageAnnualScaleUpFactor',
+          'Brokerage annual scale-up factor',
           draft,
           errors,
           handleInputChange,
@@ -256,6 +320,19 @@ export function validateBasicFormDraft(draft: BasicFormDraft): ValidationResult 
   const partnerAge = draft.filingStatus === 'mfj' ? parseIntegerField(draft, 'partnerAge', errors, 'Partner age') : 0;
   const retirementYear = parseIntegerField(draft, 'retirementYear', errors, 'Retirement target year');
   const planEndAge = parseIntegerField(draft, 'planEndAge', errors, 'Plan-end age');
+  const mortgagePayoffYear = parseIntegerField(draft, 'mortgagePayoffYear', errors, 'Mortgage payoff year');
+  const autoDepleteBrokerageEnabled = parseBooleanField(
+    draft,
+    'autoDepleteBrokerageEnabled',
+    errors,
+    'Auto-deplete brokerage',
+  );
+  const autoDepleteBrokerageYears = parseIntegerField(
+    draft,
+    'autoDepleteBrokerageYears',
+    errors,
+    'Brokerage depletion years',
+  );
   const socialSecurityClaimAge = parseIntegerField(draft, 'socialSecurityClaimAge', errors, 'Social Security claim age');
 
   if (!isFilingStatus(draft.filingStatus)) {
@@ -286,6 +363,18 @@ export function validateBasicFormDraft(draft: BasicFormDraft): ValidationResult 
     setError(errors, 'retirementYear', `Enter ${currentYear} or later.`);
   }
 
+  if (mortgagePayoffYear !== null && mortgagePayoffYear !== 0) {
+    if (mortgagePayoffYear < 0) {
+      setError(errors, 'mortgagePayoffYear', 'Enter 0 or a future payoff year.');
+    } else if (currentYear !== null && mortgagePayoffYear < currentYear) {
+      setError(errors, 'mortgagePayoffYear', `Enter 0 or ${currentYear} or later.`);
+    }
+  }
+
+  if (autoDepleteBrokerageYears !== null && (autoDepleteBrokerageYears < 1 || autoDepleteBrokerageYears > 120)) {
+    setError(errors, 'autoDepleteBrokerageYears', 'Enter 1 to 120 depletion years.');
+  }
+
   if (primaryAge !== null && planEndAge !== null && planEndAge <= primaryAge) {
     setError(errors, 'planEndAge', PLAN_END_AFTER_PRIMARY_AGE_ERROR);
   }
@@ -297,6 +386,9 @@ export function validateBasicFormDraft(draft: BasicFormDraft): ValidationResult 
   const moneyValues = Object.fromEntries(
     MONEY_FIELDS.map((field) => [field, parseMoneyField(draft, field, errors, moneyFieldLabel(field))]),
   ) as Record<(typeof MONEY_FIELDS)[number], number | null>;
+  const percentValues = Object.fromEntries(
+    PERCENT_FIELDS.map((field) => [field, parsePercentageField(draft, field, errors, percentageFieldLabel(field))]),
+  ) as Record<(typeof PERCENT_FIELDS)[number], number | null>;
 
   if (Object.keys(errors).length > 0) {
     return { errors, values: null };
@@ -313,6 +405,8 @@ export function validateBasicFormDraft(draft: BasicFormDraft): ValidationResult 
       retirementYear: retirementYear ?? 0,
       planEndAge: planEndAge ?? 0,
       annualSpendingToday: moneyValues.annualSpendingToday ?? 0,
+      annualMortgagePAndI: moneyValues.annualMortgagePAndI ?? 0,
+      mortgagePayoffYear: mortgagePayoffYear ?? 0,
       annualW2Income: moneyValues.annualW2Income ?? 0,
       annualConsultingIncome: moneyValues.annualConsultingIncome ?? 0,
       annualRentalIncome: moneyValues.annualRentalIncome ?? 0,
@@ -321,8 +415,18 @@ export function validateBasicFormDraft(draft: BasicFormDraft): ValidationResult 
       annualPensionOrAnnuityIncome: moneyValues.annualPensionOrAnnuityIncome ?? 0,
       brokerageAndCashBalance: moneyValues.brokerageAndCashBalance ?? 0,
       taxableBrokerageBasis: moneyValues.taxableBrokerageBasis ?? 0,
+      hsaBalance: moneyValues.hsaBalance ?? 0,
       traditionalBalance: moneyValues.traditionalBalance ?? 0,
       rothBalance: moneyValues.rothBalance ?? 0,
+      autoDepleteBrokerageEnabled: autoDepleteBrokerageEnabled ?? false,
+      autoDepleteBrokerageYears: autoDepleteBrokerageYears ?? 0,
+      autoDepleteBrokerageAnnualScaleUpFactor: percentValues.autoDepleteBrokerageAnnualScaleUpFactor ?? 0,
+      expectedReturnTraditional: percentValues.expectedReturnTraditional ?? 0,
+      expectedReturnRoth: percentValues.expectedReturnRoth ?? 0,
+      expectedReturnBrokerage: percentValues.expectedReturnBrokerage ?? 0,
+      expectedReturnHsa: percentValues.expectedReturnHsa ?? 0,
+      brokerageDividendYield: percentValues.brokerageDividendYield ?? 0,
+      brokerageQdiPercentage: percentValues.brokerageQdiPercentage ?? 0,
       healthcarePhase: draft.healthcarePhase as BasicHealthcarePhase,
     },
   };
@@ -331,14 +435,12 @@ export function validateBasicFormDraft(draft: BasicFormDraft): ValidationResult 
 function SectionFieldset({
   children,
   sectionId,
-  title,
 }: {
   children: ReactNode;
   sectionId: BasicFormSectionId;
-  title?: string;
 }) {
   const explanation = basicFormSectionExplanations[sectionId];
-  const label = title ?? explanation.label;
+  const label = explanation.label;
 
   return (
     <fieldset className="rounded-md border border-slate-200 p-4 sm:col-span-2">
@@ -429,25 +531,41 @@ function createValidPatch(
       return parseIntegerPatch(draft, field, 'Retirement target year');
     case 'planEndAge':
       return parseIntegerPatch(draft, field, 'Plan-end age');
+    case 'mortgagePayoffYear':
+      return parseIntegerPatch(draft, field, 'Mortgage payoff year');
+    case 'autoDepleteBrokerageYears':
+      return parseIntegerPatch(draft, field, 'Brokerage depletion years');
     case 'socialSecurityClaimAge':
       return parseIntegerPatch(draft, field, 'Social Security claim age');
     case 'annualSpendingToday':
+    case 'annualMortgagePAndI':
     case 'traditionalBalance':
     case 'rothBalance':
     case 'brokerageAndCashBalance':
     case 'taxableBrokerageBasis':
+    case 'hsaBalance':
     case 'annualW2Income':
     case 'annualConsultingIncome':
     case 'annualRentalIncome':
     case 'annualSocialSecurityBenefit':
     case 'annualPensionOrAnnuityIncome':
       return parseMoneyPatch(draft, field);
+    case 'autoDepleteBrokerageAnnualScaleUpFactor':
+    case 'expectedReturnTraditional':
+    case 'expectedReturnRoth':
+    case 'expectedReturnBrokerage':
+    case 'expectedReturnHsa':
+    case 'brokerageDividendYield':
+    case 'brokerageQdiPercentage':
+      return parsePercentagePatch(draft, field);
     case 'filingStatus':
       return isFilingStatus(draft.filingStatus) ? { filingStatus: draft.filingStatus } : null;
     case 'stateCode':
       return isStarterStateCode(draft.stateCode) ? { stateCode: draft.stateCode } : null;
     case 'healthcarePhase':
       return isHealthcarePhase(draft.healthcarePhase) ? { healthcarePhase: draft.healthcarePhase } : null;
+    case 'autoDepleteBrokerageEnabled':
+      return parseBooleanPatch(draft, field, 'Auto-deplete brokerage');
   }
 }
 
@@ -492,6 +610,35 @@ function parseMoneyPatch(
   return { [field]: value } as Partial<BasicFormValues>;
 }
 
+function parseBooleanPatch(
+  draft: BasicFormDraft,
+  field: keyof BasicFormDraft,
+  label: string,
+): Partial<BasicFormValues> | null {
+  const errors: BasicFormErrors = {};
+  const value = parseBooleanField(draft, field, errors, label);
+
+  if (value === null || errors[field] !== undefined) {
+    return null;
+  }
+
+  return { [field]: value } as Partial<BasicFormValues>;
+}
+
+function parsePercentagePatch(
+  draft: BasicFormDraft,
+  field: (typeof PERCENT_FIELDS)[number],
+): Partial<BasicFormValues> | null {
+  const errors: BasicFormErrors = {};
+  const value = parsePercentageField(draft, field, errors, percentageFieldLabel(field));
+
+  if (value === null || errors[field] !== undefined) {
+    return null;
+  }
+
+  return { [field]: value } as Partial<BasicFormValues>;
+}
+
 function renderNumberField(
   field: keyof BasicFormDraft,
   label: string,
@@ -513,6 +660,30 @@ function renderNumberField(
         onChange={handleInputChange(field)}
         type="text"
         value={draft[field]}
+      />
+    </Field>
+  );
+}
+
+function renderCheckboxField(
+  field: keyof BasicFormDraft,
+  label: string,
+  draft: BasicFormDraft,
+  errors: BasicFormErrors,
+  handleCheckboxChange: (field: keyof BasicFormDraft) => (event: ChangeEvent<HTMLInputElement>) => void,
+) {
+  const error = errors[field];
+
+  return (
+    <Field error={error} id={field} key={field} label={label}>
+      <input
+        aria-describedby={error ? `${field}-error` : undefined}
+        aria-invalid={error ? 'true' : undefined}
+        checked={draft[field] === 'true'}
+        className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600"
+        id={field}
+        onChange={handleCheckboxChange(field)}
+        type="checkbox"
       />
     </Field>
   );
@@ -564,6 +735,43 @@ function parseMoneyField(
   return value;
 }
 
+function parseBooleanField(
+  draft: BasicFormDraft,
+  field: keyof BasicFormDraft,
+  errors: BasicFormErrors,
+  label: string,
+): boolean | null {
+  if (draft[field] === 'true') {
+    return true;
+  }
+  if (draft[field] === 'false') {
+    return false;
+  }
+
+  setError(errors, field, `${label} must be checked or unchecked.`);
+  return null;
+}
+
+function parsePercentageField(
+  draft: BasicFormDraft,
+  field: (typeof PERCENT_FIELDS)[number],
+  errors: BasicFormErrors,
+  label: string,
+): number | null {
+  const value = parseRequiredNumber(draft[field], errors, field, label);
+
+  if (value === null) {
+    return null;
+  }
+
+  if (value < 0 || value > 1) {
+    setError(errors, field, `${label} must be between 0 and 1.`);
+    return null;
+  }
+
+  return value;
+}
+
 function parseRequiredNumber(
   rawValue: string,
   errors: BasicFormErrors,
@@ -593,6 +801,8 @@ function moneyFieldLabel(field: (typeof MONEY_FIELDS)[number]): string {
   switch (field) {
     case 'annualSpendingToday':
       return 'Annual spending';
+    case 'annualMortgagePAndI':
+      return 'Annual mortgage P&I';
     case 'traditionalBalance':
       return 'Traditional balance';
     case 'rothBalance':
@@ -601,6 +811,8 @@ function moneyFieldLabel(field: (typeof MONEY_FIELDS)[number]): string {
       return 'Brokerage plus cash balance';
     case 'taxableBrokerageBasis':
       return 'Weighted-average taxable basis';
+    case 'hsaBalance':
+      return 'HSA balance';
     case 'annualW2Income':
       return 'W-2 income';
     case 'annualConsultingIncome':
@@ -614,6 +826,25 @@ function moneyFieldLabel(field: (typeof MONEY_FIELDS)[number]): string {
   }
 }
 
+function percentageFieldLabel(field: (typeof PERCENT_FIELDS)[number]): string {
+  switch (field) {
+    case 'autoDepleteBrokerageAnnualScaleUpFactor':
+      return 'Brokerage annual scale-up factor';
+    case 'expectedReturnTraditional':
+      return 'Traditional expected return';
+    case 'expectedReturnRoth':
+      return 'Roth expected return';
+    case 'expectedReturnBrokerage':
+      return 'Brokerage expected return';
+    case 'expectedReturnHsa':
+      return 'HSA expected return';
+    case 'brokerageDividendYield':
+      return 'Brokerage dividend yield';
+    case 'brokerageQdiPercentage':
+      return 'Qualified dividend percentage';
+  }
+}
+
 function createDraft(values: BasicFormValues): BasicFormDraft {
   return {
     currentYear: String(values.currentYear),
@@ -624,6 +855,8 @@ function createDraft(values: BasicFormValues): BasicFormDraft {
     retirementYear: String(values.retirementYear),
     planEndAge: String(values.planEndAge),
     annualSpendingToday: String(values.annualSpendingToday),
+    annualMortgagePAndI: String(values.annualMortgagePAndI),
+    mortgagePayoffYear: String(values.mortgagePayoffYear),
     annualW2Income: String(values.annualW2Income),
     annualConsultingIncome: String(values.annualConsultingIncome),
     annualRentalIncome: String(values.annualRentalIncome),
@@ -632,8 +865,18 @@ function createDraft(values: BasicFormValues): BasicFormDraft {
     annualPensionOrAnnuityIncome: String(values.annualPensionOrAnnuityIncome),
     brokerageAndCashBalance: String(values.brokerageAndCashBalance),
     taxableBrokerageBasis: String(values.taxableBrokerageBasis),
+    hsaBalance: String(values.hsaBalance),
     traditionalBalance: String(values.traditionalBalance),
     rothBalance: String(values.rothBalance),
+    autoDepleteBrokerageEnabled: String(values.autoDepleteBrokerageEnabled),
+    autoDepleteBrokerageYears: String(values.autoDepleteBrokerageYears),
+    autoDepleteBrokerageAnnualScaleUpFactor: String(values.autoDepleteBrokerageAnnualScaleUpFactor),
+    expectedReturnTraditional: String(values.expectedReturnTraditional),
+    expectedReturnRoth: String(values.expectedReturnRoth),
+    expectedReturnBrokerage: String(values.expectedReturnBrokerage),
+    expectedReturnHsa: String(values.expectedReturnHsa),
+    brokerageDividendYield: String(values.brokerageDividendYield),
+    brokerageQdiPercentage: String(values.brokerageQdiPercentage),
     healthcarePhase: values.healthcarePhase,
   };
 }

@@ -5,7 +5,8 @@ import { computeTaxableIncome } from './tax/federal';
 import { getFPLForCoverageYear, type FplRegion, type FplTable } from './tax/aca';
 import type { BracketTable, FilingStatus } from './types';
 
-const SUPPORTED_BALANCE_KEYS = ['cash', 'taxableBrokerage', 'traditional', 'roth'] as const;
+const SUPPORTED_BALANCE_KEYS = ['cash', 'hsa', 'taxableBrokerage', 'traditional', 'roth'] as const;
+const WITHDRAWAL_RATE_NUMERATOR_KEYS = ['cash', 'taxableBrokerage', 'traditional', 'roth'] as const;
 const FPL_HOUSEHOLD_SIZE_KEYS = [1, 2, 3, 4, 5, 6, 7, 8] as const;
 const LARGE_BALANCE_DROP_MIN_AMOUNT = 50_000;
 const LARGE_BALANCE_DROP_MIN_PERCENTAGE = 0.1;
@@ -247,7 +248,11 @@ export function pickFplHouseholdSize(filingStatus: FilingStatus): 1 | 2 {
   return filingStatus === 'mfj' ? 2 : 1;
 }
 
-export function computeWithdrawalRate(year: YearBreakdown, priorYear: YearBreakdown | null | undefined): number | null {
+export function computeWithdrawalRate(
+  year: YearBreakdown,
+  priorYear: YearBreakdown | null | undefined,
+  scenario?: Scenario,
+): number | null {
   if (priorYear === null || priorYear === undefined) {
     return null;
   }
@@ -257,7 +262,22 @@ export function computeWithdrawalRate(year: YearBreakdown, priorYear: YearBreakd
     return null;
   }
 
-  return sumSupportedBalances(year.withdrawals) / priorClosingBalance;
+  const mortgageAdjustment =
+    scenario?.autoDepleteBrokerage?.excludeMortgageFromRate === true ? pAndIBeforePayoff(scenario, year.year) : 0;
+  const adjustedWithdrawals = Math.max(0, sumWithdrawalRateNumerator(year.withdrawals) - mortgageAdjustment);
+
+  return adjustedWithdrawals / priorClosingBalance;
+}
+
+export function pAndIBeforePayoff(scenario: Scenario, year: number): number {
+  const annualPI = Math.max(0, scenario.mortgage?.annualPI ?? 0);
+  const payoffYear = scenario.mortgage?.payoffYear;
+
+  if (annualPI <= 0 || payoffYear === undefined || !Number.isFinite(payoffYear) || year > payoffYear) {
+    return 0;
+  }
+
+  return roundToCents(annualPI);
 }
 
 export function computeFplBand(fplPercentage: number): FplBand {
@@ -335,7 +355,7 @@ export function computeYearDisplayMetrics(
     context.scenario.inflationRate,
   ) as BracketTable;
   const fplPercentage = computeDisplayFplPercentage(breakdown, context.scenario);
-  const withdrawalRate = computeWithdrawalRate(breakdown, context.priorYear);
+  const withdrawalRate = computeWithdrawalRate(breakdown, context.priorYear, context.scenario);
 
   return {
     year: breakdown.year,
@@ -622,6 +642,10 @@ function selectBridgeWindowEndYear({
 
 function sumSupportedBalances(balances: AccountBalances): number {
   return SUPPORTED_BALANCE_KEYS.reduce((total, key) => total + balances[key], 0);
+}
+
+function sumWithdrawalRateNumerator(withdrawals: AccountBalances): number {
+  return WITHDRAWAL_RATE_NUMERATOR_KEYS.reduce((total, key) => total + withdrawals[key], 0);
 }
 
 function sumBy<TValue>(values: readonly TValue[], getValue: (value: TValue) => number): number {

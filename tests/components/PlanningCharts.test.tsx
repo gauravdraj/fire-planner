@@ -16,6 +16,7 @@ import { installMemoryLocalStorage } from '../store/memoryStorage';
 
 const ZERO_BALANCES: AccountBalances = {
   cash: 0,
+  hsa: 0,
   taxableBrokerage: 0,
   traditional: 0,
   roth: 0,

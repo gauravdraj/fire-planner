@@ -12,6 +12,7 @@ export const tableColumnIds = [
   'taxableBrokerageBalance',
   'traditionalBalance',
   'rothBalance',
+  'hsaBalance',
   'endingBalance',
   'brokerageBasisRemaining',
   'spending',
@@ -54,7 +55,16 @@ export const liveStatMetricIds = [
 
 export type LiveStatMetricId = (typeof liveStatMetricIds)[number];
 
-export const basicFormSectionIds = ['household', 'timeline', 'spending', 'balances', 'income', 'healthcare'] as const;
+export const basicFormSectionIds = [
+  'household',
+  'timeline',
+  'spending',
+  'balances',
+  'growthDividends',
+  'withdrawalStrategy',
+  'income',
+  'healthcare',
+] as const;
 
 export type BasicFormSectionId = (typeof basicFormSectionIds)[number];
 
@@ -91,9 +101,13 @@ export const columnExplanations = {
     label: 'Roth',
     description: 'Roth account balance at year end after conversions, withdrawals, and returns.',
   },
+  hsaBalance: {
+    label: 'HSA',
+    description: 'HSA balance at year end after qualified medical withdrawals and returns.',
+  },
   endingBalance: {
     label: 'Ending balance',
-    description: 'Total supported account balance at year end across cash, taxable brokerage, traditional, and Roth buckets.',
+    description: 'Total supported account balance at year end across cash, HSA, taxable brokerage, traditional, and Roth buckets.',
   },
   brokerageBasisRemaining: {
     label: 'Brokerage basis remaining',
@@ -238,12 +252,22 @@ export const basicFormSectionExplanations = {
     description: 'Current year, retirement year, plan end, and claiming ages that set the projection window.',
   },
   spending: {
-    label: 'Spending',
-    description: 'Annual spending target that the projection tries to fund from income and supported account balances.',
+    label: 'Spending & debt',
+    description:
+      'Annual living-spending target plus fixed mortgage principal and interest that the projection tries to fund.',
   },
   balances: {
-    label: 'Balances',
-    description: 'Starting supported account balances and taxable basis used by the withdrawal display layer.',
+    label: 'Accounts',
+    description: 'Starting supported account balances, including HSA, and taxable basis used by the withdrawal display layer.',
+  },
+  growthDividends: {
+    label: 'Growth & dividends',
+    description:
+      'Expected account returns plus taxable brokerage dividend yield and qualified-dividend share assumptions.',
+  },
+  withdrawalStrategy: {
+    label: 'Withdrawal strategy',
+    description: 'Controls for optional automatic taxable brokerage draw scheduling before default account allocation.',
   },
   income: {
     label: 'Income',

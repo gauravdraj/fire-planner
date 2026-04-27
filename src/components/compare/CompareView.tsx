@@ -53,7 +53,7 @@ const TAX_COMPONENTS: ReadonlyArray<Readonly<{ key: TaxComponentKey; label: stri
   { key: 'acaPremiumCredit', label: 'ACA premium credit' },
 ];
 
-const BALANCE_KEYS = ['cash', 'taxableBrokerage', 'traditional', 'roth'] as const;
+const BALANCE_KEYS = ['cash', 'hsa', 'taxableBrokerage', 'traditional', 'roth'] as const;
 const MAGI_LABELS: Record<MagiVariant, string> = {
   acaMagi: 'ACA MAGI',
   irmaaMagi: 'IRMAA MAGI',
