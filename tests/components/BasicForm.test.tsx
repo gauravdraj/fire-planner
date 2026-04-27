@@ -1,5 +1,5 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { BasicForm } from '@/components/BasicForm';
 import { useScenarioStore } from '@/store/scenarioStore';
@@ -10,17 +10,25 @@ function changeField(label: string | RegExp, value: string) {
   fireEvent.change(screen.getByLabelText(label), { target: { value } });
 }
 
+function advanceLiveDebounce() {
+  act(() => {
+    vi.advanceTimersByTime(151);
+  });
+}
+
 describe('BasicForm', () => {
   beforeEach(() => {
+    vi.useFakeTimers();
     installMemoryLocalStorage();
     useScenarioStore.getState().resetScenario();
   });
 
   afterEach(() => {
     cleanup();
+    vi.useRealTimers();
   });
 
-  it('renders the supported Gate 3 basic fields with defaults and a responsive grid', () => {
+  it('renders the supported Gate 3 basic fields with defaults and no submit button', () => {
     render(<BasicForm />);
 
     expect(screen.getByRole('form', { name: /basic scenario form/i })).toHaveClass('sm:grid-cols-2');
@@ -42,6 +50,7 @@ describe('BasicForm', () => {
     expect(screen.getByLabelText('Social Security claim age')).toBeInTheDocument();
     expect(screen.getByLabelText('Pension/annuity annual amount')).toBeInTheDocument();
     expect(screen.getByLabelText('Healthcare phase')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /run projection/i })).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/hsa/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/hsa/i)).not.toBeInTheDocument();
   });
@@ -69,8 +78,6 @@ describe('BasicForm', () => {
     changeField('Retirement target year', '2025');
     changeField('Social Security claim age', '71');
 
-    fireEvent.click(screen.getByRole('button', { name: /run projection/i }));
-
     expect(screen.getByLabelText('Annual spending')).toHaveAttribute('aria-invalid', 'true');
     expect(screen.getByText('Annual spending is required.')).toBeInTheDocument();
     expect(screen.getAllByText('Enter an age from 18 to 110.')).toHaveLength(2);
@@ -82,16 +89,17 @@ describe('BasicForm', () => {
   it('requires plan-end age to be greater than primary age', () => {
     render(<BasicForm />);
 
-    changeField('Primary age', '60');
     changeField('Plan-end age', '60');
 
-    fireEvent.click(screen.getByRole('button', { name: /run projection/i }));
+    expect(screen.queryByText('Plan-end age must be greater than primary age.')).not.toBeInTheDocument();
+
+    changeField('Primary age', '60');
 
     expect(screen.getByLabelText('Plan-end age')).toHaveAttribute('aria-invalid', 'true');
     expect(screen.getByText('Plan-end age must be greater than primary age.')).toBeInTheDocument();
   });
 
-  it('submits valid form values through the scenario store and runs projection', () => {
+  it('debounces valid field values into the scenario store and runs projection', () => {
     render(<BasicForm />);
 
     changeField('State', 'PA');
@@ -112,11 +120,12 @@ describe('BasicForm', () => {
     changeField('Pension/annuity annual amount', '15000');
     changeField('Healthcare phase', 'aca');
 
-    fireEvent.click(screen.getByRole('button', { name: /run projection/i }));
+    expect(useScenarioStore.getState().formValues.stateCode).toBe('CA');
+
+    advanceLiveDebounce();
 
     const state = useScenarioStore.getState();
 
-    expect(screen.getByRole('status')).toHaveTextContent('Scenario updated.');
     expect(state.formValues).toMatchObject({
       filingStatus: 'mfj',
       stateCode: 'PA',
@@ -143,5 +152,17 @@ describe('BasicForm', () => {
     expect(state.plan.endYear).toBe(2032);
     expect(state.projectionResults).toHaveLength(7);
     expect(state.scenario.balances).not.toHaveProperty('hsa');
+  });
+
+  it('does not let one invalid field block another valid debounced update', () => {
+    render(<BasicForm />);
+
+    changeField('Annual spending', '');
+    changeField('W-2 income', '12345');
+    advanceLiveDebounce();
+
+    expect(screen.getByText('Annual spending is required.')).toBeInTheDocument();
+    expect(useScenarioStore.getState().formValues.annualSpendingToday).toBe(100_000);
+    expect(useScenarioStore.getState().formValues.annualW2Income).toBe(12_345);
   });
 });

@@ -42,7 +42,7 @@ describe('advanced planner controls', () => {
     expect(stateAfterEdit.plan.brokerageHarvests).toContainEqual({ year: 2026, amount: 2_500 });
     expect(stateAfterEdit.projectionResults[0]?.spending).toBe(120_000);
     expect(stateAfterEdit.projectionResults[0]?.conversions).toBe(15_000);
-    expect(stateAfterEdit.hasRunProjection).toBe(true);
+    expect(stateAfterEdit).not.toHaveProperty('hasRunProjection');
 
     fireEvent.click(screen.getByRole('tab', { name: 'Planning charts' }));
 

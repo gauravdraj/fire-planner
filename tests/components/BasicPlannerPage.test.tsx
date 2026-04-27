@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { mapBasicFormToProjectionInputs, type BasicFormValues } from '@/lib/basicFormMapping';
@@ -59,6 +59,12 @@ async function importBasicPlannerPage() {
   return { BasicPlannerPage, useScenarioStore };
 }
 
+function advanceLiveDebounce() {
+  act(() => {
+    vi.advanceTimersByTime(151);
+  });
+}
+
 describe('BasicPlannerPage', () => {
   beforeEach(() => {
     vi.resetModules();
@@ -68,39 +74,42 @@ describe('BasicPlannerPage', () => {
 
   afterEach(() => {
     cleanup();
+    vi.useRealTimers();
   });
 
-  it('renders the form with a minimal empty state before the first projection run', async () => {
+  it('smokes the live Basic Mode path without a run gate', async () => {
+    vi.useFakeTimers();
     const { BasicPlannerPage, useScenarioStore } = await importBasicPlannerPage();
 
     render(<BasicPlannerPage />);
 
     expect(screen.getByRole('form', { name: /basic scenario form/i })).toBeInTheDocument();
-    expect(screen.getByText('Projection results will appear here after you run the scenario.')).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: /projection summary/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: /year-by-year projection/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: /account balances/i })).not.toBeInTheDocument();
-    expect(useScenarioStore.getState().hasRunProjection).toBe(false);
-  });
-
-  it('renders summary cards, table, and chart after Run projection', async () => {
-    const { BasicPlannerPage, useScenarioStore } = await importBasicPlannerPage();
-
-    render(<BasicPlannerPage />);
-    fireEvent.click(screen.getByRole('button', { name: /run projection/i }));
-
-    expect(screen.getByRole('status')).toHaveTextContent('Scenario updated.');
-    expect(screen.queryByText('Projection results will appear here after you run the scenario.')).not.toBeInTheDocument();
+    expect(screen.queryByText(/run projection/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /run projection/i })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Projection results will appear here/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Run the projection to see/i)).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/live projection stats/i)).toHaveClass('sticky');
     expect(screen.getByRole('heading', { name: /projection summary/i })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: /year-by-year projection/i })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: /account balances/i })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: /magi thresholds/i })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: /tax breakdown/i })).toBeInTheDocument();
-    expect(screen.getByRole('img', { name: /stacked account balances/i })).toBeInTheDocument();
-    expect(screen.getByRole('img', { name: /magi compared with aca fpl bands/i })).toBeInTheDocument();
-    expect(screen.getByRole('img', { name: /annual tax breakdown/i })).toBeInTheDocument();
-    expect(screen.getByText('Net worth at retirement').nextElementSibling).toHaveClass('tabular-nums');
-    expect(useScenarioStore.getState().hasRunProjection).toBe(true);
+    expect(screen.getByRole('heading', { name: /72\(t\) SEPP IRA size calculator/i })).toBeInTheDocument();
+    expect(screen.getByLabelText(/72\(t\) calculator inputs/i)).toBeInTheDocument();
+    expect(screen.getByText('Fixed Amortization Method. Independent of your scenario above.')).toBeInTheDocument();
+    expect(screen.getByText('$803,990.37')).toBeInTheDocument();
+
+    const averageMagiStat = screen.getByTestId('live-stat-average-bridge-magi');
+    const initialAverageMagi = liveStatValue(averageMagiStat);
+    fireEvent.change(screen.getByLabelText('Pension/annuity annual amount'), { target: { value: '50000' } });
+    advanceLiveDebounce();
+
+    expect(useScenarioStore.getState().formValues.annualPensionOrAnnuityIncome).toBe(50_000);
+    expect(liveStatValue(averageMagiStat)).not.toBe(initialAverageMagi);
+
+    const scenarioFormValues = useScenarioStore.getState().formValues;
+    fireEvent.change(screen.getByLabelText('Desired annual income'), { target: { value: '60000' } });
+    advanceLiveDebounce();
+
+    expect(useScenarioStore.getState().formValues).toEqual(scenarioFormValues);
+    expect(useScenarioStore.getState()).not.toHaveProperty('hasRunProjection');
   });
 
   it('hydrates a valid URL hash before localStorage and renders dependent outputs', async () => {
@@ -117,7 +126,7 @@ describe('BasicPlannerPage', () => {
     render(<BasicPlannerPage />);
 
     expect(useScenarioStore.getState().formValues.stateCode).toBe('PA');
-    expect(useScenarioStore.getState().hasRunProjection).toBe(true);
+    expect(useScenarioStore.getState()).not.toHaveProperty('hasRunProjection');
     expect(screen.getByLabelText('State')).toHaveValue('PA');
     expect(screen.getByRole('heading', { name: /projection summary/i })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: /year-by-year projection/i })).toBeInTheDocument();
@@ -126,7 +135,7 @@ describe('BasicPlannerPage', () => {
     expect(screen.getByRole('heading', { name: /tax breakdown/i })).toBeInTheDocument();
   });
 
-  it('ignores malformed URL hashes without crashing and keeps the page empty before run', async () => {
+  it('ignores malformed URL hashes without crashing and still renders stored results', async () => {
     window.localStorage.setItem(
       'fire-planner.scenario.v1',
       JSON.stringify({
@@ -140,9 +149,13 @@ describe('BasicPlannerPage', () => {
     render(<BasicPlannerPage />);
 
     expect(useScenarioStore.getState().formValues.stateCode).toBe('FL');
-    expect(useScenarioStore.getState().hasRunProjection).toBe(false);
+    expect(useScenarioStore.getState()).not.toHaveProperty('hasRunProjection');
     expect(screen.getByLabelText('State')).toHaveValue('FL');
-    expect(screen.getByText('Projection results will appear here after you run the scenario.')).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: /projection summary/i })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Projection results will appear here/i)).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /projection summary/i })).toBeInTheDocument();
   });
 });
+
+function liveStatValue(stat: HTMLElement): string | null {
+  return stat.querySelector('.tabular-nums')?.textContent ?? null;
+}

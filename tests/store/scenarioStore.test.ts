@@ -82,6 +82,7 @@ describe('scenarioStore', () => {
     expect(state.customLawActive).toBe(false);
     expect(state.projectionResults).toHaveLength(41);
     expect(state.scenario.balances).not.toHaveProperty('hsa');
+    expect(state).not.toHaveProperty('hasRunProjection');
   });
 
   it('persists active scenario inputs and rehydrates from localStorage without breaking basic mode', async () => {
@@ -103,6 +104,7 @@ describe('scenarioStore', () => {
     expect(persisted.plan?.endYear).toBe(2056);
     expect(persisted.customLawActive).toBe(false);
     expect(persisted).not.toHaveProperty('customLaw');
+    expect(persisted).not.toHaveProperty('hasRunProjection');
 
     vi.resetModules();
 
@@ -114,6 +116,7 @@ describe('scenarioStore', () => {
     expect(reloadedState.customLawActive).toBe(false);
     expect(reloadedState.customLaw).toBeUndefined();
     expect(reloadedState.projectionResults.length).toBeGreaterThan(0);
+    expect(reloadedState).not.toHaveProperty('hasRunProjection');
   });
 
   it('applies a valid URL hash before localStorage and uses the mapped projection inputs', async () => {

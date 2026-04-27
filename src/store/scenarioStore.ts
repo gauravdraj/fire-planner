@@ -48,7 +48,6 @@ export const DEFAULT_BASIC_FORM_VALUES = Object.freeze({
 
 export type ScenarioStoreState = Readonly<{
   formValues: BasicFormValues;
-  hasRunProjection: boolean;
   selectedStarterStateLaw: StateIncomeTaxLaw;
   scenario: Scenario;
   plan: WithdrawalPlan;
@@ -81,22 +80,22 @@ type PersistedScenarioSnapshot = Readonly<{
 export const useScenarioStore = create<ScenarioStoreState & ScenarioStoreActions>((set) => ({
   ...readInitialScenarioState(),
   setFormValues: (patch) => {
-    set((state) => persistAndMaybeSaveDefaultScenario(buildScenarioState({ ...state.formValues, ...patch }, true)));
+    set((state) => persistAndMaybeSaveDefaultScenario(buildScenarioState({ ...state.formValues, ...patch })));
   },
   replaceFormValues: (values) => {
-    set(persistAndMaybeSaveDefaultScenario(buildScenarioState(values, true)));
+    set(persistAndMaybeSaveDefaultScenario(buildScenarioState(values)));
   },
   setPlan: (plan) => {
     set((state) =>
       persistAndMaybeSaveDefaultScenario(
-        buildScenarioState(state.formValues, true, buildProjectionInputsWithPlan(state, plan)),
+        buildScenarioState(state.formValues, buildProjectionInputsWithPlan(state, plan)),
       ),
     );
   },
   setCustomLaw: (customLaw) => {
     set((state) =>
       persistScenarioState(
-        buildScenarioState(state.formValues, state.hasRunProjection, {
+        buildScenarioState(state.formValues, {
           scenario: scenarioWithoutCustomLaw(state.scenario),
           plan: state.plan,
           ...(customLaw === undefined
@@ -107,7 +106,7 @@ export const useScenarioStore = create<ScenarioStoreState & ScenarioStoreActions
     );
   },
   resetScenario: () => {
-    set(persistScenarioState(buildScenarioState(DEFAULT_BASIC_FORM_VALUES, false)));
+    set(persistScenarioState(buildScenarioState(DEFAULT_BASIC_FORM_VALUES)));
   },
   hydrateFromUrlHash: (hash) => {
     const nextState = buildScenarioStateFromHash(hash ?? getLocationHash());
@@ -142,20 +141,16 @@ function readInitialScenarioState(): ScenarioStoreState {
 
   if (persisted.projectionInputs !== undefined) {
     try {
-      return buildScenarioState(persisted.formValues, false, persisted.projectionInputs);
+      return buildScenarioState(persisted.formValues, persisted.projectionInputs);
     } catch {
-      return buildScenarioState(persisted.formValues, false);
+      return buildScenarioState(persisted.formValues);
     }
   }
 
-  return buildScenarioState(persisted.formValues, false);
+  return buildScenarioState(persisted.formValues);
 }
 
-function buildScenarioState(
-  values: unknown,
-  hasRunProjection: boolean,
-  projectionInputs?: ProjectionInputState,
-): ScenarioStoreState {
+function buildScenarioState(values: unknown, projectionInputs?: ProjectionInputState): ScenarioStoreState {
   const formValues = sanitizeBasicFormValues(values);
   const mappedInputs = projectionInputs ?? mapBasicFormToProjectionInputs(formValues);
   const customLaw = projectionInputs?.customLaw ?? projectionInputs?.scenario.customLaw;
@@ -168,7 +163,6 @@ function buildScenarioState(
   const projectionResults = runProjection(scenario, plan);
   const state = {
     formValues,
-    hasRunProjection,
     selectedStarterStateLaw: STARTER_STATE_LAWS[formValues.stateCode],
     scenario,
     plan,
@@ -190,7 +184,7 @@ function buildScenarioStateFromHash(hash: string): ScenarioStoreState | null {
   try {
     const formValues = inferBasicFormValuesFromHashPayload(payload);
 
-    return formValues === null ? null : buildScenarioState(formValues, true, payload);
+    return formValues === null ? null : buildScenarioState(formValues, payload);
   } catch {
     return null;
   }

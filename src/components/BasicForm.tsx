@@ -1,7 +1,8 @@
-import { useState, type ChangeEvent, type FormEvent, type ReactNode } from 'react';
+import { useRef, useState, type ChangeEvent, type ReactNode } from 'react';
 
 import type { FilingStatus } from '@/core/types';
 import type { BasicFormValues, BasicHealthcarePhase, BasicStarterStateCode } from '@/lib/basicFormMapping';
+import { useDebouncedCallback } from '@/lib/useDebouncedCallback';
 import { useScenarioStore } from '@/store/scenarioStore';
 
 type BasicFormDraft = {
@@ -9,6 +10,7 @@ type BasicFormDraft = {
 };
 
 type BasicFormErrors = Partial<Record<keyof BasicFormDraft, string>>;
+type BasicFormTouched = Partial<Record<keyof BasicFormDraft, boolean>>;
 
 type ValidationResult =
   | Readonly<{
@@ -52,17 +54,43 @@ const MONEY_FIELDS = [
   'annualPensionOrAnnuityIncome',
 ] as const;
 
+const LIVE_UPDATE_DELAY_MS = 150;
+const PLAN_END_AFTER_PRIMARY_AGE_ERROR = 'Plan-end age must be greater than primary age.';
+
 export function BasicForm() {
   const formValues = useScenarioStore((state) => state.formValues);
-  const replaceFormValues = useScenarioStore((state) => state.replaceFormValues);
+  const setFormValues = useScenarioStore((state) => state.setFormValues);
   const [draft, setDraft] = useStateFromFormValues(formValues);
-  const [errors, setErrors] = useStateFromErrors();
-  const [statusMessage, setStatusMessage] = useStateFromStatusMessage();
+  const [touched, setTouched] = useStateFromTouched();
+  const pendingPatchRef = useRef<Partial<BasicFormValues>>({});
+  const validation = validateBasicFormDraft(draft);
+  const errors = visibleErrors(validation.errors, touched);
   const showPartnerAge = draft.filingStatus === 'mfj';
+  const commitPendingPatch = useDebouncedCallback(() => {
+    const patch = pendingPatchRef.current;
+
+    pendingPatchRef.current = {};
+
+    if (Object.keys(patch).length > 0) {
+      setFormValues(patch);
+    }
+  }, LIVE_UPDATE_DELAY_MS);
 
   function updateField(field: keyof BasicFormDraft, value: string) {
-    setDraft((current) => ({ ...current, [field]: value }));
-    setStatusMessage(null);
+    const nextDraft = { ...draft, [field]: value };
+    const nextValidation = validateBasicFormDraft(nextDraft);
+    const patch = createValidPatch(field, nextDraft, nextValidation.errors);
+
+    setTouched((current) => ({ ...current, [field]: true }));
+    setDraft(nextDraft);
+
+    if (patch === null) {
+      clearPendingField(field, nextValidation.errors);
+    } else {
+      pendingPatchRef.current = { ...pendingPatchRef.current, ...patch };
+    }
+
+    commitPendingPatch();
   }
 
   function handleSelectChange(field: keyof BasicFormDraft) {
@@ -73,23 +101,8 @@ export function BasicForm() {
     return (event: ChangeEvent<HTMLInputElement>) => updateField(field, event.target.value);
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
-    const result = validateBasicFormDraft(draft);
-    setErrors(result.errors);
-
-    if (result.values === null) {
-      setStatusMessage(null);
-      return;
-    }
-
-    replaceFormValues(result.values);
-    setStatusMessage('Scenario updated.');
-  }
-
   return (
-    <form aria-label="Basic scenario form" className="mt-6 grid gap-4 sm:grid-cols-2" noValidate onSubmit={handleSubmit}>
+    <div aria-label="Basic scenario form" className="mt-6 grid gap-4 sm:grid-cols-2" role="form">
       <Field error={errors.filingStatus} id="filingStatus" label="Filing status">
         <select
           aria-describedby={errors.filingStatus ? 'filingStatus-error' : undefined}
@@ -168,22 +181,20 @@ export function BasicForm() {
           ))}
         </select>
       </Field>
-
-      <div className="flex flex-col gap-3 border-t border-slate-200 pt-4 sm:col-span-2 sm:flex-row sm:items-center">
-        <button
-          className="rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
-          type="submit"
-        >
-          Run projection
-        </button>
-        {statusMessage === null ? null : (
-          <p className="text-sm font-medium text-indigo-700" role="status">
-            {statusMessage}
-          </p>
-        )}
-      </div>
-    </form>
+    </div>
   );
+
+  function clearPendingField(field: keyof BasicFormDraft, errors: BasicFormErrors) {
+    const { [field]: _ignoredField, ...withoutField } = pendingPatchRef.current;
+
+    pendingPatchRef.current = withoutField;
+
+    if ((field === 'primaryAge' || field === 'planEndAge') && errors.planEndAge === PLAN_END_AFTER_PRIMARY_AGE_ERROR) {
+      const { primaryAge: _ignoredPrimaryAge, planEndAge: _ignoredPlanEndAge, ...withoutAgePair } = pendingPatchRef.current;
+
+      pendingPatchRef.current = withoutAgePair;
+    }
+  }
 }
 
 export function validateBasicFormDraft(draft: BasicFormDraft): ValidationResult {
@@ -224,7 +235,7 @@ export function validateBasicFormDraft(draft: BasicFormDraft): ValidationResult 
   }
 
   if (primaryAge !== null && planEndAge !== null && planEndAge <= primaryAge) {
-    setError(errors, 'planEndAge', 'Plan-end age must be greater than primary age.');
+    setError(errors, 'planEndAge', PLAN_END_AFTER_PRIMARY_AGE_ERROR);
   }
 
   if (socialSecurityClaimAge !== null && (socialSecurityClaimAge < 62 || socialSecurityClaimAge > 70)) {
@@ -291,6 +302,112 @@ function Field({
   );
 }
 
+function visibleErrors(errors: BasicFormErrors, touched: BasicFormTouched): BasicFormErrors {
+  const visible: BasicFormErrors = {};
+  const fields = Object.keys(errors) as Array<keyof BasicFormDraft>;
+
+  for (const field of fields) {
+    const error = errors[field];
+
+    if (error !== undefined && shouldShowError(field, error, touched)) {
+      visible[field] = error;
+    }
+  }
+
+  return visible;
+}
+
+function shouldShowError(field: keyof BasicFormDraft, error: string, touched: BasicFormTouched): boolean {
+  if (field === 'planEndAge' && error === PLAN_END_AFTER_PRIMARY_AGE_ERROR) {
+    return touched.primaryAge === true && touched.planEndAge === true;
+  }
+
+  return touched[field] === true;
+}
+
+function createValidPatch(
+  field: keyof BasicFormDraft,
+  draft: BasicFormDraft,
+  errors: BasicFormErrors,
+): Partial<BasicFormValues> | null {
+  if (!canWriteField(field, errors)) {
+    return null;
+  }
+
+  switch (field) {
+    case 'currentYear':
+      return parseIntegerPatch(draft, field, 'Current year');
+    case 'primaryAge':
+      return parseIntegerPatch(draft, field, 'Primary age');
+    case 'partnerAge':
+      return parseIntegerPatch(draft, field, 'Partner age');
+    case 'retirementYear':
+      return parseIntegerPatch(draft, field, 'Retirement target year');
+    case 'planEndAge':
+      return parseIntegerPatch(draft, field, 'Plan-end age');
+    case 'socialSecurityClaimAge':
+      return parseIntegerPatch(draft, field, 'Social Security claim age');
+    case 'annualSpendingToday':
+    case 'traditionalBalance':
+    case 'rothBalance':
+    case 'brokerageAndCashBalance':
+    case 'taxableBrokerageBasis':
+    case 'annualW2Income':
+    case 'annualConsultingIncome':
+    case 'annualRentalIncome':
+    case 'annualSocialSecurityBenefit':
+    case 'annualPensionOrAnnuityIncome':
+      return parseMoneyPatch(draft, field);
+    case 'filingStatus':
+      return isFilingStatus(draft.filingStatus) ? { filingStatus: draft.filingStatus } : null;
+    case 'stateCode':
+      return isStarterStateCode(draft.stateCode) ? { stateCode: draft.stateCode } : null;
+    case 'healthcarePhase':
+      return isHealthcarePhase(draft.healthcarePhase) ? { healthcarePhase: draft.healthcarePhase } : null;
+  }
+}
+
+function canWriteField(field: keyof BasicFormDraft, errors: BasicFormErrors): boolean {
+  if (errors[field] !== undefined) {
+    return false;
+  }
+
+  if ((field === 'primaryAge' || field === 'planEndAge') && errors.planEndAge === PLAN_END_AFTER_PRIMARY_AGE_ERROR) {
+    return false;
+  }
+
+  return true;
+}
+
+function parseIntegerPatch(
+  draft: BasicFormDraft,
+  field: keyof BasicFormDraft,
+  label: string,
+): Partial<BasicFormValues> | null {
+  const errors: BasicFormErrors = {};
+  const value = parseIntegerField(draft, field, errors, label);
+
+  if (value === null || errors[field] !== undefined) {
+    return null;
+  }
+
+  return { [field]: value } as Partial<BasicFormValues>;
+}
+
+function parseMoneyPatch(
+  draft: BasicFormDraft,
+  field: (typeof MONEY_FIELDS)[number],
+): Partial<BasicFormValues> | null {
+  const errors: BasicFormErrors = {};
+  const value = parseMoneyField(draft, field, errors, moneyFieldLabel(field));
+
+  if (value === null || errors[field] !== undefined) {
+    return null;
+  }
+
+  return { [field]: value } as Partial<BasicFormValues>;
+}
+
 function renderNumberField(
   field: keyof BasicFormDraft,
   label: string,
@@ -309,7 +426,7 @@ function renderNumberField(
         id={field}
         inputMode="decimal"
         onChange={handleInputChange(field)}
-        type="number"
+        type="text"
         value={draft[field]}
       />
     </Field>
@@ -452,10 +569,6 @@ function useStateFromFormValues(values: BasicFormValues) {
   return useState(createDraft(values));
 }
 
-function useStateFromErrors() {
-  return useState<BasicFormErrors>({});
-}
-
-function useStateFromStatusMessage() {
-  return useState<string | null>(null);
+function useStateFromTouched() {
+  return useState<BasicFormTouched>({});
 }

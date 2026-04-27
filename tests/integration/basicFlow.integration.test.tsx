@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { SHARE_LINK_PRIVACY_TEXT } from '@/components/ShareLinkModal';
@@ -52,6 +52,12 @@ function fillRealisticMfjScenario() {
   changeField('Healthcare phase', 'aca');
 }
 
+function advanceLiveDebounce() {
+  act(() => {
+    vi.advanceTimersByTime(151);
+  });
+}
+
 function summaryCard(name: RegExp) {
   return screen.getByRole('article', { name });
 }
@@ -77,6 +83,7 @@ describe('basic Gate 3 app flow', () => {
 
   afterEach(() => {
     cleanup();
+    vi.useRealTimers();
     consoleErrorSpy.mockRestore();
   });
 
@@ -89,10 +96,11 @@ describe('basic Gate 3 app flow', () => {
     expect(form).toHaveClass('grid', 'gap-4', 'sm:grid-cols-2');
     expect(form).not.toHaveClass('grid-cols-2');
 
+    vi.useFakeTimers();
     fillRealisticMfjScenario();
-    fireEvent.click(screen.getByRole('button', { name: /run projection/i }));
+    advanceLiveDebounce();
+    vi.useRealTimers();
 
-    expect(screen.getByRole('status')).toHaveTextContent('Scenario updated.');
     expect(screen.getByRole('heading', { name: /projection summary/i })).toBeInTheDocument();
     expect(numericMoney(summaryValue(/net worth at retirement/i))).toBeGreaterThan(0);
     expect(numericMoney(summaryValue(/plan-end balance/i))).toBeGreaterThan(0);

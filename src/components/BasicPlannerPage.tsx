@@ -1,24 +1,30 @@
 import { BalancesChart } from '@/components/BalancesChart';
 import { BasicForm } from '@/components/BasicForm';
 import { MagiChart } from '@/components/charts/MagiChart';
+import { LiveStatsStrip } from '@/components/LiveStatsStrip';
+import { SeventyTwoTCalc } from '@/components/SeventyTwoTCalc';
 import { TaxBreakdownChart } from '@/components/charts/TaxBreakdownChart';
 import { SummaryCards } from '@/components/SummaryCards';
 import { YearByYearTable } from '@/components/YearByYearTable';
-import { useScenarioStore } from '@/store/scenarioStore';
 
 export function BasicPlannerPage() {
-  const hasRunProjection = useScenarioStore((state) => state.hasRunProjection);
-
   return (
     <section aria-labelledby="basic-planner-heading" className="rounded-lg border border-slate-200 p-5">
       <h2 className="text-xl font-semibold" id="basic-planner-heading">
         Basic planner
       </h2>
       <p className="mt-2 text-sm text-slate-600">
-        Enter the household facts the current engine supports, then run the projection.
+        Enter the household facts the current engine supports, and the projection updates as you edit.
       </p>
       <BasicForm />
-      {hasRunProjection ? <ProjectionResults /> : <ProjectionEmptyState />}
+      <ProjectionResults />
+      <section aria-labelledby="seventy-two-t-heading" className="mt-6 rounded-lg border border-slate-200 bg-slate-50 p-4">
+        <h3 className="text-lg font-semibold text-slate-950" id="seventy-two-t-heading">
+          72(t) SEPP IRA size calculator
+        </h3>
+        <p className="mt-1 text-sm text-slate-600">Fixed Amortization Method. Independent of your scenario above.</p>
+        <SeventyTwoTCalc />
+      </section>
     </section>
   );
 }
@@ -26,23 +32,12 @@ export function BasicPlannerPage() {
 function ProjectionResults() {
   return (
     <>
+      <LiveStatsStrip />
       <SummaryCards />
       <YearByYearTable />
       <BalancesChart />
       <MagiChart />
       <TaxBreakdownChart />
     </>
-  );
-}
-
-function ProjectionEmptyState() {
-  return (
-    <section
-      aria-label="Projection results"
-      className="mt-6 rounded-lg border border-dashed border-slate-300 bg-slate-50 p-5 text-sm text-slate-600"
-    >
-      <p className="font-medium text-slate-800">Projection results will appear here after you run the scenario.</p>
-      <p className="mt-1">Run the projection to see summary cards, a year-by-year table, and account balances.</p>
-    </section>
   );
 }
