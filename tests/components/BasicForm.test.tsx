@@ -93,7 +93,7 @@ describe('BasicForm', () => {
     expect(within(accounts).getByLabelText('Brokerage plus cash balance')).toBeInTheDocument();
     expect(within(accounts).getByLabelText('Weighted-average taxable basis')).toBeInTheDocument();
 
-    const income = screen.getByRole('group', { name: /income/i });
+    const income = fieldsets[4]!;
     expect(within(income).getByLabelText('W-2 income')).toBeInTheDocument();
     expect(within(income).getByLabelText('Net consulting income')).toBeInTheDocument();
     expect(within(income).getByLabelText('Net rental income')).toBeInTheDocument();
@@ -132,7 +132,11 @@ describe('BasicForm', () => {
 
     fireEvent.focus(screen.getByRole('button', { name: 'About Accounts' }));
 
-    expect(screen.getByRole('tooltip')).toHaveTextContent(
+    expect(
+      screen
+        .getByText('Starting supported account balances and taxable basis used by the withdrawal display layer.')
+        .closest('[role="tooltip"]'),
+    ).toHaveTextContent(
       'Starting supported account balances and taxable basis used by the withdrawal display layer.',
     );
   });

@@ -95,7 +95,7 @@ export function deriveBrokeragePlusCashChip(
 
   return fundedThroughYear === null
     ? 'Years funded unavailable'
-    : `~${formatYears(fundedYears)} funded (through ${fundedThroughYear})`;
+    : `Lasts ~${formatYears(fundedYears)} at 0% growth (through ${fundedThroughYear})`;
 }
 
 export function deriveW2IncomeChip(formValues: DerivedChipFormValues): string {

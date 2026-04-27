@@ -8,7 +8,6 @@ import { TaxBreakdownChart } from '@/components/charts/TaxBreakdownChart';
 import { LtcgHarvesterUI } from '@/components/planners/LtcgHarvesterUI';
 import { RothLadderUI } from '@/components/planners/RothLadderUI';
 import { ScenarioManager } from '@/components/scenarios/ScenarioManager';
-import { SummaryCards } from '@/components/SummaryCards';
 import { YearByYearTable } from '@/components/YearByYearTable';
 import { useUiStore } from '@/store/uiStore';
 
@@ -86,7 +85,6 @@ export function AdvancedView({ onCompare }: AdvancedViewProps = {}) {
         ) : null}
         {activeTab === 'planning-charts' ? (
           <div aria-labelledby="planning-charts-tab" className="space-y-5" id="planning-charts-panel" role="tabpanel">
-            <SummaryCards />
             <YearByYearTable />
             <BalancesChart />
             <MagiChart />

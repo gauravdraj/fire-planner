@@ -51,7 +51,7 @@ describe('derived input chips', () => {
     ).toEqual({
       retirementTarget: 'Age 65 in 5 yrs',
       annualSpending: 'Year 1 $80,000 -> 2036 $107,513',
-      brokeragePlusCash: '~3 yrs funded (through 2033)',
+      brokeragePlusCash: 'Lasts ~3 yrs at 0% growth (through 2033)',
       w2Income: 'Stops in 2031',
       socialSecurity: 'Claims in 2033 at age 67',
       healthcare: 'Subsidy band: 200-400% FPL',
@@ -81,7 +81,7 @@ describe('derived input chips', () => {
     ).toMatchObject({
       retirementTarget: 'Age 60 this year',
       annualSpending: 'Year 1 $50,000 -> 2028 $50,000',
-      brokeragePlusCash: '~3 yrs funded (through 2028)',
+      brokeragePlusCash: 'Lasts ~3 yrs at 0% growth (through 2028)',
       healthcare: 'Subsidy band: 138-200% FPL',
     });
   });
@@ -123,7 +123,7 @@ describe('derived input chips', () => {
       }),
     ).toMatchObject({
       retirementTarget: 'Age 60, 3 yrs ago',
-      brokeragePlusCash: '~2 yrs funded (through 2030)',
+      brokeragePlusCash: 'Lasts ~2 yrs at 0% growth (through 2030)',
       w2Income: 'Already retired',
     });
   });

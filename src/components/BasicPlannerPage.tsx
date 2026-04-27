@@ -4,7 +4,6 @@ import { MagiChart } from '@/components/charts/MagiChart';
 import { LiveStatsStrip } from '@/components/LiveStatsStrip';
 import { SeventyTwoTCalc } from '@/components/SeventyTwoTCalc';
 import { TaxBreakdownChart } from '@/components/charts/TaxBreakdownChart';
-import { SummaryCards } from '@/components/SummaryCards';
 import { WhyChangedCallout } from '@/components/WhyChangedCallout';
 import { YearByYearTable } from '@/components/YearByYearTable';
 
@@ -35,7 +34,6 @@ function ProjectionResults() {
     <>
       <LiveStatsStrip />
       <WhyChangedCallout />
-      <SummaryCards />
       <YearByYearTable />
       <BalancesChart />
       <MagiChart />

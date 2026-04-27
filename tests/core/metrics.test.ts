@@ -13,6 +13,7 @@ import {
   computeWithdrawalRateBand,
   computeYearDisplayMetrics,
   computeYearsFundedFromRetirement,
+  pickFplHouseholdSize,
   selectBridgeWindow,
   summarizeProjectionRunChanges,
   summarizeYearOverYearChanges,
@@ -188,12 +189,23 @@ describe('projection metric helpers', () => {
     expect(computeFplPercentage(61_400, 9)).toBe(1);
   });
 
-  it('classifies exact FPL band boundaries', () => {
+  it('picks filing-status household sizes for non-ACA FPL display', () => {
+    expect(pickFplHouseholdSize('mfj')).toBe(2);
+    expect(pickFplHouseholdSize('single')).toBe(1);
+    expect(pickFplHouseholdSize('hoh')).toBe(1);
+    expect(pickFplHouseholdSize('mfs')).toBe(1);
+  });
+
+  it('classifies representative FPL bands and exact cliff boundaries', () => {
+    expect(computeFplBand(1)).toBe('below-aca');
     expect(computeFplBand(1.3799)).toBe('below-aca');
     expect(computeFplBand(1.38)).toBe('aca-low');
+    expect(computeFplBand(1.75)).toBe('aca-low');
     expect(computeFplBand(2)).toBe('aca-mid');
+    expect(computeFplBand(2.5)).toBe('aca-mid');
+    expect(computeFplBand(3)).toBe('aca-high');
     expect(computeFplBand(4)).toBe('aca-high');
-    expect(computeFplBand(5)).toBe('above-cliff');
+    expect(computeFplBand(4.0001)).toBe('above-cliff');
   });
 
   it('computes withdrawal rates from prior closing balances and excludes conversions', () => {
@@ -213,6 +225,8 @@ describe('projection metric helpers', () => {
     expect(computeWithdrawalRateBand(0.04)).toBe('caution');
     expect(computeWithdrawalRateBand(0.0499)).toBe('caution');
     expect(computeWithdrawalRateBand(0.05)).toBe('danger');
+    expect(computeWithdrawalRateBand(0.1)).toBe('danger');
+    expect(computeWithdrawalRateBand(0.1001)).toBe('catastrophic');
   });
 
   it('computes federal bracket proximity at exact bracket edges', () => {
@@ -284,10 +298,31 @@ describe('projection metric helpers', () => {
       totalClosingBalance: 200_000,
       totalWithdrawals: 10_000,
       fplPercentage: 4.2,
-      fplBand: 'aca-high',
+      fplBand: 'above-cliff',
       withdrawalRate: 0.05,
       withdrawalRateBand: 'danger',
       ltcgRealized: 12_345,
+    });
+  });
+
+  it('falls back to filing status for non-ACA display FPL percentage', () => {
+    const scenario = makeScenario({
+      filingStatus: 'mfj',
+      healthcare: [{ year: 2027, kind: 'medicare' }],
+    });
+    const row = makeBreakdown({
+      year: 2027,
+      acaMagi: CONSTANTS_2026.fpl.contiguous.householdSize[2] * 2.5,
+    });
+
+    expect(
+      computeYearDisplayMetrics(row, {
+        formValues: makeFormValues(),
+        scenario,
+      }),
+    ).toMatchObject({
+      fplPercentage: 2.5,
+      fplBand: 'aca-mid',
     });
   });
 

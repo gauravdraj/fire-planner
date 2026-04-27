@@ -75,7 +75,7 @@ const TABLE_FIXTURE = [
     year: 2027,
   }),
   buildYearBreakdown({
-    afterTaxCashFlow: 70_000,
+    afterTaxCashFlow: -2_000,
     agi: 80_000,
     acaMagi: 80_000,
     closingBalances: {
@@ -250,7 +250,11 @@ describe('YearByYearTable', () => {
     expect(within(secondHeaderRow as HTMLElement).getAllByRole('button', { name: /About / })).toHaveLength(28);
 
     fireEvent.focus(screen.getByRole('button', { name: 'About ACA MAGI' }));
-    expect(screen.getByRole('tooltip')).toHaveTextContent(
+    expect(
+      screen
+        .getByText('Modified adjusted gross income used for ACA premium tax credit eligibility and FPL percentage.')
+        .closest('[role="tooltip"]'),
+    ).toHaveTextContent(
       'Modified adjusted gross income used for ACA premium tax credit eligibility and FPL percentage.',
     );
   });
@@ -293,6 +297,16 @@ describe('YearByYearTable', () => {
     expect(cellFor(2027, 'phase')).toHaveClass('text-left');
   });
 
+  it('renders and colors FPL percentage for non-ACA rows using the filing-status fallback', () => {
+    render(<YearByYearTable now={dateAtTaxDataAge(0)} />);
+
+    const nonAcaFplValue = within(cellFor(2028, 'fplPercentage')).getByText(/\d+(?:\.\d)?%/);
+
+    expect(nonAcaFplValue).toHaveTextContent('486.6%');
+    expect(nonAcaFplValue).toHaveClass('bg-rose-300', 'text-rose-950', 'font-bold');
+    expect(cellFor(2028, 'fplPercentage')).toHaveTextContent('FPL band: above the ACA subsidy cliff risk area.');
+  });
+
   it('converts displayed monetary values between real and nominal dollars', () => {
     render(<YearByYearTable now={dateAtTaxDataAge(0)} />);
 
@@ -317,11 +331,19 @@ describe('YearByYearTable', () => {
     expect(rowForYear(2027)).toHaveClass('border-l-4', 'border-indigo-500', 'bg-indigo-50/40');
     expect(cellFor(2027, 'year')).toHaveClass('border-l-4', 'border-indigo-500');
 
-    expect(cellFor(2027, 'fplPercentage')).toHaveClass('bg-amber-50', 'text-amber-800');
-    expect(cellFor(2027, 'fplPercentage')).toHaveTextContent('FPL band: near the ACA subsidy cliff risk area.');
-    expect(cellFor(2027, 'withdrawalRate')).toHaveClass('bg-rose-50', 'text-rose-800');
+    expect(within(cellFor(2027, 'fplPercentage')).getByText('420%')).toHaveClass(
+      'bg-rose-300',
+      'text-rose-950',
+      'font-bold',
+    );
+    expect(cellFor(2027, 'fplPercentage')).toHaveTextContent('FPL band: above the ACA subsidy cliff risk area.');
+    expect(within(cellFor(2027, 'withdrawalRate')).getByText('5%')).toHaveClass('bg-rose-200', 'text-rose-900');
     expect(cellFor(2027, 'withdrawalRate')).toHaveTextContent(
-      'Withdrawal-rate band: at or above the 5% danger threshold.',
+      'Withdrawal-rate band: between the 5% danger threshold and 10% catastrophic threshold.',
+    );
+    expect(within(cellFor(2028, 'afterTaxCashFlow')).getByText('-$2,000')).toHaveClass(
+      'text-rose-700',
+      'font-semibold',
     );
 
     expect(cellFor(2027, 'federalTax')).toHaveClass('bg-amber-50', 'text-amber-900');

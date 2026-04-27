@@ -42,7 +42,7 @@ export type BridgeWindow = Readonly<{
 
 export type FplBand = 'below-aca' | 'aca-low' | 'aca-mid' | 'aca-high' | 'above-cliff';
 
-export type WithdrawalRateBand = 'safe' | 'caution' | 'danger';
+export type WithdrawalRateBand = 'safe' | 'caution' | 'danger' | 'catastrophic';
 
 export type FederalBracketProximity = Readonly<{
   marginalRate: number;
@@ -243,6 +243,10 @@ export function computeFplPercentage(
   return povertyGuideline <= 0 ? 0 : Math.max(0, householdIncome) / povertyGuideline;
 }
 
+export function pickFplHouseholdSize(filingStatus: FilingStatus): 1 | 2 {
+  return filingStatus === 'mfj' ? 2 : 1;
+}
+
 export function computeWithdrawalRate(year: YearBreakdown, priorYear: YearBreakdown | null | undefined): number | null {
   if (priorYear === null || priorYear === undefined) {
     return null;
@@ -263,10 +267,10 @@ export function computeFplBand(fplPercentage: number): FplBand {
   if (fplPercentage < 2) {
     return 'aca-low';
   }
-  if (fplPercentage < 4) {
+  if (fplPercentage < 3) {
     return 'aca-mid';
   }
-  if (fplPercentage < 5) {
+  if (fplPercentage <= 4) {
     return 'aca-high';
   }
 
@@ -280,8 +284,11 @@ export function computeWithdrawalRateBand(withdrawalRate: number): WithdrawalRat
   if (withdrawalRate < 0.05) {
     return 'caution';
   }
+  if (withdrawalRate <= 0.1) {
+    return 'danger';
+  }
 
-  return 'danger';
+  return 'catastrophic';
 }
 
 export function computeFederalBracketProximity(
@@ -420,20 +427,24 @@ function computeProjectedTaxableIncome(scenario: Scenario, breakdown: YearBreakd
 
 function computeDisplayFplPercentage(breakdown: YearBreakdown, scenario: Scenario): number | null {
   const healthcarePhase = getHealthcarePhase(scenario.healthcare, breakdown.year);
-  if (healthcarePhase.kind !== 'aca') {
-    return null;
+  const fplTable = getFPLForCoverageYear({
+    coverageYear: breakdown.year,
+    fplIndexingRate: scenario.inflationRate,
+  });
+
+  if (healthcarePhase.kind === 'aca') {
+    if (breakdown.acaPremiumCredit !== null) {
+      return breakdown.acaPremiumCredit.fplPercent;
+    }
+
+    return computeFplPercentage(breakdown.acaMagi, healthcarePhase.householdSize, {
+      fplTable,
+      ...(healthcarePhase.region !== undefined ? { region: healthcarePhase.region } : {}),
+    });
   }
 
-  if (breakdown.acaPremiumCredit !== null) {
-    return breakdown.acaPremiumCredit.fplPercent;
-  }
-
-  return computeFplPercentage(breakdown.acaMagi, healthcarePhase.householdSize, {
-    fplTable: getFPLForCoverageYear({
-      coverageYear: breakdown.year,
-      fplIndexingRate: scenario.inflationRate,
-    }),
-    ...(healthcarePhase.region !== undefined ? { region: healthcarePhase.region } : {}),
+  return computeFplPercentage(breakdown.acaMagi, pickFplHouseholdSize(scenario.filingStatus), {
+    fplTable,
   });
 }
 

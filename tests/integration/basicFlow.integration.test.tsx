@@ -64,14 +64,12 @@ function advancePulseDuration() {
   });
 }
 
-function summaryCard(name: RegExp) {
-  return screen.getByRole('article', { name });
+function liveStat(id: string) {
+  return screen.getByTestId(`live-stat-${id}`);
 }
 
-function summaryValue(name: RegExp): string {
-  const card = summaryCard(name);
-
-  return within(card).getByText(/^-?\$[\d,]+$/).textContent ?? '';
+function liveStatValue(id: string): string {
+  return liveStat(id).querySelector('.tabular-nums')?.textContent ?? '';
 }
 
 function numericMoney(value: string): number {
@@ -82,19 +80,19 @@ function expectedFplClassForPercent(percentLabel: string): readonly string[] {
   const percentage = Number(percentLabel.replace('%', '')) / 100;
 
   if (percentage < 1.38) {
-    return ['bg-rose-50', 'text-rose-800'];
+    return ['bg-rose-100', 'text-rose-800'];
   }
   if (percentage < 2) {
-    return ['bg-emerald-50', 'text-emerald-800'];
-  }
-  if (percentage < 4) {
-    return ['bg-sky-50', 'text-sky-800'];
-  }
-  if (percentage < 5) {
     return ['bg-amber-50', 'text-amber-800'];
   }
+  if (percentage < 3) {
+    return ['bg-emerald-100', 'text-emerald-900'];
+  }
+  if (percentage <= 4) {
+    return ['bg-amber-100', 'text-amber-900'];
+  }
 
-  return ['bg-rose-100', 'text-rose-900'];
+  return ['bg-rose-300', 'text-rose-950', 'font-bold'];
 }
 
 function firstBridgeFplCell(table: HTMLElement): HTMLElement {
@@ -175,15 +173,11 @@ describe('basic Gate 3 app flow', () => {
     advancePulseDuration();
     vi.useRealTimers();
 
-    expect(screen.getByRole('heading', { name: /projection summary/i })).toBeInTheDocument();
-    expect(numericMoney(summaryValue(/net worth at retirement/i))).toBeGreaterThan(0);
-    expect(numericMoney(summaryValue(/plan-end balance/i))).toBeGreaterThan(0);
-    expect(within(summaryCard(/years funded/i)).getByText(/\d+ years?/)).toHaveTextContent(/year/);
-
-    const summaryGrid = screen.getByRole('heading', { name: /projection summary/i }).parentElement?.querySelector('.grid');
-
-    expect(summaryGrid).toHaveClass('grid', 'gap-3', 'md:grid-cols-3');
-    expect(summaryGrid).not.toHaveClass('grid-cols-3', 'sm:grid-cols-3');
+    expect(screen.queryByRole('heading', { name: /projection summary/i })).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/live projection stats/i)).toBeInTheDocument();
+    expect(numericMoney(liveStatValue('net-worth-at-retirement'))).toBeGreaterThan(0);
+    expect(numericMoney(liveStatValue('plan-end-balance'))).toBeGreaterThan(0);
+    expect(within(liveStat('years-funded')).getByText(/\d+ years?/)).toHaveTextContent(/year/);
 
     const table = screen.getByRole('table');
     const expectedProjectionYears = 90 - 58 + 1;
@@ -196,10 +190,10 @@ describe('basic Gate 3 app flow', () => {
     expect(within(table).getByRole('columnheader', { name: 'Year' })).toHaveClass('sticky', 'left-0');
     expect(within(table).getAllByRole('rowheader')[0]).toHaveClass('sticky', 'left-0');
 
-    const realRetirementValue = summaryValue(/net worth at retirement/i);
+    const realRetirementValue = liveStatValue('net-worth-at-retirement');
     fireEvent.click(screen.getByRole('button', { name: 'Nominal dollars' }));
 
-    expect(summaryValue(/net worth at retirement/i)).not.toBe(realRetirementValue);
+    expect(liveStatValue('net-worth-at-retirement')).not.toBe(realRetirementValue);
 
     fireEvent.click(screen.getByRole('button', { name: /^share$/i }));
 
@@ -273,9 +267,10 @@ describe('basic Gate 3 app flow', () => {
   it('colors a bridge-year FPL percentage cell with its threshold class', async () => {
     const { table } = await renderFilledRealisticPlanner();
     const bridgeFplCell = firstBridgeFplCell(table);
-    const bridgeFplValue = bridgeFplCell.querySelector('span')?.textContent ?? '';
+    const bridgeFplMetric = bridgeFplCell.querySelector('span') as HTMLElement;
+    const bridgeFplValue = bridgeFplMetric.textContent ?? '';
 
-    expect(bridgeFplCell).toHaveClass(...expectedFplClassForPercent(bridgeFplValue));
+    expect(bridgeFplMetric).toHaveClass(...expectedFplClassForPercent(bridgeFplValue));
   }, 10_000);
 
   it('renders six basic-form fieldsets with the expected legends', async () => {
@@ -306,12 +301,12 @@ describe('basic Gate 3 app flow', () => {
     expect(within(table).getAllByRole('rowheader')[0]).toHaveClass('sticky', 'left-0');
   }, 10_000);
 
-  it('continues to update summary values when display units change', async () => {
+  it('continues to update live stat values when display units change', async () => {
     await renderFilledRealisticPlanner();
 
-    const realRetirementValue = summaryValue(/net worth at retirement/i);
+    const realRetirementValue = liveStatValue('net-worth-at-retirement');
     fireEvent.click(screen.getByRole('button', { name: 'Nominal dollars' }));
 
-    expect(summaryValue(/net worth at retirement/i)).not.toBe(realRetirementValue);
+    expect(liveStatValue('net-worth-at-retirement')).not.toBe(realRetirementValue);
   }, 10_000);
 });

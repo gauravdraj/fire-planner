@@ -15,6 +15,7 @@ import type { DisplayUnit } from '@/store/uiStore';
 import { useUiStore } from '@/store/uiStore';
 
 import { InfoTooltip } from './InfoTooltip';
+import { MetricCell, type MetricCellBandType } from './MetricCell';
 
 type YearByYearTableProps = {
   now?: Date | string;
@@ -39,6 +40,8 @@ type CellModel = Readonly<{
   value: string;
   pulseValue: string | number;
   className?: string;
+  metricBandType?: MetricCellBandType;
+  rawNumeric?: number | null;
   marker?: string;
   srText?: string;
   title?: string;
@@ -249,7 +252,7 @@ const TABLE_COLUMNS: readonly TableColumn[] = [
     id: 'afterTaxCashFlow',
     band: 'KPIs',
     label: 'After-tax cash flow',
-    getCell: (row, context) => moneyCell(row.breakdown.afterTaxCashFlow, row.breakdown.year, context),
+    getCell: (row, context) => cashflowCell(row.breakdown.afterTaxCashFlow, row.breakdown.year, context),
   },
 ];
 
@@ -402,7 +405,17 @@ function TableCell({
   );
   const contents = (
     <>
-      <span>{cell.value}</span>
+      {cell.metricBandType === undefined ? (
+        <span>{cell.value}</span>
+      ) : (
+        <MetricCell
+          bandType={cell.metricBandType}
+          className="inline-block rounded px-1"
+          displayText={cell.value}
+          pulseKey={cell.pulseValue}
+          rawNumeric={cell.rawNumeric ?? null}
+        />
+      )}
       {cell.marker === undefined ? null : (
         <span
           aria-hidden="true"
@@ -462,6 +475,14 @@ function optionalMoneyCell(amount: number | null, year: number, context: TableRe
   return moneyCell(amount === null || amount === 0 ? null : amount, year, context);
 }
 
+function cashflowCell(amount: number, year: number, context: TableRenderContext): CellModel {
+  return {
+    ...moneyCell(amount, year, context),
+    metricBandType: 'cashflow',
+    rawNumeric: amount,
+  };
+}
+
 function federalTaxCell(row: DisplayRow, context: TableRenderContext): CellModel {
   const distanceToNextEdge = row.metrics.federalBracketProximity.distanceToNextEdge;
   const baseCell = moneyCell(row.breakdown.federalTax, row.breakdown.year, context);
@@ -493,7 +514,8 @@ function fplCell(fplPercentage: number | null, fplBand: FplBand | null): CellMod
   return {
     value: PERCENT_FORMATTER.format(fplPercentage),
     pulseValue: fplPercentage,
-    className: fplBandClass(fplBand),
+    metricBandType: 'fpl',
+    rawNumeric: fplPercentage,
     srText: fplBandDescription(fplBand),
   };
 }
@@ -509,7 +531,8 @@ function withdrawalRateCell(withdrawalRate: number | null, withdrawalRateBand: W
   return {
     value: PERCENT_FORMATTER.format(withdrawalRate),
     pulseValue: withdrawalRate,
-    className: withdrawalRateBandClass(withdrawalRateBand),
+    metricBandType: 'wdRate',
+    rawNumeric: withdrawalRate,
     srText: withdrawalRateBandDescription(withdrawalRateBand),
   };
 }
@@ -555,21 +578,6 @@ function columnWidthClass(column: TableColumn): string {
   }
 }
 
-function fplBandClass(band: FplBand): string {
-  switch (band) {
-    case 'below-aca':
-      return 'bg-rose-50 text-rose-800';
-    case 'aca-low':
-      return 'bg-emerald-50 text-emerald-800';
-    case 'aca-mid':
-      return 'bg-sky-50 text-sky-800';
-    case 'aca-high':
-      return 'bg-amber-50 text-amber-800';
-    case 'above-cliff':
-      return 'bg-rose-100 text-rose-900';
-  }
-}
-
 function fplBandDescription(band: FplBand): string {
   switch (band) {
     case 'below-aca':
@@ -585,17 +593,6 @@ function fplBandDescription(band: FplBand): string {
   }
 }
 
-function withdrawalRateBandClass(band: WithdrawalRateBand): string {
-  switch (band) {
-    case 'safe':
-      return 'bg-emerald-50 text-emerald-800';
-    case 'caution':
-      return 'bg-amber-50 text-amber-800';
-    case 'danger':
-      return 'bg-rose-50 text-rose-800';
-  }
-}
-
 function withdrawalRateBandDescription(band: WithdrawalRateBand): string {
   switch (band) {
     case 'safe':
@@ -603,7 +600,9 @@ function withdrawalRateBandDescription(band: WithdrawalRateBand): string {
     case 'caution':
       return 'Withdrawal-rate band: between the 4% caution threshold and 5% danger threshold.';
     case 'danger':
-      return 'Withdrawal-rate band: at or above the 5% danger threshold.';
+      return 'Withdrawal-rate band: between the 5% danger threshold and 10% catastrophic threshold.';
+    case 'catastrophic':
+      return 'Withdrawal-rate band: above the 10% catastrophic threshold.';
   }
 }
 

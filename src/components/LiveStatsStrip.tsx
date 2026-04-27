@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 
 import {
   computeAverageBridgeAcaMagi,
+  computeYearDisplayMetrics,
   computeMaxBridgeGrossBucketDrawPercentage,
   computeNetWorthAtRetirement,
   computePlanEndBalance,
@@ -19,12 +20,15 @@ import type { DisplayUnit } from '@/store/uiStore';
 import { useUiStore } from '@/store/uiStore';
 
 import { InfoTooltip } from './InfoTooltip';
+import { MetricCell, type MetricCellBandType } from './MetricCell';
 
 type LiveStat = Readonly<{
   id: LiveStatMetricId;
   label: string;
   explanation: string;
   value: string;
+  rawNumeric: number | null;
+  bandType: MetricCellBandType;
   pulseValue: string | number;
   detail: string;
 }>;
@@ -75,7 +79,14 @@ function LiveStatCell({ stat }: { stat: LiveStat }) {
         <span>{stat.label}</span>
         <InfoTooltip ariaLabel={`About ${stat.label}`}>{stat.explanation}</InfoTooltip>
       </p>
-      <p className="mt-1 text-base font-semibold tabular-nums text-slate-950">{stat.value}</p>
+      <p className="mt-1 text-base font-semibold text-slate-950">
+        <MetricCell
+          bandType={stat.bandType}
+          displayText={stat.value}
+          rawNumeric={stat.rawNumeric}
+          {...(stat.bandType === 'none' ? {} : { className: 'rounded px-1' })}
+        />
+      </p>
       <p className="mt-1 text-[0.7rem] leading-snug text-slate-500">{stat.detail}</p>
     </li>
   );
@@ -97,6 +108,7 @@ function buildLiveStats({
   const yearsFunded = computeYearsFundedFromRetirement(projectionResults, formValues.retirementYear);
   const bridgeWindow = selectBridgeWindow(formValues, projectionResults);
   const averageBridgeMagi = computeAverageBridgeAcaMagi(bridgeWindow.years);
+  const averageBridgeFplPercentage = computeAverageBridgeFplPercentage(bridgeWindow.years, projectionResults, formValues, scenario);
   const maxBridgeDrawPercentage = computeMaxBridgeGrossBucketDrawPercentage(bridgeWindow.years);
   const totalBridgeTax = computeTotalBridgeTax(bridgeWindow.years);
   const bridgeDetail = formatBridgeDetail(bridgeWindow.startYear, bridgeWindow.endYear);
@@ -107,6 +119,8 @@ function buildLiveStats({
       label: liveStatExplanations['net-worth-at-retirement'].label,
       explanation: liveStatExplanations['net-worth-at-retirement'].description,
       value: formatBalanceMetric(retirementNetWorth, scenario, displayUnit),
+      rawNumeric: retirementNetWorth?.amount ?? null,
+      bandType: 'none',
       pulseValue: metricPulseValue(retirementNetWorth),
       detail: retirementNetWorth === null ? 'No retirement row.' : `Opening balance in ${retirementNetWorth.year}.`,
     },
@@ -115,6 +129,8 @@ function buildLiveStats({
       label: liveStatExplanations['plan-end-balance'].label,
       explanation: liveStatExplanations['plan-end-balance'].description,
       value: formatBalanceMetric(planEndBalance, scenario, displayUnit),
+      rawNumeric: planEndBalance?.amount ?? null,
+      bandType: 'none',
       pulseValue: metricPulseValue(planEndBalance),
       detail: planEndBalance === null ? 'No final row.' : `Closing balance in ${planEndBalance.year}.`,
     },
@@ -123,6 +139,8 @@ function buildLiveStats({
       label: liveStatExplanations['years-funded'].label,
       explanation: liveStatExplanations['years-funded'].description,
       value: formatYears(yearsFunded.count),
+      rawNumeric: yearsFunded.count,
+      bandType: 'none',
       pulseValue: yearsFunded.count,
       detail:
         yearsFunded.depletedYear === null
@@ -138,6 +156,8 @@ function buildLiveStats({
           ? computeAverageDisplayAmount(bridgeWindow.years, scenario, (breakdown) => breakdown.acaMagi)
           : averageBridgeMagi,
       ),
+      rawNumeric: averageBridgeFplPercentage,
+      bandType: 'fpl',
       pulseValue: nullablePulseValue(averageBridgeMagi),
       detail: bridgeDetail,
     },
@@ -146,6 +166,8 @@ function buildLiveStats({
       label: liveStatExplanations['max-bridge-draw-percentage'].label,
       explanation: liveStatExplanations['max-bridge-draw-percentage'].description,
       value: formatNullablePercentage(maxBridgeDrawPercentage),
+      rawNumeric: maxBridgeDrawPercentage,
+      bandType: 'wdRate',
       pulseValue: nullablePulseValue(maxBridgeDrawPercentage),
       detail: bridgeDetail,
     },
@@ -158,6 +180,8 @@ function buildLiveStats({
           ? computeTotalDisplayAmount(bridgeWindow.years, scenario, (breakdown) => breakdown.totalTax)
           : totalBridgeTax,
       ),
+      rawNumeric: totalBridgeTax,
+      bandType: 'none',
       pulseValue: nullablePulseValue(totalBridgeTax),
       detail: bridgeDetail,
     },
@@ -200,6 +224,32 @@ function computeTotalDisplayAmount(
   }
 
   return years.reduce((total, breakdown) => total + displayAmount(getAmount(breakdown), breakdown.year, scenario, 'real'), 0);
+}
+
+function computeAverageBridgeFplPercentage(
+  bridgeYears: readonly YearBreakdown[],
+  projectionResults: readonly YearBreakdown[],
+  formValues: ProjectionMetricFormValues,
+  scenario: Scenario,
+): number | null {
+  const bridgeYearSet = new Set(bridgeYears.map((breakdown) => breakdown.year));
+  const fplPercentages = projectionResults
+    .map((breakdown, index) =>
+      bridgeYearSet.has(breakdown.year)
+        ? computeYearDisplayMetrics(breakdown, {
+            formValues,
+            priorYear: projectionResults[index - 1] ?? null,
+            scenario,
+          }).fplPercentage
+        : null,
+    )
+    .filter((value): value is number => value !== null);
+
+  if (fplPercentages.length === 0) {
+    return null;
+  }
+
+  return fplPercentages.reduce((total, value) => total + value, 0) / fplPercentages.length;
 }
 
 function displayAmount(amount: number, year: number, scenario: Scenario, displayUnit: DisplayUnit): number {

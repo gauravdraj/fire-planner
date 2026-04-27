@@ -46,7 +46,7 @@ describe('AdvancedView', () => {
     expect(screen.getByRole('heading', { name: 'Generate brokerage harvests' })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('tab', { name: 'Planning charts' }));
-    expect(screen.getByRole('heading', { name: 'Projection summary' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Projection summary' })).not.toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Year-by-year projection' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Account balances' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'MAGI thresholds' })).toBeInTheDocument();

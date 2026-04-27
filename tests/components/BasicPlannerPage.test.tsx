@@ -89,7 +89,10 @@ describe('BasicPlannerPage', () => {
     expect(screen.queryByText(/Projection results will appear here/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/Run the projection to see/i)).not.toBeInTheDocument();
     expect(screen.getByLabelText(/live projection stats/i)).toHaveClass('sticky');
-    expect(screen.getByRole('heading', { name: /projection summary/i })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: /projection summary/i })).not.toBeInTheDocument();
+    expect(screen.getByTestId('live-stat-net-worth-at-retirement')).toHaveTextContent('Net worth at retirement');
+    expect(screen.getByTestId('live-stat-plan-end-balance')).toHaveTextContent('Plan-end balance');
+    expect(screen.getByTestId('live-stat-years-funded')).toHaveTextContent('Years funded');
     expect(screen.getByRole('heading', { name: /year-by-year projection/i })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: /72\(t\) SEPP IRA size calculator/i })).toBeInTheDocument();
     expect(screen.getByLabelText(/72\(t\) calculator inputs/i)).toBeInTheDocument();
@@ -128,7 +131,8 @@ describe('BasicPlannerPage', () => {
     expect(useScenarioStore.getState().formValues.stateCode).toBe('PA');
     expect(useScenarioStore.getState()).not.toHaveProperty('hasRunProjection');
     expect(screen.getByLabelText('State')).toHaveValue('PA');
-    expect(screen.getByRole('heading', { name: /projection summary/i })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: /projection summary/i })).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/live projection stats/i)).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: /year-by-year projection/i })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: /account balances/i })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: /magi thresholds/i })).toBeInTheDocument();
@@ -152,7 +156,8 @@ describe('BasicPlannerPage', () => {
     expect(useScenarioStore.getState()).not.toHaveProperty('hasRunProjection');
     expect(screen.getByLabelText('State')).toHaveValue('FL');
     expect(screen.queryByText(/Projection results will appear here/i)).not.toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: /projection summary/i })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: /projection summary/i })).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/live projection stats/i)).toBeInTheDocument();
   });
 });
 
