@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo } from 'react';
 
 import {
   computeAverageBridgeAcaMagi,
@@ -11,19 +11,23 @@ import {
   type ProjectionMetricFormValues,
 } from '@/core/metrics';
 import type { Scenario, YearBreakdown } from '@/core/projection';
+import { liveStatExplanations, type LiveStatMetricId } from '@/lib/columnExplanations';
 import { toReal } from '@/lib/realDollars';
+import { useChangePulse } from '@/lib/useChangePulse';
 import { useScenarioStore } from '@/store/scenarioStore';
 import type { DisplayUnit } from '@/store/uiStore';
 import { useUiStore } from '@/store/uiStore';
 
+import { InfoTooltip } from './InfoTooltip';
+
 type LiveStat = Readonly<{
-  id: string;
+  id: LiveStatMetricId;
   label: string;
+  explanation: string;
   value: string;
+  pulseValue: string | number;
   detail: string;
 }>;
-
-const RECENT_UPDATE_MS = 600;
 
 const DOLLAR_FORMATTER = new Intl.NumberFormat('en-US', {
   currency: 'USD',
@@ -45,66 +49,32 @@ export function LiveStatsStrip() {
     () => buildLiveStats({ displayUnit, formValues, projectionResults, scenario }),
     [displayUnit, formValues, projectionResults, scenario],
   );
-  const valueSnapshot = stats.map((stat) => `${stat.id}:${stat.value}`).join('|');
-  const previousValuesRef = useRef<Record<string, string> | null>(null);
-  const [recentlyChangedIds, setRecentlyChangedIds] = useState<ReadonlySet<string>>(() => new Set());
-
-  useEffect(() => {
-    const previousValues = previousValuesRef.current;
-    const currentValues = Object.fromEntries(stats.map((stat) => [stat.id, stat.value]));
-
-    previousValuesRef.current = currentValues;
-
-    if (previousValues === null) {
-      return;
-    }
-
-    const changedIds = stats
-      .filter((stat) => previousValues[stat.id] !== undefined && previousValues[stat.id] !== stat.value)
-      .map((stat) => stat.id);
-
-    if (changedIds.length === 0) {
-      return;
-    }
-
-    setRecentlyChangedIds(new Set(changedIds));
-
-    const timeoutId = setTimeout(() => {
-      setRecentlyChangedIds(new Set());
-    }, RECENT_UPDATE_MS);
-
-    return () => {
-      clearTimeout(timeoutId);
-    };
-  }, [stats, valueSnapshot]);
-
   return (
     <section aria-label="Live projection stats" className="sticky top-0 z-10 mt-6 bg-white/90 py-3 backdrop-blur">
       <ul className="grid gap-2 rounded-lg border border-slate-200 bg-white/80 p-3 sm:grid-cols-2 lg:grid-cols-6">
         {stats.map((stat) => (
-          <LiveStatCell isRecentlyChanged={recentlyChangedIds.has(stat.id)} key={stat.id} stat={stat} />
+          <LiveStatCell key={stat.id} stat={stat} />
         ))}
       </ul>
     </section>
   );
 }
 
-function LiveStatCell({ isRecentlyChanged, stat }: { isRecentlyChanged: boolean; stat: LiveStat }) {
+function LiveStatCell({ stat }: { stat: LiveStat }) {
+  const isPulsing = useChangePulse(stat.pulseValue);
+
   return (
     <li
-      className="relative rounded-md border border-slate-100 bg-white px-3 py-2"
-      data-recent-update={isRecentlyChanged ? 'true' : undefined}
+      className={[
+        'relative rounded-md border border-slate-100 px-3 py-2 transition-colors duration-700',
+        isPulsing ? 'bg-yellow-100' : 'bg-white',
+      ].join(' ')}
       data-testid={`live-stat-${stat.id}`}
     >
-      <span
-        aria-hidden="true"
-        className={[
-          'absolute right-2 top-2 h-2 w-2 rounded-full bg-emerald-400 transition-opacity duration-500',
-          isRecentlyChanged ? 'opacity-100 animate-pulse' : 'opacity-0',
-        ].join(' ')}
-        data-testid={`live-stat-pulse-${stat.id}`}
-      />
-      <p className="pr-4 text-[0.7rem] font-medium uppercase tracking-wide text-slate-500">{stat.label}</p>
+      <p className="flex items-center gap-1.5 pr-4 text-[0.7rem] font-medium uppercase tracking-wide text-slate-500">
+        <span>{stat.label}</span>
+        <InfoTooltip ariaLabel={`About ${stat.label}`}>{stat.explanation}</InfoTooltip>
+      </p>
       <p className="mt-1 text-base font-semibold tabular-nums text-slate-950">{stat.value}</p>
       <p className="mt-1 text-[0.7rem] leading-snug text-slate-500">{stat.detail}</p>
     </li>
@@ -134,20 +104,26 @@ function buildLiveStats({
   return [
     {
       id: 'net-worth-at-retirement',
-      label: 'Net worth at retirement',
+      label: liveStatExplanations['net-worth-at-retirement'].label,
+      explanation: liveStatExplanations['net-worth-at-retirement'].description,
       value: formatBalanceMetric(retirementNetWorth, scenario, displayUnit),
+      pulseValue: metricPulseValue(retirementNetWorth),
       detail: retirementNetWorth === null ? 'No retirement row.' : `Opening balance in ${retirementNetWorth.year}.`,
     },
     {
       id: 'plan-end-balance',
-      label: 'Plan-end balance',
+      label: liveStatExplanations['plan-end-balance'].label,
+      explanation: liveStatExplanations['plan-end-balance'].description,
       value: formatBalanceMetric(planEndBalance, scenario, displayUnit),
+      pulseValue: metricPulseValue(planEndBalance),
       detail: planEndBalance === null ? 'No final row.' : `Closing balance in ${planEndBalance.year}.`,
     },
     {
       id: 'years-funded',
-      label: 'Years funded',
+      label: liveStatExplanations['years-funded'].label,
+      explanation: liveStatExplanations['years-funded'].description,
       value: formatYears(yearsFunded.count),
+      pulseValue: yearsFunded.count,
       detail:
         yearsFunded.depletedYear === null
           ? `Funded through ${yearsFunded.fundedThroughYear ?? 'plan end'}.`
@@ -155,28 +131,34 @@ function buildLiveStats({
     },
     {
       id: 'average-bridge-magi',
-      label: 'Average MAGI',
+      label: liveStatExplanations['average-bridge-magi'].label,
+      explanation: liveStatExplanations['average-bridge-magi'].description,
       value: formatNullableDollar(
         displayUnit === 'real'
           ? computeAverageDisplayAmount(bridgeWindow.years, scenario, (breakdown) => breakdown.acaMagi)
           : averageBridgeMagi,
       ),
+      pulseValue: nullablePulseValue(averageBridgeMagi),
       detail: bridgeDetail,
     },
     {
       id: 'max-bridge-draw-percentage',
-      label: 'Max gross bucket draw',
+      label: liveStatExplanations['max-bridge-draw-percentage'].label,
+      explanation: liveStatExplanations['max-bridge-draw-percentage'].description,
       value: formatNullablePercentage(maxBridgeDrawPercentage),
+      pulseValue: nullablePulseValue(maxBridgeDrawPercentage),
       detail: bridgeDetail,
     },
     {
       id: 'total-bridge-tax',
-      label: 'Total bridge tax',
+      label: liveStatExplanations['total-bridge-tax'].label,
+      explanation: liveStatExplanations['total-bridge-tax'].description,
       value: formatNullableDollar(
         displayUnit === 'real'
           ? computeTotalDisplayAmount(bridgeWindow.years, scenario, (breakdown) => breakdown.totalTax)
           : totalBridgeTax,
       ),
+      pulseValue: nullablePulseValue(totalBridgeTax),
       detail: bridgeDetail,
     },
   ];
@@ -226,6 +208,14 @@ function displayAmount(amount: number, year: number, scenario: Scenario, display
 
 function formatNullableDollar(amount: number | null): string {
   return amount === null ? '-' : DOLLAR_FORMATTER.format(amount);
+}
+
+function metricPulseValue(metric: ReturnType<typeof computeNetWorthAtRetirement> | ReturnType<typeof computePlanEndBalance>): string | number {
+  return metric === null ? 'missing' : metric.amount;
+}
+
+function nullablePulseValue(value: number | null): string | number {
+  return value === null ? 'missing' : value;
 }
 
 function formatNullablePercentage(value: number | null): string {

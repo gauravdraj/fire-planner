@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { BasicForm } from '@/components/BasicForm';
@@ -36,6 +36,7 @@ describe('BasicForm', () => {
     expect(screen.getByLabelText('State')).toHaveValue('CA');
     expect(screen.getByLabelText('Primary age')).toBeInTheDocument();
     expect(screen.getByLabelText('Partner age')).toBeInTheDocument();
+    expect(screen.getByLabelText('Current year')).toBeInTheDocument();
     expect(screen.getByLabelText('Retirement target year')).toBeInTheDocument();
     expect(screen.getByLabelText('Plan-end age')).toBeInTheDocument();
     expect(screen.getByLabelText('Annual spending')).toBeInTheDocument();
@@ -55,10 +56,59 @@ describe('BasicForm', () => {
     expect(screen.queryByText(/hsa/i)).not.toBeInTheDocument();
   });
 
+  it('groups fields into the ordered basic form sections', () => {
+    const { container } = render(<BasicForm />);
+    const fieldsets = Array.from(container.querySelectorAll('fieldset')) as HTMLElement[];
+
+    expect(fieldsets).toHaveLength(6);
+    expect(
+      fieldsets.map((fieldset) =>
+        within(fieldset).getByRole('button', { name: /About / }).getAttribute('aria-label')?.replace('About ', ''),
+      ),
+    ).toEqual(['Household', 'Timeline', 'Spending', 'Accounts', 'Income', 'Healthcare']);
+    for (const fieldset of fieldsets) {
+      expect(fieldset).toHaveClass('rounded-md', 'border', 'border-slate-200', 'p-4');
+      expect(fieldset.querySelector('legend')).toHaveClass('px-2', 'text-sm', 'font-semibold', 'text-slate-700');
+    }
+
+    const household = screen.getByRole('group', { name: /household/i });
+    expect(within(household).getByLabelText('Filing status')).toBeInTheDocument();
+    expect(within(household).getByLabelText('State')).toBeInTheDocument();
+    expect(within(household).getByLabelText('Primary age')).toBeInTheDocument();
+    expect(within(household).getByLabelText('Partner age')).toBeInTheDocument();
+
+    const timeline = screen.getByRole('group', { name: /timeline/i });
+    expect(within(timeline).getByLabelText('Current year')).toBeInTheDocument();
+    expect(within(timeline).getByLabelText('Retirement target year')).toBeInTheDocument();
+    expect(within(timeline).getByLabelText('Plan-end age')).toBeInTheDocument();
+    expect(within(timeline).getByLabelText('Social Security claim age')).toBeInTheDocument();
+
+    expect(
+      within(screen.getByRole('group', { name: /spending/i })).getByLabelText('Annual spending'),
+    ).toBeInTheDocument();
+
+    const accounts = screen.getByRole('group', { name: /accounts/i });
+    expect(within(accounts).getByLabelText('Traditional balance')).toBeInTheDocument();
+    expect(within(accounts).getByLabelText('Roth balance')).toBeInTheDocument();
+    expect(within(accounts).getByLabelText('Brokerage plus cash balance')).toBeInTheDocument();
+    expect(within(accounts).getByLabelText('Weighted-average taxable basis')).toBeInTheDocument();
+
+    const income = screen.getByRole('group', { name: /income/i });
+    expect(within(income).getByLabelText('W-2 income')).toBeInTheDocument();
+    expect(within(income).getByLabelText('Net consulting income')).toBeInTheDocument();
+    expect(within(income).getByLabelText('Net rental income')).toBeInTheDocument();
+    expect(within(income).getByLabelText('Social Security annual benefit')).toBeInTheDocument();
+    expect(within(income).getByLabelText('Pension/annuity annual amount')).toBeInTheDocument();
+
+    expect(
+      within(screen.getByRole('group', { name: /healthcare/i })).getByLabelText('Healthcare phase'),
+    ).toBeInTheDocument();
+  });
+
   it('shows partner age only for married filing jointly', () => {
     render(<BasicForm />);
 
-    expect(screen.getByLabelText('Partner age')).toBeInTheDocument();
+    expect(within(screen.getByRole('group', { name: /household/i })).getByLabelText('Partner age')).toBeInTheDocument();
 
     changeField('Filing status', 'single');
 
@@ -66,7 +116,58 @@ describe('BasicForm', () => {
 
     changeField('Filing status', 'mfj');
 
-    expect(screen.getByLabelText('Partner age')).toBeInTheDocument();
+    expect(within(screen.getByRole('group', { name: /household/i })).getByLabelText('Partner age')).toBeInTheDocument();
+  });
+
+  it('adds accessible section tooltips to every fieldset legend', () => {
+    render(<BasicForm />);
+
+    expect(screen.getAllByRole('button', { name: /About / })).toHaveLength(6);
+    expect(screen.getByRole('button', { name: 'About Household' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'About Timeline' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'About Spending' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'About Accounts' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'About Income' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'About Healthcare' })).toBeInTheDocument();
+
+    fireEvent.focus(screen.getByRole('button', { name: 'About Accounts' }));
+
+    expect(screen.getByRole('tooltip')).toHaveTextContent(
+      'Starting supported account balances and taxable basis used by the withdrawal display layer.',
+    );
+  });
+
+  it('renders derived chips and updates them after valid debounced edits', () => {
+    render(<BasicForm />);
+
+    expect(screen.getByText('→ Age 64 in 9 yrs')).toHaveClass(
+      'text-xs',
+      'uppercase',
+      'tracking-wide',
+      'text-slate-500',
+    );
+    expect(screen.getByText(/→ Year 1 \$100,000 -> 2066 \$/)).toBeInTheDocument();
+    expect(screen.getByText('→ Stops in 2035')).toBeInTheDocument();
+    expect(screen.getByText('→ Claims in 2038 at age 67')).toBeInTheDocument();
+    expect(screen.getByText('→ Subsidy band unavailable')).toBeInTheDocument();
+
+    changeField('Retirement target year', '2030');
+    changeField('Annual spending', '90000');
+    changeField('Social Security claim age', '68');
+    changeField('Healthcare phase', 'aca');
+    advanceLiveDebounce();
+
+    expect(screen.getByText('→ Age 59 in 4 yrs')).toBeInTheDocument();
+    expect(screen.getByText(/→ Year 1 \$90,000 -> 2066 \$/)).toBeInTheDocument();
+    expect(screen.getByText('→ Stops in 2030')).toBeInTheDocument();
+    expect(screen.getByText('→ Claims in 2039 at age 68')).toBeInTheDocument();
+    expect(screen.getByText('→ Subsidy band: below 138% FPL')).toBeInTheDocument();
+
+    changeField('Annual spending', '');
+    advanceLiveDebounce();
+
+    expect(screen.getByText('Annual spending is required.')).toBeInTheDocument();
+    expect(screen.getByText(/→ Year 1 \$90,000 -> 2066 \$/)).toBeInTheDocument();
   });
 
   it('highlights blank required fields and out-of-range values', () => {

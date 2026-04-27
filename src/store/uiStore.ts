@@ -1,26 +1,38 @@
 import { create } from 'zustand';
 
+import type { ProjectionMetricFormValues } from '@/core/metrics';
+import type { Scenario, YearBreakdown } from '@/core/projection';
+
 export type PlannerMode = 'basic' | 'advanced' | 'compare';
 export type DisplayUnit = 'real' | 'nominal';
 
 export const UI_STORAGE_KEY = 'fire-planner.ui.v1';
 
+export type ProjectionRunSnapshot = Readonly<{
+  formValues: ProjectionMetricFormValues;
+  projectionResults: readonly YearBreakdown[];
+  scenario: Scenario;
+}>;
+
 export type UiStoreState = Readonly<{
   mode: PlannerMode;
   displayUnit: DisplayUnit;
+  lastProjectionRunSnapshot: ProjectionRunSnapshot | null;
 }>;
 
 type UiStoreActions = {
   setMode: (mode: PlannerMode) => void;
   setDisplayUnit: (displayUnit: DisplayUnit) => void;
+  trackProjectionRunSnapshot: (snapshot: ProjectionRunSnapshot) => void;
   resetUiPreferences: () => void;
 };
 
-type PersistedUiState = Partial<UiStoreState>;
+type PersistedUiState = Partial<Pick<UiStoreState, 'displayUnit' | 'mode'>>;
 
 const DEFAULT_UI_STATE: UiStoreState = {
   mode: 'basic',
   displayUnit: 'real',
+  lastProjectionRunSnapshot: null,
 };
 
 export const useUiStore = create<UiStoreState & UiStoreActions>((set) => ({
@@ -30,6 +42,9 @@ export const useUiStore = create<UiStoreState & UiStoreActions>((set) => ({
   },
   setDisplayUnit: (displayUnit) => {
     set((state) => persistUiState({ ...state, displayUnit }));
+  },
+  trackProjectionRunSnapshot: (snapshot) => {
+    set({ lastProjectionRunSnapshot: snapshot });
   },
   resetUiPreferences: () => {
     set(persistUiState(DEFAULT_UI_STATE));
@@ -42,6 +57,7 @@ function readInitialUiState(): UiStoreState {
   return {
     mode: isPlannerMode(persisted.mode) ? persisted.mode : DEFAULT_UI_STATE.mode,
     displayUnit: isDisplayUnit(persisted.displayUnit) ? persisted.displayUnit : DEFAULT_UI_STATE.displayUnit,
+    lastProjectionRunSnapshot: null,
   };
 }
 

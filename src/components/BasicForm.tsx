@@ -1,9 +1,13 @@
 import { useRef, useState, type ChangeEvent, type ReactNode } from 'react';
 
+import { deriveInputChips } from '@/core/derivedChips';
 import type { FilingStatus } from '@/core/types';
 import type { BasicFormValues, BasicHealthcarePhase, BasicStarterStateCode } from '@/lib/basicFormMapping';
+import { basicFormSectionExplanations, type BasicFormSectionId } from '@/lib/columnExplanations';
 import { useDebouncedCallback } from '@/lib/useDebouncedCallback';
 import { useScenarioStore } from '@/store/scenarioStore';
+
+import { InfoTooltip } from './InfoTooltip';
 
 type BasicFormDraft = {
   [Field in keyof BasicFormValues]: string;
@@ -59,6 +63,8 @@ const PLAN_END_AFTER_PRIMARY_AGE_ERROR = 'Plan-end age must be greater than prim
 
 export function BasicForm() {
   const formValues = useScenarioStore((state) => state.formValues);
+  const scenario = useScenarioStore((state) => state.scenario);
+  const projectionResults = useScenarioStore((state) => state.projectionResults);
   const setFormValues = useScenarioStore((state) => state.setFormValues);
   const [draft, setDraft] = useStateFromFormValues(formValues);
   const [touched, setTouched] = useStateFromTouched();
@@ -66,6 +72,7 @@ export function BasicForm() {
   const validation = validateBasicFormDraft(draft);
   const errors = visibleErrors(validation.errors, touched);
   const showPartnerAge = draft.filingStatus === 'mfj';
+  const chips = deriveInputChips({ formValues, projectionResults, scenario });
   const commitPendingPatch = useDebouncedCallback(() => {
     const patch = pendingPatchRef.current;
 
@@ -103,84 +110,129 @@ export function BasicForm() {
 
   return (
     <div aria-label="Basic scenario form" className="mt-6 grid gap-4 sm:grid-cols-2" role="form">
-      <Field error={errors.filingStatus} id="filingStatus" label="Filing status">
-        <select
-          aria-describedby={errors.filingStatus ? 'filingStatus-error' : undefined}
-          aria-invalid={errors.filingStatus ? 'true' : undefined}
-          className={inputClassName(errors.filingStatus)}
-          id="filingStatus"
-          onChange={handleSelectChange('filingStatus')}
-          value={draft.filingStatus}
-        >
-          {FILING_STATUS_OPTIONS.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-      </Field>
+      <SectionFieldset sectionId="household">
+        <Field error={errors.filingStatus} id="filingStatus" label="Filing status">
+          <select
+            aria-describedby={errors.filingStatus ? 'filingStatus-error' : undefined}
+            aria-invalid={errors.filingStatus ? 'true' : undefined}
+            className={inputClassName(errors.filingStatus)}
+            id="filingStatus"
+            onChange={handleSelectChange('filingStatus')}
+            value={draft.filingStatus}
+          >
+            {FILING_STATUS_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </Field>
 
-      <Field error={errors.stateCode} id="stateCode" label="State">
-        <select
-          aria-describedby={errors.stateCode ? 'stateCode-error' : undefined}
-          aria-invalid={errors.stateCode ? 'true' : undefined}
-          className={inputClassName(errors.stateCode)}
-          id="stateCode"
-          onChange={handleSelectChange('stateCode')}
-          value={draft.stateCode}
-        >
-          {STATE_OPTIONS.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-      </Field>
+        <Field error={errors.stateCode} id="stateCode" label="State">
+          <select
+            aria-describedby={errors.stateCode ? 'stateCode-error' : undefined}
+            aria-invalid={errors.stateCode ? 'true' : undefined}
+            className={inputClassName(errors.stateCode)}
+            id="stateCode"
+            onChange={handleSelectChange('stateCode')}
+            value={draft.stateCode}
+          >
+            {STATE_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </Field>
 
-      {renderNumberField('primaryAge', 'Primary age', draft, errors, handleInputChange)}
-      {showPartnerAge ? renderNumberField('partnerAge', 'Partner age', draft, errors, handleInputChange) : null}
-      {renderNumberField('retirementYear', 'Retirement target year', draft, errors, handleInputChange)}
-      {renderNumberField('planEndAge', 'Plan-end age', draft, errors, handleInputChange)}
-      {renderNumberField('annualSpendingToday', 'Annual spending', draft, errors, handleInputChange)}
-      {renderNumberField('traditionalBalance', 'Traditional balance', draft, errors, handleInputChange)}
-      {renderNumberField('rothBalance', 'Roth balance', draft, errors, handleInputChange)}
-      {renderNumberField('brokerageAndCashBalance', 'Brokerage plus cash balance', draft, errors, handleInputChange)}
-      {renderNumberField('taxableBrokerageBasis', 'Weighted-average taxable basis', draft, errors, handleInputChange)}
-      {renderNumberField('annualW2Income', 'W-2 income', draft, errors, handleInputChange)}
-      {renderNumberField('annualConsultingIncome', 'Net consulting income', draft, errors, handleInputChange)}
-      {renderNumberField('annualRentalIncome', 'Net rental income', draft, errors, handleInputChange)}
-      {renderNumberField(
-        'annualSocialSecurityBenefit',
-        'Social Security annual benefit',
-        draft,
-        errors,
-        handleInputChange,
-      )}
-      {renderNumberField('socialSecurityClaimAge', 'Social Security claim age', draft, errors, handleInputChange)}
-      {renderNumberField(
-        'annualPensionOrAnnuityIncome',
-        'Pension/annuity annual amount',
-        draft,
-        errors,
-        handleInputChange,
-      )}
+        {renderNumberField('primaryAge', 'Primary age', draft, errors, handleInputChange)}
+        {showPartnerAge ? renderNumberField('partnerAge', 'Partner age', draft, errors, handleInputChange) : null}
+      </SectionFieldset>
 
-      <Field error={errors.healthcarePhase} id="healthcarePhase" label="Healthcare phase">
-        <select
-          aria-describedby={errors.healthcarePhase ? 'healthcarePhase-error' : undefined}
-          aria-invalid={errors.healthcarePhase ? 'true' : undefined}
-          className={inputClassName(errors.healthcarePhase)}
-          id="healthcarePhase"
-          onChange={handleSelectChange('healthcarePhase')}
-          value={draft.healthcarePhase}
-        >
-          {HEALTHCARE_PHASE_OPTIONS.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-      </Field>
+      <SectionFieldset sectionId="timeline">
+        {renderNumberField('currentYear', 'Current year', draft, errors, handleInputChange)}
+        {renderNumberField(
+          'retirementYear',
+          'Retirement target year',
+          draft,
+          errors,
+          handleInputChange,
+          chips.retirementTarget,
+        )}
+        {renderNumberField('planEndAge', 'Plan-end age', draft, errors, handleInputChange)}
+        {renderNumberField('socialSecurityClaimAge', 'Social Security claim age', draft, errors, handleInputChange)}
+      </SectionFieldset>
+
+      <SectionFieldset sectionId="spending">
+        {renderNumberField(
+          'annualSpendingToday',
+          'Annual spending',
+          draft,
+          errors,
+          handleInputChange,
+          chips.annualSpending,
+        )}
+      </SectionFieldset>
+
+      <SectionFieldset sectionId="balances" title="Accounts">
+        {renderNumberField('traditionalBalance', 'Traditional balance', draft, errors, handleInputChange)}
+        {renderNumberField('rothBalance', 'Roth balance', draft, errors, handleInputChange)}
+        {renderNumberField(
+          'brokerageAndCashBalance',
+          'Brokerage plus cash balance',
+          draft,
+          errors,
+          handleInputChange,
+          chips.brokeragePlusCash,
+        )}
+        {renderNumberField(
+          'taxableBrokerageBasis',
+          'Weighted-average taxable basis',
+          draft,
+          errors,
+          handleInputChange,
+        )}
+      </SectionFieldset>
+
+      <SectionFieldset sectionId="income">
+        {renderNumberField('annualW2Income', 'W-2 income', draft, errors, handleInputChange, chips.w2Income)}
+        {renderNumberField('annualConsultingIncome', 'Net consulting income', draft, errors, handleInputChange)}
+        {renderNumberField('annualRentalIncome', 'Net rental income', draft, errors, handleInputChange)}
+        {renderNumberField(
+          'annualSocialSecurityBenefit',
+          'Social Security annual benefit',
+          draft,
+          errors,
+          handleInputChange,
+          chips.socialSecurity,
+        )}
+        {renderNumberField(
+          'annualPensionOrAnnuityIncome',
+          'Pension/annuity annual amount',
+          draft,
+          errors,
+          handleInputChange,
+        )}
+      </SectionFieldset>
+
+      <SectionFieldset sectionId="healthcare">
+        <Field error={errors.healthcarePhase} id="healthcarePhase" label="Healthcare phase" chip={chips.healthcare}>
+          <select
+            aria-describedby={errors.healthcarePhase ? 'healthcarePhase-error' : undefined}
+            aria-invalid={errors.healthcarePhase ? 'true' : undefined}
+            className={inputClassName(errors.healthcarePhase)}
+            id="healthcarePhase"
+            onChange={handleSelectChange('healthcarePhase')}
+            value={draft.healthcarePhase}
+          >
+            {HEALTHCARE_PHASE_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </Field>
+      </SectionFieldset>
     </div>
   );
 
@@ -276,13 +328,40 @@ export function validateBasicFormDraft(draft: BasicFormDraft): ValidationResult 
   };
 }
 
+function SectionFieldset({
+  children,
+  sectionId,
+  title,
+}: {
+  children: ReactNode;
+  sectionId: BasicFormSectionId;
+  title?: string;
+}) {
+  const explanation = basicFormSectionExplanations[sectionId];
+  const label = title ?? explanation.label;
+
+  return (
+    <fieldset className="rounded-md border border-slate-200 p-4 sm:col-span-2">
+      <legend className="px-2 text-sm font-semibold text-slate-700">
+        <span className="inline-flex items-center gap-1.5">
+          {label}
+          <InfoTooltip ariaLabel={`About ${label}`}>{explanation.description}</InfoTooltip>
+        </span>
+      </legend>
+      <div className="grid gap-4 sm:grid-cols-2">{children}</div>
+    </fieldset>
+  );
+}
+
 function Field({
   children,
+  chip,
   error,
   id,
   label,
 }: {
   children: ReactNode;
+  chip?: string | undefined;
   error: string | undefined;
   id: string;
   label: string;
@@ -293,6 +372,7 @@ function Field({
         {label}
       </label>
       {children}
+      {chip === undefined ? null : <DerivedChip>{chip}</DerivedChip>}
       {error === undefined ? null : (
         <p className="text-sm text-red-700" id={`${id}-error`}>
           {error}
@@ -300,6 +380,10 @@ function Field({
       )}
     </div>
   );
+}
+
+function DerivedChip({ children }: { children: string }) {
+  return <p className="text-xs font-medium uppercase tracking-wide text-slate-500">→ {children}</p>;
 }
 
 function visibleErrors(errors: BasicFormErrors, touched: BasicFormTouched): BasicFormErrors {
@@ -414,11 +498,12 @@ function renderNumberField(
   draft: BasicFormDraft,
   errors: BasicFormErrors,
   handleInputChange: (field: keyof BasicFormDraft) => (event: ChangeEvent<HTMLInputElement>) => void,
+  chip?: string | undefined,
 ) {
   const error = errors[field];
 
   return (
-    <Field error={error} id={field} key={field} label={label}>
+    <Field chip={chip} error={error} id={field} key={field} label={label}>
       <input
         aria-describedby={error ? `${field}-error` : undefined}
         aria-invalid={error ? 'true' : undefined}

@@ -99,11 +99,9 @@ describe('advanced Gate 4 app flow', () => {
     fireEvent.click(screen.getByRole('tab', { name: 'Planning charts' }));
 
     const projectedAgi = useScenarioStore.getState().projectionResults[0]?.agi ?? 0;
-    const projectionRow = screen.getByRole('rowheader', { name: '2026' }).closest('tr');
 
     expect(screen.getByRole('heading', { name: 'Year-by-year projection' })).toBeInTheDocument();
-    expect(projectionRow).not.toBeNull();
-    expect(within(projectionRow as HTMLElement).getByText(formatMoney(projectedAgi))).toBeInTheDocument();
+    expect(screen.getByTestId('year-table-cell-2026-agi')).toHaveTextContent(formatMoney(projectedAgi));
   });
 
   it('saves Conservative, duplicates it, and edits the duplicate spending plan', () => {

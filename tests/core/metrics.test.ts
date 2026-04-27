@@ -2,15 +2,25 @@ import { describe, expect, it } from 'vitest';
 
 import {
   computeAverageBridgeAcaMagi,
+  computeFederalBracketProximity,
+  computeFplBand,
+  computeFplPercentage,
   computeMaxBridgeGrossBucketDrawPercentage,
   computeNetWorthAtRetirement,
   computePlanEndBalance,
   computeTotalBridgeTax,
+  computeWithdrawalRate,
+  computeWithdrawalRateBand,
+  computeYearDisplayMetrics,
   computeYearsFundedFromRetirement,
   selectBridgeWindow,
+  summarizeProjectionRunChanges,
+  summarizeYearOverYearChanges,
   type ProjectionMetricFormValues,
 } from '@/core/metrics';
-import type { AccountBalances, YearBreakdown } from '@/core/projection';
+import { CONSTANTS_2026 } from '@/core/constants/2026';
+import { FLORIDA_STATE_TAX } from '@/core/constants/states/florida';
+import type { AccountBalances, Scenario, YearBreakdown } from '@/core/projection';
 
 describe('projection metric helpers', () => {
   it('computes balance metrics from retirement and plan-end projection rows', () => {
@@ -171,6 +181,176 @@ describe('projection metric helpers', () => {
       2036,
     ]);
   });
+
+  it('computes FPL percentages with encoded household-size and additional-person rules', () => {
+    expect(computeFplPercentage(CONSTANTS_2026.fpl.contiguous.householdSize[1] * 1.5, 1)).toBe(1.5);
+    expect(computeFplPercentage(CONSTANTS_2026.fpl.contiguous.householdSize[8] * 2, 8)).toBe(2);
+    expect(computeFplPercentage(61_400, 9)).toBe(1);
+  });
+
+  it('classifies exact FPL band boundaries', () => {
+    expect(computeFplBand(1.3799)).toBe('below-aca');
+    expect(computeFplBand(1.38)).toBe('aca-low');
+    expect(computeFplBand(2)).toBe('aca-mid');
+    expect(computeFplBand(4)).toBe('aca-high');
+    expect(computeFplBand(5)).toBe('above-cliff');
+  });
+
+  it('computes withdrawal rates from prior closing balances and excludes conversions', () => {
+    const priorYear = makeBreakdown({ closingBalances: makeBalances({ taxableBrokerage: 100_000 }) });
+    const currentYear = makeBreakdown({
+      conversions: 20_000,
+      withdrawals: makeBalances({ cash: 1_000, taxableBrokerage: 4_000 }),
+    });
+
+    expect(computeWithdrawalRate(currentYear, null)).toBeNull();
+    expect(computeWithdrawalRate(currentYear, makeBreakdown({ closingBalances: makeBalances({}) }))).toBeNull();
+    expect(computeWithdrawalRate(currentYear, priorYear)).toBe(0.05);
+  });
+
+  it('classifies exact withdrawal-rate band boundaries', () => {
+    expect(computeWithdrawalRateBand(0.0399)).toBe('safe');
+    expect(computeWithdrawalRateBand(0.04)).toBe('caution');
+    expect(computeWithdrawalRateBand(0.0499)).toBe('caution');
+    expect(computeWithdrawalRateBand(0.05)).toBe('danger');
+  });
+
+  it('computes federal bracket proximity at exact bracket edges', () => {
+    expect(computeFederalBracketProximity(12_399, 'single')).toEqual({
+      marginalRate: 0.1,
+      nextEdge: 12_400,
+      distanceToNextEdge: 1,
+    });
+    expect(computeFederalBracketProximity(12_400, 'single')).toEqual({
+      marginalRate: 0.12,
+      nextEdge: 50_400,
+      distanceToNextEdge: 38_000,
+    });
+    expect(computeFederalBracketProximity(640_600, 'single')).toEqual({
+      marginalRate: 0.37,
+      nextEdge: null,
+      distanceToNextEdge: null,
+    });
+  });
+
+  it('derives display-ready row metrics from a projection row and scenario context', () => {
+    const scenario = makeScenario({
+      healthcare: [{ year: 2027, kind: 'aca', householdSize: 2, annualBenchmarkPremium: 12_000 }],
+      w2Income: [{ year: 2027, amount: 45_000 }],
+    });
+    const priorYear = makeBreakdown({ year: 2026, closingBalances: makeBalances({ taxableBrokerage: 200_000 }) });
+    const row = makeBreakdown({
+      year: 2027,
+      agi: 100_000,
+      irmaaMagi: 100_000,
+      qbiDeduction: 5_000,
+      acaPremiumCredit: {
+        applicablePercentage: 0.0996,
+        fplPercent: 4.2,
+        isEligible: false,
+        premiumTaxCredit: 0,
+        requiredContribution: 9_960,
+      },
+      brokerageBasis: {
+        opening: 80_000,
+        sold: 10_000,
+        realizedGainOrLoss: 12_345,
+        closing: 70_000,
+      },
+      closingBalances: makeBalances({ taxableBrokerage: 180_000, roth: 20_000 }),
+      openingBalances: makeBalances({ taxableBrokerage: 210_000 }),
+      withdrawals: makeBalances({ taxableBrokerage: 10_000 }),
+    });
+
+    expect(
+      computeYearDisplayMetrics(row, {
+        formValues: makeFormValues({
+          currentYear: 2026,
+          primaryAge: 64,
+          retirementYear: 2027,
+          annualSocialSecurityBenefit: 30_000,
+          socialSecurityClaimAge: 67,
+        }),
+        priorYear,
+        scenario,
+      }),
+    ).toMatchObject({
+      age: 65,
+      phaseLabel: 'Medicare-eligible',
+      wages: 45_000,
+      taxableIncome: 78_900,
+      totalDisplayedIncome: 100_000,
+      totalOpeningBalance: 210_000,
+      totalClosingBalance: 200_000,
+      totalWithdrawals: 10_000,
+      fplPercentage: 4.2,
+      fplBand: 'aca-high',
+      withdrawalRate: 0.05,
+      withdrawalRateBand: 'danger',
+      ltcgRealized: 12_345,
+    });
+  });
+
+  it('prioritizes at most three year-over-year notable changes', () => {
+    const scenario = makeScenario({
+      healthcare: [
+        { year: 2026, kind: 'aca', householdSize: 1, annualBenchmarkPremium: 12_000 },
+        { year: 2027, kind: 'aca', householdSize: 1, annualBenchmarkPremium: 12_000 },
+      ],
+    });
+    const projectionResults = [
+      makeBreakdown({
+        year: 2026,
+        agi: 20_000,
+        acaPremiumCredit: makeAcaPremiumCredit(3.5),
+        brokerageBasis: { opening: 2_000, sold: 1_000, realizedGainOrLoss: 0, closing: 1_000 },
+        closingBalances: makeBalances({ taxableBrokerage: 1_000_000 }),
+        irmaaPremium: makeIrmaaPremium(0),
+      }),
+      makeBreakdown({
+        year: 2027,
+        agi: 80_000,
+        acaPremiumCredit: makeAcaPremiumCredit(4.5),
+        brokerageBasis: { opening: 1_000, sold: 1_000, realizedGainOrLoss: 0, closing: 0 },
+        closingBalances: makeBalances({ taxableBrokerage: 800_000 }),
+        irmaaPremium: makeIrmaaPremium(1),
+      }),
+    ];
+
+    expect(
+      summarizeYearOverYearChanges({
+        formValues: makeFormValues(),
+        projectionResults,
+        scenario,
+        targetYear: 2027,
+      }).map((summary) => summary.kind),
+    ).toEqual(['federal-bracket-crossing', 'irmaa-tier-crossing', 'brokerage-basis-depletion']);
+  });
+
+  it('compares the same target year across projection runs', () => {
+    const scenario = makeScenario();
+    const summaries = summarizeProjectionRunChanges({
+      currentFormValues: makeFormValues(),
+      currentProjectionResults: [
+        makeBreakdown({
+          year: 2027,
+          agi: 80_000,
+          closingBalances: makeBalances({ taxableBrokerage: 750_000 }),
+        }),
+      ],
+      currentScenario: scenario,
+      previousProjectionResults: [
+        makeBreakdown({
+          year: 2027,
+          agi: 20_000,
+          closingBalances: makeBalances({ taxableBrokerage: 1_000_000 }),
+        }),
+      ],
+      targetYear: 2027,
+    });
+
+    expect(summaries.map((summary) => summary.kind)).toEqual(['federal-bracket-crossing', 'large-balance-drop']);
+  });
 });
 
 function makeFormValues(overrides: Partial<ProjectionMetricFormValues> = {}): ProjectionMetricFormValues {
@@ -220,6 +400,29 @@ function makeBreakdown(overrides: Partial<YearBreakdown> = {}): YearBreakdown {
   };
 }
 
+function makeScenario(overrides: Partial<Scenario> = {}): Scenario {
+  return {
+    startYear: 2026,
+    filingStatus: 'single',
+    w2Income: [],
+    consultingIncome: [],
+    healthcare: [],
+    pensionIncome: [],
+    annuityIncome: [],
+    rentalIncome: [],
+    state: {
+      incomeTaxLaw: FLORIDA_STATE_TAX,
+    },
+    balances: makeBalances({}),
+    basis: {
+      taxableBrokerage: 0,
+    },
+    inflationRate: 0,
+    expectedReturns: {},
+    ...overrides,
+  };
+}
+
 function makeBalances(overrides: Partial<AccountBalances>): AccountBalances {
   return {
     cash: 0,
@@ -227,5 +430,28 @@ function makeBalances(overrides: Partial<AccountBalances>): AccountBalances {
     traditional: 0,
     roth: 0,
     ...overrides,
+  };
+}
+
+function makeAcaPremiumCredit(fplPercent: number): NonNullable<YearBreakdown['acaPremiumCredit']> {
+  return {
+    applicablePercentage: 0.0996,
+    fplPercent,
+    isEligible: fplPercent <= 4,
+    premiumTaxCredit: 0,
+    requiredContribution: 0,
+  };
+}
+
+function makeIrmaaPremium(tier: number): NonNullable<YearBreakdown['irmaaPremium']> {
+  return {
+    annualIrmaaSurcharge: tier * 1_000,
+    annualTotal: 2_434.8 + tier * 1_000,
+    magiSourceYear: 2025,
+    magiUsed: 100_000 + tier * 50_000,
+    partBMonthlyAdjustment: 0,
+    partDMonthlyAdjustment: 0,
+    standardPartBPremium: 202.9,
+    tier,
   };
 }

@@ -5,6 +5,7 @@ import { LiveStatsStrip } from '@/components/LiveStatsStrip';
 import { SeventyTwoTCalc } from '@/components/SeventyTwoTCalc';
 import { TaxBreakdownChart } from '@/components/charts/TaxBreakdownChart';
 import { SummaryCards } from '@/components/SummaryCards';
+import { WhyChangedCallout } from '@/components/WhyChangedCallout';
 import { YearByYearTable } from '@/components/YearByYearTable';
 
 export function BasicPlannerPage() {
@@ -33,6 +34,7 @@ function ProjectionResults() {
   return (
     <>
       <LiveStatsStrip />
+      <WhyChangedCallout />
       <SummaryCards />
       <YearByYearTable />
       <BalancesChart />

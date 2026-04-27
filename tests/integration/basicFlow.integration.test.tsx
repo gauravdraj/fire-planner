@@ -58,6 +58,12 @@ function advanceLiveDebounce() {
   });
 }
 
+function advancePulseDuration() {
+  act(() => {
+    vi.advanceTimersByTime(700);
+  });
+}
+
 function summaryCard(name: RegExp) {
   return screen.getByRole('article', { name });
 }
@@ -70,6 +76,73 @@ function summaryValue(name: RegExp): string {
 
 function numericMoney(value: string): number {
   return Number(value.replace(/[^-\d]/g, ''));
+}
+
+function expectedFplClassForPercent(percentLabel: string): readonly string[] {
+  const percentage = Number(percentLabel.replace('%', '')) / 100;
+
+  if (percentage < 1.38) {
+    return ['bg-rose-50', 'text-rose-800'];
+  }
+  if (percentage < 2) {
+    return ['bg-emerald-50', 'text-emerald-800'];
+  }
+  if (percentage < 4) {
+    return ['bg-sky-50', 'text-sky-800'];
+  }
+  if (percentage < 5) {
+    return ['bg-amber-50', 'text-amber-800'];
+  }
+
+  return ['bg-rose-100', 'text-rose-900'];
+}
+
+function firstBridgeFplCell(table: HTMLElement): HTMLElement {
+  const bodyRows = Array.from(table.querySelectorAll('tbody tr')) as HTMLElement[];
+  const bridgeRow = bodyRows.find((row) => {
+    const phaseCell = row.querySelector('[data-testid$="-phase"]');
+    const fplCell = row.querySelector('[data-testid$="-fplPercentage"]');
+
+    return phaseCell?.textContent?.includes('Bridge') === true && fplCell?.textContent?.includes('%') === true;
+  });
+
+  if (bridgeRow === undefined) {
+    throw new Error('Expected at least one bridge year with an FPL percentage cell.');
+  }
+
+  return bridgeRow.querySelector('[data-testid$="-fplPercentage"]') as HTMLElement;
+}
+
+async function renderFilledRealisticPlanner() {
+  const App = await importApp();
+  const result = render(<App />);
+
+  vi.useFakeTimers();
+  fillRealisticMfjScenario();
+  advanceLiveDebounce();
+  advancePulseDuration();
+  vi.useRealTimers();
+
+  return {
+    container: result.container,
+    form: screen.getByRole('form', { name: /basic scenario form/i }),
+    table: screen.getByRole('table'),
+  };
+}
+
+async function renderFilledRealisticPlannerWithFakeTimers() {
+  const App = await importApp();
+  const result = render(<App />);
+
+  vi.useFakeTimers();
+  fillRealisticMfjScenario();
+  advanceLiveDebounce();
+
+  return {
+    container: result.container,
+    form: screen.getByRole('form', { name: /basic scenario form/i }),
+    table: screen.getByRole('table'),
+  };
 }
 
 describe('basic Gate 3 app flow', () => {
@@ -99,6 +172,7 @@ describe('basic Gate 3 app flow', () => {
     vi.useFakeTimers();
     fillRealisticMfjScenario();
     advanceLiveDebounce();
+    advancePulseDuration();
     vi.useRealTimers();
 
     expect(screen.getByRole('heading', { name: /projection summary/i })).toBeInTheDocument();
@@ -114,7 +188,7 @@ describe('basic Gate 3 app flow', () => {
     const table = screen.getByRole('table');
     const expectedProjectionYears = 90 - 58 + 1;
 
-    expect(within(table).getAllByRole('row')).toHaveLength(expectedProjectionYears + 1);
+    expect(within(table).getAllByRole('row')).toHaveLength(expectedProjectionYears + 2);
 
     const scrollableRegions = container.querySelectorAll('.overflow-x-auto');
     expect(scrollableRegions).toHaveLength(1);
@@ -147,5 +221,97 @@ describe('basic Gate 3 app flow', () => {
     expect(screen.queryByRole('dialog', { name: /share-link privacy/i })).not.toBeInTheDocument();
     expect(new URL(clipboardWrites[1] ?? '').hash).toMatch(/^#v1:/);
     expect(consoleErrorSpy).not.toHaveBeenCalled();
-  });
+  }, 10_000);
+
+  it('pulses a live stat cell after typing into annual spending', async () => {
+    await renderFilledRealisticPlannerWithFakeTimers();
+    advancePulseDuration();
+
+    changeField('Annual spending', '95000');
+    advanceLiveDebounce();
+
+    const liveStats = within(screen.getByLabelText(/live projection stats/i)).getAllByRole('listitem');
+
+    expect(liveStats.some((stat) => stat.classList.contains('bg-yellow-100'))).toBe(true);
+  }, 10_000);
+
+  it('updates the retirement target derived chip after typing into the field', async () => {
+    await renderFilledRealisticPlannerWithFakeTimers();
+
+    expect(screen.getByText('→ Age 64 in 6 yrs')).toBeInTheDocument();
+
+    changeField('Retirement target year', '2031');
+    advanceLiveDebounce();
+
+    expect(screen.getByText('→ Age 63 in 5 yrs')).toBeInTheDocument();
+    expect(screen.queryByText('→ Age 64 in 6 yrs')).not.toBeInTheDocument();
+  }, 10_000);
+
+  it('renders the five grouped year-table band labels', async () => {
+    const { container } = await renderFilledRealisticPlanner();
+
+    expect(Array.from(container.querySelectorAll('thead tr:first-child th')).map((header) => header.textContent)).toEqual([
+      'Identity',
+      'Balances',
+      'Income',
+      'Tax',
+      'KPIs',
+    ]);
+  }, 10_000);
+
+  it('renders a dense year-table row with at least eighteen per-year columns', async () => {
+    const { container, table } = await renderFilledRealisticPlanner();
+    const perYearColumnCount = container.querySelectorAll('thead tr:nth-child(2) th').length;
+    const firstDataRow = within(table).getAllByRole('row')[2] as HTMLElement;
+
+    expect(perYearColumnCount).toBeGreaterThanOrEqual(18);
+    expect(within(firstDataRow).getAllByRole('cell').length + within(firstDataRow).getAllByRole('rowheader').length).toBe(
+      perYearColumnCount,
+    );
+  }, 10_000);
+
+  it('colors a bridge-year FPL percentage cell with its threshold class', async () => {
+    const { table } = await renderFilledRealisticPlanner();
+    const bridgeFplCell = firstBridgeFplCell(table);
+    const bridgeFplValue = bridgeFplCell.querySelector('span')?.textContent ?? '';
+
+    expect(bridgeFplCell).toHaveClass(...expectedFplClassForPercent(bridgeFplValue));
+  }, 10_000);
+
+  it('renders six basic-form fieldsets with the expected legends', async () => {
+    const { form } = await renderFilledRealisticPlanner();
+    const fieldsets = Array.from(form.querySelectorAll('fieldset')) as HTMLElement[];
+
+    expect(fieldsets).toHaveLength(6);
+    expect(
+      fieldsets.map((fieldset) =>
+        within(fieldset).getByRole('button', { name: /About / }).getAttribute('aria-label')?.replace('About ', ''),
+      ),
+    ).toEqual(['Household', 'Timeline', 'Spending', 'Accounts', 'Income', 'Healthcare']);
+  }, 10_000);
+
+  it('renders at least twenty info tooltip glyphs across the planner page', async () => {
+    await renderFilledRealisticPlanner();
+
+    expect(screen.getAllByRole('button', { name: /About / }).length).toBeGreaterThanOrEqual(20);
+  }, 10_000);
+
+  it('keeps the rich year table horizontally scrollable with sticky year headers', async () => {
+    const { container, table } = await renderFilledRealisticPlanner();
+    const scrollableRegions = container.querySelectorAll('.overflow-x-auto');
+
+    expect(scrollableRegions).toHaveLength(1);
+    expect(scrollableRegions[0]?.querySelector('table')).toBe(table);
+    expect(within(table).getByRole('columnheader', { name: 'Year' })).toHaveClass('sticky', 'left-0');
+    expect(within(table).getAllByRole('rowheader')[0]).toHaveClass('sticky', 'left-0');
+  }, 10_000);
+
+  it('continues to update summary values when display units change', async () => {
+    await renderFilledRealisticPlanner();
+
+    const realRetirementValue = summaryValue(/net worth at retirement/i);
+    fireEvent.click(screen.getByRole('button', { name: 'Nominal dollars' }));
+
+    expect(summaryValue(/net worth at retirement/i)).not.toBe(realRetirementValue);
+  }, 10_000);
 });

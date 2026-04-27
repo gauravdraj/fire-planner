@@ -1,6 +1,16 @@
-import type { AccountBalances, YearBreakdown } from './projection';
+import { CONSTANTS_2026 } from './constants/2026';
+import { effectiveConstants } from './constants/customLaw';
+import { indexBracketsForYear, type AccountBalances, type HealthcarePhase, type Scenario, type YearBreakdown } from './projection';
+import { computeTaxableIncome } from './tax/federal';
+import { getFPLForCoverageYear, type FplRegion, type FplTable } from './tax/aca';
+import type { BracketTable, FilingStatus } from './types';
 
 const SUPPORTED_BALANCE_KEYS = ['cash', 'taxableBrokerage', 'traditional', 'roth'] as const;
+const FPL_HOUSEHOLD_SIZE_KEYS = [1, 2, 3, 4, 5, 6, 7, 8] as const;
+const LARGE_BALANCE_DROP_MIN_AMOUNT = 50_000;
+const LARGE_BALANCE_DROP_MIN_PERCENTAGE = 0.1;
+
+type FplHouseholdSize = (typeof FPL_HOUSEHOLD_SIZE_KEYS)[number];
 
 export type ProjectionMetricFormValues = Readonly<{
   currentYear: number;
@@ -28,6 +38,82 @@ export type BridgeWindow = Readonly<{
   endYear: number;
   reason: BridgeWindowReason;
   years: readonly YearBreakdown[];
+}>;
+
+export type FplBand = 'below-aca' | 'aca-low' | 'aca-mid' | 'aca-high' | 'above-cliff';
+
+export type WithdrawalRateBand = 'safe' | 'caution' | 'danger';
+
+export type FederalBracketProximity = Readonly<{
+  marginalRate: number;
+  nextEdge: number | null;
+  distanceToNextEdge: number | null;
+}>;
+
+export type YearPhaseLabel = 'SS claimed' | 'Medicare-eligible' | 'Bridge' | 'Pre-RE';
+
+export type YearDisplayMetricContext = Readonly<{
+  formValues: ProjectionMetricFormValues;
+  priorYear?: YearBreakdown | null;
+  scenario: Scenario;
+}>;
+
+export type YearDisplayMetrics = Readonly<{
+  year: number;
+  age: number;
+  phaseLabel: YearPhaseLabel;
+  wages: number;
+  taxableIncome: number;
+  federalBracketProximity: FederalBracketProximity;
+  totalOpeningBalance: number;
+  totalClosingBalance: number;
+  totalWithdrawals: number;
+  totalDisplayedIncome: number;
+  fplPercentage: number | null;
+  fplBand: FplBand | null;
+  withdrawalRate: number | null;
+  withdrawalRateBand: WithdrawalRateBand | null;
+  irmaaTier: number | null;
+  ltcgRealized: number | null;
+}>;
+
+export type YearChangeSummaryKind =
+  | 'federal-bracket-crossing'
+  | 'irmaa-tier-crossing'
+  | 'brokerage-basis-depletion'
+  | 'large-balance-drop'
+  | 'aca-cliff-risk-crossing';
+
+export type YearChangeSummary = Readonly<{
+  kind: YearChangeSummaryKind;
+  year: number;
+  label: string;
+  detail: string;
+  from: number | null;
+  to: number | null;
+  priority: number;
+}>;
+
+export type YearOverYearChangeInput = Readonly<{
+  formValues: ProjectionMetricFormValues;
+  projectionResults: readonly YearBreakdown[];
+  scenario: Scenario;
+  targetYear: number;
+}>;
+
+export type ProjectionRunChangeInput = Readonly<{
+  currentFormValues: ProjectionMetricFormValues;
+  currentProjectionResults: readonly YearBreakdown[];
+  currentScenario: Scenario;
+  previousFormValues?: ProjectionMetricFormValues;
+  previousProjectionResults: readonly YearBreakdown[];
+  previousScenario?: Scenario;
+  targetYear: number;
+}>;
+
+export type FplPercentageOptions = Readonly<{
+  fplTable?: FplTable;
+  region?: FplRegion;
 }>;
 
 export function computeNetWorthAtRetirement(
@@ -143,6 +229,349 @@ export function computeTotalBridgeTax(bridgeYears: readonly YearBreakdown[]): nu
   }
 
   return roundToCents(sumBy(bridgeYears, (breakdown) => breakdown.totalTax));
+}
+
+export function computeFplPercentage(
+  householdIncome: number,
+  householdSize: number,
+  options: FplPercentageOptions = {},
+): number {
+  const region = options.region ?? 'contiguous';
+  const fplTable = options.fplTable ?? CONSTANTS_2026.fpl;
+  const povertyGuideline = getPovertyGuideline(fplTable, householdSize, region);
+
+  return povertyGuideline <= 0 ? 0 : Math.max(0, householdIncome) / povertyGuideline;
+}
+
+export function computeWithdrawalRate(year: YearBreakdown, priorYear: YearBreakdown | null | undefined): number | null {
+  if (priorYear === null || priorYear === undefined) {
+    return null;
+  }
+
+  const priorClosingBalance = sumSupportedBalances(priorYear.closingBalances);
+  if (priorClosingBalance <= 0) {
+    return null;
+  }
+
+  return sumSupportedBalances(year.withdrawals) / priorClosingBalance;
+}
+
+export function computeFplBand(fplPercentage: number): FplBand {
+  if (fplPercentage < 1.38) {
+    return 'below-aca';
+  }
+  if (fplPercentage < 2) {
+    return 'aca-low';
+  }
+  if (fplPercentage < 4) {
+    return 'aca-mid';
+  }
+  if (fplPercentage < 5) {
+    return 'aca-high';
+  }
+
+  return 'above-cliff';
+}
+
+export function computeWithdrawalRateBand(withdrawalRate: number): WithdrawalRateBand {
+  if (withdrawalRate < 0.04) {
+    return 'safe';
+  }
+  if (withdrawalRate < 0.05) {
+    return 'caution';
+  }
+
+  return 'danger';
+}
+
+export function computeFederalBracketProximity(
+  taxableIncome: number,
+  filingStatus: FilingStatus = 'single',
+  brackets: BracketTable = CONSTANTS_2026.federal.ordinaryBrackets,
+): FederalBracketProximity {
+  const income = Math.max(0, taxableIncome);
+  const statusBrackets = brackets[filingStatus];
+  if (statusBrackets.length === 0) {
+    throw new Error(`Federal bracket table for ${filingStatus} is empty`);
+  }
+
+  let currentIndex = 0;
+  for (let index = 0; index < statusBrackets.length; index += 1) {
+    const bracket = statusBrackets[index];
+    if (bracket !== undefined && income >= bracket.from) {
+      currentIndex = index;
+    }
+  }
+
+  const currentBracket = statusBrackets[currentIndex];
+  if (currentBracket === undefined) {
+    throw new Error(`Federal bracket table for ${filingStatus} is empty`);
+  }
+
+  const nextBracket = statusBrackets[currentIndex + 1] ?? null;
+
+  return {
+    marginalRate: currentBracket.rate,
+    nextEdge: nextBracket?.from ?? null,
+    distanceToNextEdge: nextBracket === null ? null : roundToCents(Math.max(0, nextBracket.from - income)),
+  };
+}
+
+export function computeYearDisplayMetrics(
+  breakdown: YearBreakdown,
+  context: YearDisplayMetricContext,
+): YearDisplayMetrics {
+  const taxableIncome = computeProjectedTaxableIncome(context.scenario, breakdown);
+  const indexedOrdinaryBrackets = indexBracketsForYear(
+    effectiveConstants(context.scenario).federal.ordinaryBrackets,
+    breakdown.year,
+    context.scenario.inflationRate,
+  ) as BracketTable;
+  const fplPercentage = computeDisplayFplPercentage(breakdown, context.scenario);
+  const withdrawalRate = computeWithdrawalRate(breakdown, context.priorYear);
+
+  return {
+    year: breakdown.year,
+    age: context.formValues.primaryAge + (breakdown.year - context.formValues.currentYear),
+    phaseLabel: computePhaseLabel(breakdown, context),
+    wages: sumAnnualAmounts(context.scenario.w2Income, breakdown.year),
+    taxableIncome,
+    federalBracketProximity: computeFederalBracketProximity(
+      taxableIncome,
+      context.scenario.filingStatus,
+      indexedOrdinaryBrackets,
+    ),
+    totalOpeningBalance: sumSupportedBalances(breakdown.openingBalances),
+    totalClosingBalance: sumSupportedBalances(breakdown.closingBalances),
+    totalWithdrawals: sumSupportedBalances(breakdown.withdrawals),
+    totalDisplayedIncome: breakdown.agi,
+    fplPercentage,
+    fplBand: fplPercentage === null ? null : computeFplBand(fplPercentage),
+    withdrawalRate,
+    withdrawalRateBand: withdrawalRate === null ? null : computeWithdrawalRateBand(withdrawalRate),
+    irmaaTier: breakdown.irmaaPremium?.tier ?? null,
+    ltcgRealized: breakdown.brokerageBasis.realizedGainOrLoss,
+  };
+}
+
+export function summarizeYearOverYearChanges(input: YearOverYearChangeInput): readonly YearChangeSummary[] {
+  const currentIndex = input.projectionResults.findIndex((breakdown) => breakdown.year === input.targetYear);
+  if (currentIndex <= 0) {
+    return [];
+  }
+
+  const previousYear = input.projectionResults[currentIndex - 1];
+  const currentYear = input.projectionResults[currentIndex];
+  if (previousYear === undefined || currentYear === undefined) {
+    return [];
+  }
+
+  return summarizeDisplayMetricChanges({
+    currentFormValues: input.formValues,
+    currentScenario: input.scenario,
+    currentYear,
+    previousFormValues: input.formValues,
+    previousScenario: input.scenario,
+    previousYear,
+  });
+}
+
+export function summarizeProjectionRunChanges(input: ProjectionRunChangeInput): readonly YearChangeSummary[] {
+  const previousYear = input.previousProjectionResults.find((breakdown) => breakdown.year === input.targetYear);
+  const currentYear = input.currentProjectionResults.find((breakdown) => breakdown.year === input.targetYear);
+  if (previousYear === undefined || currentYear === undefined) {
+    return [];
+  }
+
+  return summarizeDisplayMetricChanges({
+    currentFormValues: input.currentFormValues,
+    currentScenario: input.currentScenario,
+    currentYear,
+    previousFormValues: input.previousFormValues ?? input.currentFormValues,
+    previousScenario: input.previousScenario ?? input.currentScenario,
+    previousYear,
+  });
+}
+
+function getPovertyGuideline(table: FplTable, householdSize: number, region: FplRegion): number {
+  if (!Number.isInteger(householdSize) || householdSize < 1) {
+    throw new Error('FPL householdSize must be a positive integer');
+  }
+
+  const regionTable = table[region];
+  if (householdSize <= 8) {
+    return regionTable.householdSize[householdSize as FplHouseholdSize];
+  }
+
+  return regionTable.householdSize[8] + (householdSize - 8) * regionTable.additionalPerPerson;
+}
+
+function computeProjectedTaxableIncome(scenario: Scenario, breakdown: YearBreakdown): number {
+  const constants = effectiveConstants(scenario);
+  const taxableIncomeBeforeQbi = computeTaxableIncome(breakdown.agi, scenario.filingStatus, {
+    magi: breakdown.irmaaMagi,
+    standardDeduction: constants.federal.standardDeduction,
+    ...(scenario.age65Plus !== undefined ? { age65Plus: scenario.age65Plus } : {}),
+    ...(scenario.partnerAge65Plus !== undefined ? { partnerAge65Plus: scenario.partnerAge65Plus } : {}),
+  });
+
+  return roundToCents(Math.max(0, taxableIncomeBeforeQbi - breakdown.qbiDeduction));
+}
+
+function computeDisplayFplPercentage(breakdown: YearBreakdown, scenario: Scenario): number | null {
+  const healthcarePhase = getHealthcarePhase(scenario.healthcare, breakdown.year);
+  if (healthcarePhase.kind !== 'aca') {
+    return null;
+  }
+
+  if (breakdown.acaPremiumCredit !== null) {
+    return breakdown.acaPremiumCredit.fplPercent;
+  }
+
+  return computeFplPercentage(breakdown.acaMagi, healthcarePhase.householdSize, {
+    fplTable: getFPLForCoverageYear({
+      coverageYear: breakdown.year,
+      fplIndexingRate: scenario.inflationRate,
+    }),
+    ...(healthcarePhase.region !== undefined ? { region: healthcarePhase.region } : {}),
+  });
+}
+
+function computePhaseLabel(breakdown: YearBreakdown, context: YearDisplayMetricContext): YearPhaseLabel {
+  const claimYear =
+    context.scenario.socialSecurity?.claimYear ??
+    context.formValues.currentYear + (context.formValues.socialSecurityClaimAge - context.formValues.primaryAge);
+  const socialSecurityAnnualBenefit =
+    context.scenario.socialSecurity?.annualBenefit ?? context.formValues.annualSocialSecurityBenefit;
+  if (socialSecurityAnnualBenefit > 0 && breakdown.year >= claimYear) {
+    return 'SS claimed';
+  }
+
+  const age = context.formValues.primaryAge + (breakdown.year - context.formValues.currentYear);
+  if (age >= 65 || getHealthcarePhase(context.scenario.healthcare, breakdown.year).kind === 'medicare') {
+    return 'Medicare-eligible';
+  }
+
+  if (breakdown.year >= context.formValues.retirementYear) {
+    return 'Bridge';
+  }
+
+  return 'Pre-RE';
+}
+
+function getHealthcarePhase(phases: readonly HealthcarePhase[], year: number): HealthcarePhase {
+  return phases.find((phase) => phase.year === year) ?? { year, kind: 'none' };
+}
+
+function summarizeDisplayMetricChanges({
+  currentFormValues,
+  currentScenario,
+  currentYear,
+  previousFormValues,
+  previousScenario,
+  previousYear,
+}: {
+  currentFormValues: ProjectionMetricFormValues;
+  currentScenario: Scenario;
+  currentYear: YearBreakdown;
+  previousFormValues: ProjectionMetricFormValues;
+  previousScenario: Scenario;
+  previousYear: YearBreakdown;
+}): readonly YearChangeSummary[] {
+  const previousMetrics = computeYearDisplayMetrics(previousYear, {
+    formValues: previousFormValues,
+    scenario: previousScenario,
+  });
+  const currentMetrics = computeYearDisplayMetrics(currentYear, {
+    formValues: currentFormValues,
+    scenario: currentScenario,
+  });
+  const summaries: YearChangeSummary[] = [];
+
+  if (previousMetrics.federalBracketProximity.marginalRate !== currentMetrics.federalBracketProximity.marginalRate) {
+    summaries.push({
+      kind: 'federal-bracket-crossing',
+      year: currentYear.year,
+      label: 'Federal bracket changed',
+      detail: `Marginal federal rate moved from ${formatPercentage(previousMetrics.federalBracketProximity.marginalRate)} to ${formatPercentage(currentMetrics.federalBracketProximity.marginalRate)}.`,
+      from: previousMetrics.federalBracketProximity.marginalRate,
+      to: currentMetrics.federalBracketProximity.marginalRate,
+      priority: 1,
+    });
+  }
+
+  if (previousMetrics.irmaaTier !== currentMetrics.irmaaTier) {
+    summaries.push({
+      kind: 'irmaa-tier-crossing',
+      year: currentYear.year,
+      label: 'IRMAA tier changed',
+      detail: `IRMAA tier moved from ${formatNullableNumber(previousMetrics.irmaaTier)} to ${formatNullableNumber(currentMetrics.irmaaTier)}.`,
+      from: previousMetrics.irmaaTier,
+      to: currentMetrics.irmaaTier,
+      priority: 2,
+    });
+  }
+
+  if (previousYear.brokerageBasis.closing > 0 && currentYear.brokerageBasis.closing <= 0) {
+    summaries.push({
+      kind: 'brokerage-basis-depletion',
+      year: currentYear.year,
+      label: 'Brokerage basis depleted',
+      detail: 'Taxable brokerage basis reached zero, so future taxable sales may realize more gains.',
+      from: previousYear.brokerageBasis.closing,
+      to: currentYear.brokerageBasis.closing,
+      priority: 3,
+    });
+  }
+
+  const balanceDrop = previousMetrics.totalClosingBalance - currentMetrics.totalClosingBalance;
+  const balanceDropPercentage =
+    previousMetrics.totalClosingBalance <= 0 ? 0 : balanceDrop / previousMetrics.totalClosingBalance;
+  if (balanceDrop >= LARGE_BALANCE_DROP_MIN_AMOUNT && balanceDropPercentage >= LARGE_BALANCE_DROP_MIN_PERCENTAGE) {
+    summaries.push({
+      kind: 'large-balance-drop',
+      year: currentYear.year,
+      label: 'Large balance drop',
+      detail: `Closing balance fell by ${formatPercentage(balanceDropPercentage)} from the comparison year.`,
+      from: previousMetrics.totalClosingBalance,
+      to: currentMetrics.totalClosingBalance,
+      priority: 4,
+    });
+  }
+
+  if (
+    previousMetrics.fplPercentage !== null &&
+    currentMetrics.fplPercentage !== null &&
+    isAcaCliffRisk(previousMetrics.fplBand) !== isAcaCliffRisk(currentMetrics.fplBand)
+  ) {
+    summaries.push({
+      kind: 'aca-cliff-risk-crossing',
+      year: currentYear.year,
+      label: 'ACA cliff risk changed',
+      detail: `FPL moved from ${formatPercentage(previousMetrics.fplPercentage)} to ${formatPercentage(currentMetrics.fplPercentage)}.`,
+      from: previousMetrics.fplPercentage,
+      to: currentMetrics.fplPercentage,
+      priority: 5,
+    });
+  }
+
+  return summaries.sort((left, right) => left.priority - right.priority).slice(0, 3);
+}
+
+function isAcaCliffRisk(band: FplBand | null): boolean {
+  return band === 'aca-high' || band === 'above-cliff';
+}
+
+function sumAnnualAmounts(entries: readonly { year: number; amount: number }[], year: number): number {
+  return entries.reduce((total, entry) => total + (entry.year === year ? entry.amount : 0), 0);
+}
+
+function formatPercentage(value: number): string {
+  return `${(value * 100).toFixed(1)}%`;
+}
+
+function formatNullableNumber(value: number | null): string {
+  return value === null ? 'none' : String(value);
 }
 
 function selectBridgeWindowEndYear({

@@ -1,5 +1,5 @@
-import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { act, cleanup, render, screen, within } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { LiveStatsStrip } from '@/components/LiveStatsStrip';
 import { toReal } from '@/lib/realDollars';
@@ -41,6 +41,7 @@ describe('LiveStatsStrip', () => {
 
   afterEach(() => {
     cleanup();
+    vi.useRealTimers();
   });
 
   it('renders the default scenario metrics in the required order', () => {
@@ -65,7 +66,8 @@ describe('LiveStatsStrip', () => {
     expect(within(cellAt(cells, 5)).getByText('$0')).toHaveClass('tabular-nums');
   });
 
-  it('updates values after setFormValues and marks recently changed stats without deltas', async () => {
+  it('updates values after setFormValues and pulses changed stats without deltas', () => {
+    vi.useFakeTimers();
     useUiStore.getState().setDisplayUnit('nominal');
     render(<LiveStatsStrip />);
 
@@ -83,15 +85,17 @@ describe('LiveStatsStrip', () => {
       });
     });
 
-    await waitFor(() => {
-      expect(within(statCell('net-worth-at-retirement')).getByText('$150,000')).toBeInTheDocument();
-    });
-
+    expect(within(statCell('net-worth-at-retirement')).getByText('$150,000')).toBeInTheDocument();
     expect(within(statCell('plan-end-balance')).getByText('$150,000')).toBeInTheDocument();
     expect(within(statCell('years-funded')).getByText('2 years')).toBeInTheDocument();
-    expect(statCell('net-worth-at-retirement')).toHaveAttribute('data-recent-update', 'true');
-    expect(screen.getByTestId('live-stat-pulse-net-worth-at-retirement')).toHaveClass('opacity-100', 'animate-pulse');
+    expect(statCell('net-worth-at-retirement')).toHaveClass('bg-yellow-100', 'transition-colors', 'duration-700');
     expect(screen.queryByText(/\+|\u2212|delta/i)).not.toBeInTheDocument();
+
+    act(() => {
+      vi.advanceTimersByTime(700);
+    });
+
+    expect(statCell('net-worth-at-retirement')).not.toHaveClass('bg-yellow-100');
 
     act(() => {
       useUiStore.getState().setDisplayUnit('real');
@@ -99,8 +103,7 @@ describe('LiveStatsStrip', () => {
 
     const expectedRealRetirementBalance = DOLLAR_FORMATTER.format(toReal(150_000, 2028, 2026, 0.03));
 
-    await waitFor(() => {
-      expect(within(statCell('net-worth-at-retirement')).getByText(expectedRealRetirementBalance)).toBeInTheDocument();
-    });
+    expect(within(statCell('net-worth-at-retirement')).getByText(expectedRealRetirementBalance)).toBeInTheDocument();
+    expect(statCell('net-worth-at-retirement')).not.toHaveClass('bg-yellow-100');
   });
 });
