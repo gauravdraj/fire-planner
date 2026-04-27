@@ -1,0 +1,20 @@
+node_modules/
+dist/
+coverage/
+.cursor/
+.DS_Store
+.env.local
+.env.*.local
+
+# Build-process artifacts (operator-only, not product docs)
+DESIGN.md
+COUNCIL.md
+AIZEN_SPEC_*.md
+.aizen/
+
+# IDE-specific
+.vscode/
+.idea/
+
+# TypeScript incremental build cache
+*.tsbuildinfo
