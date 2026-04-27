@@ -1,33 +1,55 @@
+import { useState } from 'react';
+
+import { AdvancedView } from '@/components/advanced/AdvancedView';
 import { BasicPlannerPage } from '@/components/BasicPlannerPage';
+import { CompareView } from '@/components/compare/CompareView';
 import { Disclaimer } from '@/components/Disclaimer';
 import { Footer } from '@/components/Footer';
 import { Header } from '@/components/Header';
 import { StalenessGate } from '@/components/StalenessGate';
+import { useScenarioStore } from '@/store/scenarioStore';
 import { useUiStore } from '@/store/uiStore';
+
+export const CUSTOM_LAW_BANNER_TEXT =
+  'Custom-law scenario active — outputs reflect your edits, not current US tax law.';
+
+type ScenarioIdPair = readonly [string, string];
 
 export function App() {
   const mode = useUiStore((state) => state.mode);
+  const setMode = useUiStore((state) => state.setMode);
+  const customLawActive = useScenarioStore((state) => state.customLawActive);
+  const [compareScenarioIds, setCompareScenarioIds] = useState<ScenarioIdPair | undefined>(undefined);
+
+  function launchCompare(scenarioIds: ScenarioIdPair) {
+    setCompareScenarioIds(scenarioIds);
+    setMode('compare');
+  }
 
   return (
     <div className="min-h-screen bg-white text-slate-950">
       <Disclaimer />
       <StalenessGate />
       <Header />
+      {customLawActive ? <CustomLawBanner /> : null}
       <main className="mx-auto w-full max-w-5xl px-4 py-8">
-        {mode === 'advanced' ? <AdvancedPlaceholder /> : <BasicPlannerPage />}
+        {mode === 'compare' ? (
+          <CompareView {...(compareScenarioIds === undefined ? {} : { initialScenarioIds: compareScenarioIds })} />
+        ) : mode === 'advanced' ? (
+          <AdvancedView onCompare={launchCompare} />
+        ) : (
+          <BasicPlannerPage />
+        )}
       </main>
       <Footer />
     </div>
   );
 }
 
-function AdvancedPlaceholder() {
+function CustomLawBanner() {
   return (
-    <section aria-labelledby="advanced-placeholder-heading" className="rounded-lg border border-slate-200 p-5">
-      <h2 className="text-xl font-semibold" id="advanced-placeholder-heading">
-        Advanced mode
-      </h2>
-      <p className="mt-2 text-sm text-slate-600">Advanced controls arrive in Gate 4.</p>
-    </section>
+    <div className="border-y border-amber-300 bg-amber-100 px-4 py-3 text-sm font-medium text-amber-950" role="status">
+      <div className="mx-auto max-w-5xl">{CUSTOM_LAW_BANNER_TEXT}</div>
+    </div>
   );
 }

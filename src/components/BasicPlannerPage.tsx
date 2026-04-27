@@ -1,5 +1,7 @@
 import { BalancesChart } from '@/components/BalancesChart';
 import { BasicForm } from '@/components/BasicForm';
+import { MagiChart } from '@/components/charts/MagiChart';
+import { TaxBreakdownChart } from '@/components/charts/TaxBreakdownChart';
 import { SummaryCards } from '@/components/SummaryCards';
 import { YearByYearTable } from '@/components/YearByYearTable';
 import { useScenarioStore } from '@/store/scenarioStore';
@@ -27,6 +29,8 @@ function ProjectionResults() {
       <SummaryCards />
       <YearByYearTable />
       <BalancesChart />
+      <MagiChart />
+      <TaxBreakdownChart />
     </>
   );
 }

@@ -4,6 +4,7 @@ import { useUiStore } from '@/store/uiStore';
 const MODES: ReadonlyArray<{ label: string; value: PlannerMode }> = [
   { label: 'Basic', value: 'basic' },
   { label: 'Advanced', value: 'advanced' },
+  { label: 'Compare', value: 'compare' },
 ];
 
 export function ModeToggle() {

@@ -11,6 +11,7 @@
  */
 
 import { CONSTANTS_2026 } from './constants/2026';
+import { effectiveConstants, type CustomLaw, type LawConstants } from './constants/customLaw';
 import { computeFederalTax, computeTaxableIncome } from './tax/federal';
 import { computeLtcgTax } from './tax/ltcg';
 import { computeAgi, computeMagiAca, computeMagiIrmaa } from './tax/magi';
@@ -133,12 +134,24 @@ export type Scenario = Readonly<{
   otherIncome?: readonly AnnualAmount[];
   age65Plus?: boolean;
   partnerAge65Plus?: boolean;
+  customLaw?: CustomLaw;
 }>;
+
+export type AnnualSpendingOverride = AnnualAmount;
+
+export type RothConversion = AnnualAmount;
+
+/**
+ * Amount is the desired realized long-term capital gain from selling and
+ * immediately rebuying taxable brokerage holdings.
+ */
+export type BrokerageHarvest = AnnualAmount;
 
 export type WithdrawalPlan = Readonly<{
   endYear: number;
-  annualSpending: readonly AnnualAmount[];
-  rothConversions?: readonly AnnualAmount[];
+  annualSpending: readonly AnnualSpendingOverride[];
+  rothConversions?: readonly RothConversion[];
+  brokerageHarvests?: readonly BrokerageHarvest[];
 }>;
 
 export type BrokerageBasisBreakdown = Readonly<{
@@ -154,6 +167,7 @@ export type YearBreakdown = Readonly<{
   openingBalances: AccountBalances;
   withdrawals: AccountBalances;
   conversions: number;
+  brokerageHarvests: number;
   gainsOrLosses: AccountBalances;
   brokerageBasis: BrokerageBasisBreakdown;
   agi: number;
@@ -182,6 +196,13 @@ type WithdrawalAllocation = Readonly<{
   remainingNeed: number;
   balancesAfterWithdrawals: AccountBalances;
   taxableBrokerageBasisAfterSale: number;
+}>;
+
+type BrokerageHarvestAllocation = Readonly<{
+  basisSold: number;
+  realizedGain: number;
+  basisAfterHarvest: number;
+  unharvestedGain: number;
 }>;
 
 type YearComputation = Readonly<{
@@ -309,6 +330,7 @@ export function runProjection(scenario: Scenario, plan: WithdrawalPlan): YearBre
     throw new Error('Projection plan endYear must be at least the scenario startYear');
   }
 
+  const constants = effectiveConstants(scenario);
   const results: YearBreakdown[] = [];
   let balances = copyBalances(scenario.balances);
   let taxableBrokerageBasis = roundToCents(Math.max(0, scenario.basis.taxableBrokerage));
@@ -316,7 +338,16 @@ export function runProjection(scenario: Scenario, plan: WithdrawalPlan): YearBre
 
   for (let year = scenario.startYear; year <= plan.endYear; year += 1) {
     let withdrawalTarget = Math.max(0, computeCashNeedBeforeTax(scenario, plan, year));
-    let computation = computeProjectionYear(scenario, plan, year, balances, taxableBrokerageBasis, magiHistory, withdrawalTarget);
+    let computation = computeProjectionYear(
+      scenario,
+      plan,
+      constants,
+      year,
+      balances,
+      taxableBrokerageBasis,
+      magiHistory,
+      withdrawalTarget,
+    );
 
     for (let attempt = 0; attempt < 5; attempt += 1) {
       const nextWithdrawalTarget = Math.max(
@@ -334,6 +365,7 @@ export function runProjection(scenario: Scenario, plan: WithdrawalPlan): YearBre
       computation = computeProjectionYear(
         scenario,
         plan,
+        constants,
         year,
         balances,
         taxableBrokerageBasis,
@@ -354,6 +386,7 @@ export function runProjection(scenario: Scenario, plan: WithdrawalPlan): YearBre
 function computeProjectionYear(
   scenario: Scenario,
   plan: WithdrawalPlan,
+  constants: LawConstants,
   year: number,
   openingBalances: AccountBalances,
   openingBrokerageBasis: number,
@@ -363,6 +396,15 @@ function computeProjectionYear(
   const spending = nonnegative(sumAnnualAmounts(plan.annualSpending, year));
   const warnings: string[] = [];
   const allocation = allocateWithdrawals(openingBalances, openingBrokerageBasis, withdrawalTarget);
+  const plannedBrokerageHarvest = nonnegative(sumAnnualAmounts(plan.brokerageHarvests ?? [], year));
+  const brokerageHarvest = allocateBrokerageHarvest(
+    allocation.balancesAfterWithdrawals.taxableBrokerage,
+    allocation.taxableBrokerageBasisAfterSale,
+    plannedBrokerageHarvest,
+  );
+  const taxableBrokerageGainOrLoss = roundToCents(
+    allocation.taxableBrokerageGainOrLoss + brokerageHarvest.realizedGain,
+  );
   const plannedConversion = nonnegative(sumAnnualAmounts(plan.rothConversions ?? [], year));
   const conversion = Math.min(plannedConversion, allocation.balancesAfterWithdrawals.traditional);
   const balancesAfterConversion: AccountBalances = {
@@ -377,6 +419,11 @@ function computeProjectionYear(
   }
   if (plannedConversion > conversion) {
     warnings.push(`Planned Roth conversion exceeded remaining traditional balance by ${formatDollars(plannedConversion - conversion)}.`);
+  }
+  if (brokerageHarvest.unharvestedGain > 0) {
+    warnings.push(
+      `Planned brokerage harvest exceeded remaining unrealized gain by ${formatDollars(brokerageHarvest.unharvestedGain)}.`,
+    );
   }
 
   const wages = sumAnnualAmounts(scenario.w2Income, year);
@@ -418,7 +465,7 @@ function computeProjectionYear(
       annuityIncome +
       taxableInterest +
       qualifiedDividends +
-      allocation.taxableBrokerageGainOrLoss +
+      taxableBrokerageGainOrLoss +
       allocation.withdrawals.traditional +
       conversion +
       rentalNetIncome +
@@ -445,7 +492,7 @@ function computeProjectionYear(
     iraDistributions: allocation.withdrawals.traditional,
     rothConversions: conversion,
     taxableBrokerageIncome: taxableInterest,
-    capitalGains: qualifiedDividends + allocation.taxableBrokerageGainOrLoss,
+    capitalGains: qualifiedDividends + taxableBrokerageGainOrLoss,
     rentalNetIncome,
     otherIncome,
     seDeductibleHalf: seTax.deductibleHalf,
@@ -458,7 +505,10 @@ function computeProjectionYear(
   });
   const irmaaMagi = computeMagiIrmaa({ agi, taxExemptInterest });
 
-  const taxableIncomeOptions: Parameters<typeof computeTaxableIncome>[2] = { magi: irmaaMagi };
+  const taxableIncomeOptions: Parameters<typeof computeTaxableIncome>[2] = {
+    magi: irmaaMagi,
+    standardDeduction: constants.federal.standardDeduction,
+  };
   if (scenario.age65Plus !== undefined) {
     taxableIncomeOptions.age65Plus = scenario.age65Plus;
   }
@@ -467,7 +517,7 @@ function computeProjectionYear(
   }
 
   const taxableIncomeBeforeQbi = computeTaxableIncome(agi, scenario.filingStatus, taxableIncomeOptions);
-  const preferentialIncome = Math.max(0, qualifiedDividends + Math.max(0, allocation.taxableBrokerageGainOrLoss));
+  const preferentialIncome = Math.max(0, qualifiedDividends + Math.max(0, taxableBrokerageGainOrLoss));
   const qbiDeduction = computeQbi({
     filingStatus: scenario.filingStatus,
     qbiNetIncome: consultingIncome,
@@ -487,11 +537,11 @@ function computeProjectionYear(
   const preferentialTaxableIncome = Math.min(preferentialIncome, taxableIncome);
   const ordinaryTaxableIncome = roundToCents(Math.max(0, taxableIncome - preferentialTaxableIncome));
   const indexedOrdinaryBrackets = indexBracketsForYear(
-    CONSTANTS_2026.federal.ordinaryBrackets,
+    constants.federal.ordinaryBrackets,
     year,
     scenario.inflationRate,
   ) as BracketTable;
-  const indexedLtcgBrackets = indexBracketsForYear(CONSTANTS_2026.ltcg.brackets, year, scenario.inflationRate) as LtcgBracketTable;
+  const indexedLtcgBrackets = indexBracketsForYear(constants.ltcg.brackets, year, scenario.inflationRate) as LtcgBracketTable;
   const federalTax = computeFederalTax(ordinaryTaxableIncome, scenario.filingStatus, indexedOrdinaryBrackets);
   const ltcgTax = computeLtcgTax({
     filingStatus: scenario.filingStatus,
@@ -502,7 +552,8 @@ function computeProjectionYear(
   const niit = computeNiit({
     filingStatus: scenario.filingStatus,
     magiForNiit: agi,
-    netInvestmentIncome: taxableInterest + qualifiedDividends + Math.max(0, allocation.taxableBrokerageGainOrLoss) + passiveRentalNetIncome,
+    netInvestmentIncome: taxableInterest + qualifiedDividends + Math.max(0, taxableBrokerageGainOrLoss) + passiveRentalNetIncome,
+    rate: constants.niit.rate,
   });
   const stateTaxableIncome = scenario.state.taxableIncomeSource === 'agi' ? agi : taxableIncome;
   const stateTax = computeStateTax({
@@ -542,9 +593,9 @@ function computeProjectionYear(
       })
     : null;
 
-  if (healthcarePhase.kind === 'aca' && allocation.withdrawals.taxableBrokerage > 0 && allocation.taxableBrokerageGainOrLoss > 0) {
+  if (healthcarePhase.kind === 'aca' && taxableBrokerageGainOrLoss > 0) {
     warnings.push(
-      `Taxable brokerage sale created ${formatDollars(allocation.taxableBrokerageGainOrLoss)} of realized gain included in ACA MAGI.`,
+      `Taxable brokerage activity created ${formatDollars(taxableBrokerageGainOrLoss)} of realized gain included in ACA MAGI.`,
     );
   }
   if (acaPremiumCredit !== null && !acaPremiumCredit.isEligible && acaPremiumCredit.fplPercent > 4) {
@@ -594,12 +645,13 @@ function computeProjectionYear(
       openingBalances: copyBalances(openingBalances),
       withdrawals: allocation.withdrawals,
       conversions: roundToCents(conversion),
+      brokerageHarvests: roundToCents(brokerageHarvest.realizedGain),
       gainsOrLosses: returns.gainsOrLosses,
       brokerageBasis: {
         opening: roundToCents(openingBrokerageBasis),
-        sold: roundToCents(allocation.taxableBrokerageBasisSold),
-        realizedGainOrLoss: roundToCents(allocation.taxableBrokerageGainOrLoss),
-        closing: roundToCents(allocation.taxableBrokerageBasisAfterSale),
+        sold: roundToCents(allocation.taxableBrokerageBasisSold + brokerageHarvest.basisSold),
+        realizedGainOrLoss: taxableBrokerageGainOrLoss,
+        closing: roundToCents(brokerageHarvest.basisAfterHarvest),
       },
       agi,
       acaMagi,
@@ -619,7 +671,7 @@ function computeProjectionYear(
       warnings,
       closingBalances,
     },
-    closingBrokerageBasis: allocation.taxableBrokerageBasisAfterSale,
+    closingBrokerageBasis: brokerageHarvest.basisAfterHarvest,
     cashIncomeBeforeWithdrawals: roundToCents(cashIncomeBeforeWithdrawals),
   };
 }
@@ -680,6 +732,38 @@ function allocateWithdrawals(
       roth: roundToCents(openingBalances.roth - roth),
     },
     taxableBrokerageBasisAfterSale: roundToCents(taxableBrokerageBasisAfterSale),
+  };
+}
+
+function allocateBrokerageHarvest(
+  taxableBrokerageBalance: number,
+  taxableBrokerageBasis: number,
+  requestedGain: number,
+): BrokerageHarvestAllocation {
+  const balance = nonnegative(taxableBrokerageBalance);
+  const basis = Math.max(0, taxableBrokerageBasis);
+  const requested = nonnegative(requestedGain);
+  const embeddedGain = Math.max(0, balance - basis);
+  const realizedGain = Math.min(requested, embeddedGain);
+
+  if (realizedGain <= 0 || balance <= 0 || embeddedGain <= 0) {
+    return {
+      basisSold: 0,
+      realizedGain: 0,
+      basisAfterHarvest: roundToCents(basis),
+      unharvestedGain: roundToCents(requested),
+    };
+  }
+
+  const gainRatio = embeddedGain / balance;
+  const proceeds = Math.min(balance, realizedGain / gainRatio);
+  const basisSold = Math.max(0, proceeds - realizedGain);
+
+  return {
+    basisSold: roundToCents(basisSold),
+    realizedGain: roundToCents(realizedGain),
+    basisAfterHarvest: roundToCents(basis - basisSold + proceeds),
+    unharvestedGain: roundToCents(requested - realizedGain),
   };
 }
 

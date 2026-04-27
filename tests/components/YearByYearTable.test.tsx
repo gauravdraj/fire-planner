@@ -75,6 +75,7 @@ function buildYearBreakdown(
     openingBalances: ZERO_BALANCES,
     withdrawals: values.withdrawals,
     conversions: 0,
+    brokerageHarvests: 0,
     gainsOrLosses: ZERO_BALANCES,
     brokerageBasis: {
       opening: 0,

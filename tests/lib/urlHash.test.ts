@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { compressToEncodedURIComponent, decompressFromEncodedURIComponent } from 'lz-string';
 
+import type { CustomLaw } from '@/core/constants/customLaw';
 import { mapBasicFormToProjectionInputs, type BasicFormValues } from '@/lib/basicFormMapping';
 import { decodeScenario, encodeScenario } from '@/lib/urlHash';
 
@@ -26,6 +27,17 @@ const BASIC_FORM_VALUES: BasicFormValues = {
   healthcarePhase: 'aca',
 };
 
+const CUSTOM_LAW = {
+  federal: {
+    standardDeduction: {
+      single: 20_000,
+      mfj: 40_000,
+      hoh: 30_000,
+      mfs: 20_000,
+    },
+  },
+} satisfies CustomLaw;
+
 function buildProjectionInputs() {
   return mapBasicFormToProjectionInputs(BASIC_FORM_VALUES);
 }
@@ -38,11 +50,16 @@ function decodeRawPayload(hash: string): unknown {
 }
 
 describe('URL hash scenario codec', () => {
-  it('round-trips a populated scenario payload and keeps only scenario plus plan', () => {
+  it('round-trips a populated scenario payload and keeps only shareable active state', () => {
     const { scenario, plan } = buildProjectionInputs();
+    const advancedPlan = {
+      ...plan,
+      rothConversions: [{ year: scenario.startYear + 1, amount: 25_000 }],
+      brokerageHarvests: [{ year: scenario.startYear + 2, amount: 12_500 }],
+    };
     const payloadWithUiState = {
       scenario,
-      plan,
+      plan: advancedPlan,
       mode: 'advanced',
       displayUnit: 'real',
     };
@@ -50,9 +67,67 @@ describe('URL hash scenario codec', () => {
     const encoded = encodeScenario(payloadWithUiState);
 
     expect(encoded.startsWith('v1:')).toBe(true);
-    expect(decodeScenario(encoded)).toEqual({ scenario, plan });
-    expect(decodeScenario(`#${encoded}`)).toEqual({ scenario, plan });
-    expect(Object.keys(decodeRawPayload(encoded) as Record<string, unknown>).sort()).toEqual(['plan', 'scenario']);
+    expect(decodeScenario(encoded)).toEqual({ scenario, plan: advancedPlan, customLawActive: false });
+    expect(decodeScenario(`#${encoded}`)).toEqual({ scenario, plan: advancedPlan, customLawActive: false });
+    expect(Object.keys(decodeRawPayload(encoded) as Record<string, unknown>).sort()).toEqual([
+      'customLawActive',
+      'plan',
+      'scenario',
+    ]);
+  });
+
+  it('encodes custom-law overrides and excludes named-scenario local identifiers', () => {
+    const { scenario, plan } = buildProjectionInputs();
+    const payloadWithLocalState = {
+      scenario,
+      plan,
+      customLaw: CUSTOM_LAW,
+      customLawActive: true,
+      namedScenarioId: 'local-only-id',
+      activeScenarioIndex: 2,
+    };
+
+    const encoded = encodeScenario(payloadWithLocalState);
+    const decoded = decodeScenario(encoded);
+    const rawPayload = decodeRawPayload(encoded) as Record<string, unknown>;
+
+    expect(decoded).toEqual({
+      scenario: { ...scenario, customLaw: CUSTOM_LAW },
+      plan,
+      customLaw: CUSTOM_LAW,
+      customLawActive: true,
+    });
+    expect(Object.keys(rawPayload).sort()).toEqual(['customLaw', 'customLawActive', 'plan', 'scenario']);
+    expect(rawPayload).not.toHaveProperty('namedScenarioId');
+    expect(rawPayload).not.toHaveProperty('activeScenarioIndex');
+  });
+
+  it('hydrates legacy Gate 3 hashes that only contain scenario plus plan', () => {
+    const { scenario, plan } = buildProjectionInputs();
+    const legacyHash = `v1:${compressToEncodedURIComponent(JSON.stringify({ scenario, plan }))}`;
+
+    expect(decodeScenario(legacyHash)).toEqual({ scenario, plan, customLawActive: false });
+  });
+
+  it('requires both a true flag and non-empty overrides before marking custom law active', () => {
+    const { scenario, plan } = buildProjectionInputs();
+    const emptyOverrideHash = `v1:${compressToEncodedURIComponent(
+      JSON.stringify({ scenario, plan, customLaw: {}, customLawActive: true }),
+    )}`;
+    const inactiveOverrideHash = encodeScenario({ scenario, plan, customLaw: CUSTOM_LAW, customLawActive: false });
+
+    expect(decodeScenario(emptyOverrideHash)).toEqual({
+      scenario,
+      plan,
+      customLaw: {},
+      customLawActive: false,
+    });
+    expect(decodeScenario(inactiveOverrideHash)).toEqual({
+      scenario,
+      plan,
+      customLaw: CUSTOM_LAW,
+      customLawActive: false,
+    });
   });
 
   it.each(['', '#', 'not-a-share-hash', 'v1:', '#v1:', 'v1:not-valid-compressed-data'])(

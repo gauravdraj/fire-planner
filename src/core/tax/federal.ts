@@ -1,6 +1,13 @@
 import { CONSTANTS_2026 } from '../constants/2026';
 import type { BracketTable, FilingStatus } from '../types';
 
+type TaxableIncomeOptions = {
+  age65Plus?: boolean;
+  partnerAge65Plus?: boolean;
+  magi?: number;
+  standardDeduction?: Readonly<Record<FilingStatus, number>>;
+};
+
 // Tax outputs are nonnegative dollar amounts. This helper rounds positive values
 // to cents with ROUND_HALF_UP-style behavior and is used only at return boundaries.
 function roundToCents(value: number): number {
@@ -39,9 +46,9 @@ export function computeFederalTax(taxableIncome: number, filingStatus: FilingSta
 export function computeTaxableIncome(
   agi: number,
   filingStatus: FilingStatus,
-  options: { age65Plus?: boolean; partnerAge65Plus?: boolean; magi?: number } = {},
+  options: TaxableIncomeOptions = {},
 ): number {
-  const standardDeduction = CONSTANTS_2026.federal.standardDeduction[filingStatus];
+  const standardDeduction = options.standardDeduction?.[filingStatus] ?? CONSTANTS_2026.federal.standardDeduction[filingStatus];
   const seniorDeduction = computeSeniorDeduction(agi, filingStatus, options);
 
   return roundToCents(Math.max(0, agi - standardDeduction - seniorDeduction));
@@ -50,7 +57,7 @@ export function computeTaxableIncome(
 function computeSeniorDeduction(
   agi: number,
   filingStatus: FilingStatus,
-  options: { age65Plus?: boolean; partnerAge65Plus?: boolean; magi?: number },
+  options: TaxableIncomeOptions,
 ): number {
   const seniorDeduction = CONSTANTS_2026.federal.seniorDeduction;
   if (!seniorDeduction.eligibleFilingStatuses[filingStatus]) {

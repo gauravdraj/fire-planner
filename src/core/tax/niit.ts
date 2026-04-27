@@ -5,6 +5,7 @@ export type NiitInput = {
   magiForNiit: number;
   netInvestmentIncome: number;
   filingStatus: FilingStatus;
+  rate?: number;
 };
 
 // Tax outputs are nonnegative dollar amounts. This helper rounds positive values
@@ -21,5 +22,5 @@ export function computeNiit(input: NiitInput): number {
   const excessMagi = Math.max(0, input.magiForNiit - threshold);
   const taxableNetInvestmentIncome = Math.min(Math.max(0, input.netInvestmentIncome), excessMagi);
 
-  return roundToCents(taxableNetInvestmentIncome * CONSTANTS_2026.niit.rate);
+  return roundToCents(taxableNetInvestmentIncome * (input.rate ?? CONSTANTS_2026.niit.rate));
 }

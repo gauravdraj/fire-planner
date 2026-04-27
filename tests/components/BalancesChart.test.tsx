@@ -56,6 +56,7 @@ function buildYearBreakdown(values: Pick<YearBreakdown, 'closingBalances' | 'yea
     openingBalances: ZERO_BALANCES,
     withdrawals: ZERO_BALANCES,
     conversions: 0,
+    brokerageHarvests: 0,
     gainsOrLosses: ZERO_BALANCES,
     brokerageBasis: {
       opening: 0,

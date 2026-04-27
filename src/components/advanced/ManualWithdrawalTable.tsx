@@ -1,0 +1,225 @@
+import type { AnnualAmount, WithdrawalPlan } from '@/core/projection';
+import { useScenarioStore } from '@/store/scenarioStore';
+
+export function ManualWithdrawalTable() {
+  const scenario = useScenarioStore((state) => state.scenario);
+  const plan = useScenarioStore((state) => state.plan);
+  const setPlan = useScenarioStore((state) => state.setPlan);
+  const years = buildYearRange(scenario.startYear, plan.endYear);
+
+  function updateSpending(year: number, value: string) {
+    setPlan({
+      ...plan,
+      annualSpending: setAnnualAmount(plan.annualSpending, year, parseMoneyInput(value), true),
+    });
+  }
+
+  function updateRothConversion(year: number, value: string) {
+    setPlan(withOptionalAnnualAmounts(plan, 'rothConversions', year, parseMoneyInput(value)));
+  }
+
+  function updateBrokerageHarvest(year: number, value: string) {
+    setPlan(withOptionalAnnualAmounts(plan, 'brokerageHarvests', year, parseMoneyInput(value)));
+  }
+
+  function clearYear(year: number) {
+    setPlan({
+      ...withoutOptionalAnnualAmount(withoutOptionalAnnualAmount(plan, 'rothConversions', year), 'brokerageHarvests', year),
+      annualSpending: removeAnnualAmount(plan.annualSpending, year),
+    });
+  }
+
+  function clearPlannerActions() {
+    const { brokerageHarvests: _ignoredHarvests, rothConversions: _ignoredConversions, ...planWithoutActions } = plan;
+
+    setPlan(planWithoutActions);
+  }
+
+  return (
+    <section aria-labelledby="manual-plan-heading" className="space-y-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h3 className="text-base font-semibold text-slate-900" id="manual-plan-heading">
+            Manual withdrawal planning
+          </h3>
+          <p className="mt-1 text-sm text-slate-600">
+            Edit annual spending overrides, Roth conversions, and brokerage LTCG harvest targets used by the projection
+            engine.
+          </p>
+        </div>
+        <button
+          className="self-start rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
+          onClick={clearPlannerActions}
+          type="button"
+        >
+          Clear planner actions
+        </button>
+      </div>
+
+      <div className="overflow-x-auto rounded-lg border border-slate-200">
+        <table className="min-w-full divide-y divide-slate-200 text-sm">
+          <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">
+            <tr>
+              <th className="px-3 py-2" scope="col">
+                Year
+              </th>
+              <th className="px-3 py-2" scope="col">
+                Spending
+              </th>
+              <th className="px-3 py-2" scope="col">
+                Roth conversion
+              </th>
+              <th className="px-3 py-2" scope="col">
+                Brokerage harvest
+              </th>
+              <th className="px-3 py-2" scope="col">
+                Actions
+              </th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100 bg-white">
+            {years.map((year) => (
+              <tr key={year}>
+                <th className="whitespace-nowrap px-3 py-2 text-left font-medium text-slate-900" scope="row">
+                  {year}
+                </th>
+                <td className="px-3 py-2">
+                  <MoneyInput
+                    ariaLabel={`Spending ${year}`}
+                    onChange={(value) => updateSpending(year, value)}
+                    value={amountForYear(plan.annualSpending, year)}
+                  />
+                </td>
+                <td className="px-3 py-2">
+                  <MoneyInput
+                    ariaLabel={`Roth conversion ${year}`}
+                    onChange={(value) => updateRothConversion(year, value)}
+                    value={amountForYear(plan.rothConversions ?? [], year)}
+                  />
+                </td>
+                <td className="px-3 py-2">
+                  <MoneyInput
+                    ariaLabel={`Brokerage harvest ${year}`}
+                    onChange={(value) => updateBrokerageHarvest(year, value)}
+                    value={amountForYear(plan.brokerageHarvests ?? [], year)}
+                  />
+                </td>
+                <td className="px-3 py-2">
+                  <button
+                    className="rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100"
+                    onClick={() => clearYear(year)}
+                    type="button"
+                  >
+                    Clear {year}
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+function MoneyInput({
+  ariaLabel,
+  onChange,
+  value,
+}: {
+  ariaLabel: string;
+  onChange: (value: string) => void;
+  value: number | null;
+}) {
+  return (
+    <input
+      aria-label={ariaLabel}
+      className="w-32 rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+      inputMode="decimal"
+      min="0"
+      onChange={(event) => onChange(event.target.value)}
+      placeholder="0"
+      step="100"
+      type="number"
+      value={value === null ? '' : String(value)}
+    />
+  );
+}
+
+function buildYearRange(startYear: number, endYear: number): number[] {
+  const years: number[] = [];
+
+  for (let year = startYear; year <= endYear; year += 1) {
+    years.push(year);
+  }
+
+  return years;
+}
+
+function amountForYear(entries: readonly AnnualAmount[], year: number): number | null {
+  return entries.find((entry) => entry.year === year)?.amount ?? null;
+}
+
+function parseMoneyInput(value: string): number | null {
+  const trimmed = value.trim().replaceAll(',', '');
+
+  if (trimmed.length === 0) {
+    return null;
+  }
+
+  const parsed = Number(trimmed);
+
+  return Number.isFinite(parsed) && parsed >= 0 ? roundToCents(parsed) : null;
+}
+
+function withOptionalAnnualAmounts(
+  plan: WithdrawalPlan,
+  field: 'rothConversions' | 'brokerageHarvests',
+  year: number,
+  amount: number | null,
+): WithdrawalPlan {
+  const entries = setAnnualAmount(plan[field] ?? [], year, amount, false);
+
+  if (entries.length === 0) {
+    const { [field]: _ignoredField, ...planWithoutField } = plan;
+
+    return planWithoutField;
+  }
+
+  return {
+    ...plan,
+    [field]: entries,
+  };
+}
+
+function withoutOptionalAnnualAmount(
+  plan: WithdrawalPlan,
+  field: 'rothConversions' | 'brokerageHarvests',
+  year: number,
+): WithdrawalPlan {
+  return withOptionalAnnualAmounts(plan, field, year, null);
+}
+
+function setAnnualAmount(
+  entries: readonly AnnualAmount[],
+  year: number,
+  amount: number | null,
+  keepZero: boolean,
+): AnnualAmount[] {
+  if (amount === null || (!keepZero && amount <= 0)) {
+    return removeAnnualAmount(entries, year);
+  }
+
+  return [...entries.filter((entry) => entry.year !== year), { year, amount }].sort((left, right) => left.year - right.year);
+}
+
+function removeAnnualAmount(entries: readonly AnnualAmount[], year: number): AnnualAmount[] {
+  return entries.filter((entry) => entry.year !== year);
+}
+
+function roundToCents(value: number): number {
+  const sign = value < 0 ? -1 : 1;
+  const cents = Math.trunc(Math.abs(value) * 100 + 0.5 + Number.EPSILON);
+
+  return (sign * cents) / 100;
+}

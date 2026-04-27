@@ -13,10 +13,13 @@ type CopyStatus = 'idle' | 'share-link' | 'json' | 'error';
 export function ShareButton() {
   const scenario = useScenarioStore((state) => state.scenario);
   const plan = useScenarioStore((state) => state.plan);
+  const customLaw = useScenarioStore((state) => state.customLaw);
+  const customLawActive = useScenarioStore((state) => state.customLawActive);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [copyStatus, setCopyStatus] = useState<CopyStatus>('idle');
 
-  const payload = { scenario, plan };
+  const payload =
+    customLaw === undefined ? { scenario, plan, customLawActive } : { scenario, plan, customLaw, customLawActive };
 
   function handleShareClick() {
     setCopyStatus('idle');

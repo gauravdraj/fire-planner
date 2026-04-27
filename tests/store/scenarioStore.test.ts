@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { compressToEncodedURIComponent } from 'lz-string';
 
+import type { CustomLaw } from '@/core/constants/customLaw';
 import { mapBasicFormToProjectionInputs, type BasicFormValues } from '@/lib/basicFormMapping';
 import { encodeScenario } from '@/lib/urlHash';
 
@@ -49,6 +51,17 @@ const HASH_FORM_VALUES: BasicFormValues = {
   healthcarePhase: 'aca',
 };
 
+const CUSTOM_LAW = {
+  federal: {
+    standardDeduction: {
+      single: 20_000,
+      mfj: 40_000,
+      hoh: 30_000,
+      mfs: 20_000,
+    },
+  },
+} satisfies CustomLaw;
+
 describe('scenarioStore', () => {
   beforeEach(() => {
     vi.resetModules();
@@ -65,22 +78,31 @@ describe('scenarioStore', () => {
     expect(state.selectedStarterStateLaw.stateCode).toBe('CA');
     expect(state.scenario.state.incomeTaxLaw.stateCode).toBe('CA');
     expect(state.plan.endYear).toBe(2066);
+    expect(state.customLaw).toBeUndefined();
+    expect(state.customLawActive).toBe(false);
     expect(state.projectionResults).toHaveLength(41);
     expect(state.scenario.balances).not.toHaveProperty('hsa');
   });
 
-  it('persists only Gate 3 basic form fields and rehydrates from localStorage', async () => {
+  it('persists active scenario inputs and rehydrates from localStorage without breaking basic mode', async () => {
     const { SCENARIO_STORAGE_KEY, useScenarioStore } = await import('@/store/scenarioStore');
 
     useScenarioStore.getState().replaceFormValues(STORED_FORM_VALUES);
 
     const persisted = JSON.parse(window.localStorage.getItem(SCENARIO_STORAGE_KEY) ?? '{}') as {
       formValues?: Record<string, unknown>;
+      scenario?: Record<string, unknown>;
+      plan?: Record<string, unknown>;
+      customLawActive?: unknown;
     };
 
     expect(persisted.formValues).toEqual(STORED_FORM_VALUES);
     expect(persisted.formValues).not.toHaveProperty('hsa');
     expect(persisted.formValues).not.toHaveProperty('hsaBalance');
+    expect(persisted.scenario?.state).toBeDefined();
+    expect(persisted.plan?.endYear).toBe(2056);
+    expect(persisted.customLawActive).toBe(false);
+    expect(persisted).not.toHaveProperty('customLaw');
 
     vi.resetModules();
 
@@ -89,11 +111,18 @@ describe('scenarioStore', () => {
 
     expect(reloadedState.formValues).toEqual(STORED_FORM_VALUES);
     expect(reloadedState.scenario.state.incomeTaxLaw.stateCode).toBe('FL');
+    expect(reloadedState.customLawActive).toBe(false);
+    expect(reloadedState.customLaw).toBeUndefined();
     expect(reloadedState.projectionResults.length).toBeGreaterThan(0);
   });
 
   it('applies a valid URL hash before localStorage and uses the mapped projection inputs', async () => {
-    const { plan } = mapBasicFormToProjectionInputs(HASH_FORM_VALUES);
+    const { scenario, plan } = mapBasicFormToProjectionInputs(HASH_FORM_VALUES);
+    const sharedPlan = {
+      ...plan,
+      rothConversions: [{ year: HASH_FORM_VALUES.currentYear, amount: 50_000 }],
+      brokerageHarvests: [{ year: HASH_FORM_VALUES.currentYear, amount: 10_000 }],
+    };
     window.localStorage.setItem(
       'fire-planner.scenario.v1',
       JSON.stringify({
@@ -103,7 +132,7 @@ describe('scenarioStore', () => {
         },
       }),
     );
-    window.location.hash = encodeScenario(mapBasicFormToProjectionInputs(HASH_FORM_VALUES));
+    window.location.hash = encodeScenario({ scenario, plan: sharedPlan });
 
     const { SCENARIO_STORAGE_KEY, useScenarioStore } = await import('@/store/scenarioStore');
     const state = useScenarioStore.getState();
@@ -111,8 +140,12 @@ describe('scenarioStore', () => {
     expect(state.formValues.stateCode).toBe('PA');
     expect(state.formValues.annualSpendingToday).toBe(HASH_FORM_VALUES.annualSpendingToday);
     expect(state.formValues.annualW2Income).toBe(HASH_FORM_VALUES.annualW2Income);
-    expect(state.plan.endYear).toBe(plan.endYear);
+    expect(state.plan).toEqual(sharedPlan);
     expect(state.scenario.state.incomeTaxLaw.stateCode).toBe('PA');
+    expect(state.customLawActive).toBe(false);
+    expect(state.customLaw).toBeUndefined();
+    expect(state.projectionResults[0]?.conversions).toBe(50_000);
+    expect(state.projectionResults[0]?.brokerageHarvests).toBe(10_000);
     expect(state.projectionResults.map((year) => year.year)[0]).toBe(HASH_FORM_VALUES.currentYear);
 
     const persisted = JSON.parse(window.localStorage.getItem(SCENARIO_STORAGE_KEY) ?? '{}') as {
@@ -120,6 +153,57 @@ describe('scenarioStore', () => {
     };
     expect(persisted.formValues?.stateCode).toBe('PA');
     expect(persisted.formValues).not.toHaveProperty('hsaBalance');
+  });
+
+  it('hydrates active custom-law state from URL hashes and persists it locally', async () => {
+    const { scenario, plan } = mapBasicFormToProjectionInputs(HASH_FORM_VALUES);
+    window.location.hash = encodeScenario({ scenario, plan, customLaw: CUSTOM_LAW, customLawActive: true });
+
+    const { SCENARIO_STORAGE_KEY, useScenarioStore } = await import('@/store/scenarioStore');
+    const state = useScenarioStore.getState();
+
+    expect(state.customLaw).toEqual(CUSTOM_LAW);
+    expect(state.customLawActive).toBe(true);
+    expect(state.scenario.customLaw).toEqual(CUSTOM_LAW);
+    expect(state.projectionResults.length).toBeGreaterThan(0);
+
+    const persisted = JSON.parse(window.localStorage.getItem(SCENARIO_STORAGE_KEY) ?? '{}') as {
+      customLaw?: unknown;
+      customLawActive?: unknown;
+      scenario?: { customLaw?: unknown };
+    };
+
+    expect(persisted.customLaw).toEqual(CUSTOM_LAW);
+    expect(persisted.customLawActive).toBe(true);
+    expect(persisted.scenario?.customLaw).toEqual(CUSTOM_LAW);
+  });
+
+  it('hydrates legacy Gate 3 URL hashes that only include scenario and plan', async () => {
+    const { scenario, plan } = mapBasicFormToProjectionInputs(HASH_FORM_VALUES);
+    window.location.hash = `v1:${compressToEncodedURIComponent(JSON.stringify({ scenario, plan }))}`;
+
+    const { useScenarioStore } = await import('@/store/scenarioStore');
+    const state = useScenarioStore.getState();
+
+    expect(state.formValues.stateCode).toBe('PA');
+    expect(state.plan).toEqual(plan);
+    expect(state.customLawActive).toBe(false);
+    expect(state.customLaw).toBeUndefined();
+    expect(state.scenario.customLaw).toBeUndefined();
+  });
+
+  it('does not activate the custom-law banner without non-empty decoded overrides', async () => {
+    const { scenario, plan } = mapBasicFormToProjectionInputs(HASH_FORM_VALUES);
+    window.location.hash = `v1:${compressToEncodedURIComponent(
+      JSON.stringify({ scenario, plan, customLaw: {}, customLawActive: true }),
+    )}`;
+
+    const { useScenarioStore } = await import('@/store/scenarioStore');
+    const state = useScenarioStore.getState();
+
+    expect(state.customLaw).toEqual({});
+    expect(state.customLawActive).toBe(false);
+    expect(state.scenario.customLaw).toBeUndefined();
   });
 
   it('ignores malformed URL hashes and falls back to localStorage', async () => {

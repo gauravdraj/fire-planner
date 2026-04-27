@@ -3,6 +3,7 @@ import { create } from 'zustand';
 import { CALIFORNIA_STATE_TAX } from '@/core/constants/states/california';
 import { FLORIDA_STATE_TAX } from '@/core/constants/states/florida';
 import { PENNSYLVANIA_STATE_TAX } from '@/core/constants/states/pennsylvania';
+import { isCustomLawActive, type CustomLaw } from '@/core/constants/customLaw';
 import { runProjection, type Scenario, type WithdrawalPlan, type YearBreakdown } from '@/core/projection';
 import type { StateIncomeTaxLaw } from '@/core/tax/state';
 import type { FilingStatus } from '@/core/types';
@@ -13,6 +14,7 @@ import {
   type BasicStarterStateCode,
 } from '@/lib/basicFormMapping';
 import { decodeScenario, type ScenarioHashPayload } from '@/lib/urlHash';
+import { useScenariosStore } from '@/store/scenariosStore';
 
 export const SCENARIO_STORAGE_KEY = 'fire-planner.scenario.v1';
 
@@ -50,23 +52,59 @@ export type ScenarioStoreState = Readonly<{
   selectedStarterStateLaw: StateIncomeTaxLaw;
   scenario: Scenario;
   plan: WithdrawalPlan;
+  customLaw: CustomLaw | undefined;
+  customLawActive: boolean;
   projectionResults: readonly YearBreakdown[];
 }>;
 
 type ScenarioStoreActions = {
   setFormValues: (patch: Partial<BasicFormValues>) => void;
   replaceFormValues: (values: BasicFormValues) => void;
+  setPlan: (plan: WithdrawalPlan) => void;
+  setCustomLaw: (customLaw: CustomLaw | undefined) => void;
   resetScenario: () => void;
   hydrateFromUrlHash: (hash?: string) => boolean;
 };
 
+type ProjectionInputState = Readonly<{
+  scenario: Scenario;
+  plan: WithdrawalPlan;
+  customLaw?: CustomLaw;
+  customLawActive?: boolean;
+}>;
+
+type PersistedScenarioSnapshot = Readonly<{
+  formValues: BasicFormValues;
+  projectionInputs?: ProjectionInputState;
+}>;
+
 export const useScenarioStore = create<ScenarioStoreState & ScenarioStoreActions>((set) => ({
   ...readInitialScenarioState(),
   setFormValues: (patch) => {
-    set((state) => persistScenarioState(buildScenarioState({ ...state.formValues, ...patch }, true)));
+    set((state) => persistAndMaybeSaveDefaultScenario(buildScenarioState({ ...state.formValues, ...patch }, true)));
   },
   replaceFormValues: (values) => {
-    set(persistScenarioState(buildScenarioState(values, true)));
+    set(persistAndMaybeSaveDefaultScenario(buildScenarioState(values, true)));
+  },
+  setPlan: (plan) => {
+    set((state) =>
+      persistAndMaybeSaveDefaultScenario(
+        buildScenarioState(state.formValues, true, buildProjectionInputsWithPlan(state, plan)),
+      ),
+    );
+  },
+  setCustomLaw: (customLaw) => {
+    set((state) =>
+      persistScenarioState(
+        buildScenarioState(state.formValues, state.hasRunProjection, {
+          scenario: scenarioWithoutCustomLaw(state.scenario),
+          plan: state.plan,
+          ...(customLaw === undefined
+            ? { customLawActive: false }
+            : { customLaw, customLawActive: isCustomLawActive(customLaw) }),
+        }),
+      ),
+    );
   },
   resetScenario: () => {
     set(persistScenarioState(buildScenarioState(DEFAULT_BASIC_FORM_VALUES, false)));
@@ -83,6 +121,16 @@ export const useScenarioStore = create<ScenarioStoreState & ScenarioStoreActions
   },
 }));
 
+function buildProjectionInputsWithPlan(state: ScenarioStoreState, plan: WithdrawalPlan): ProjectionInputState {
+  const projectionInputs = {
+    scenario: scenarioWithoutCustomLaw(state.scenario),
+    plan,
+    customLawActive: state.customLawActive,
+  };
+
+  return state.customLaw === undefined ? projectionInputs : { ...projectionInputs, customLaw: state.customLaw };
+}
+
 function readInitialScenarioState(): ScenarioStoreState {
   const hashState = buildScenarioStateFromHash(getLocationHash());
 
@@ -90,21 +138,46 @@ function readInitialScenarioState(): ScenarioStoreState {
     return persistScenarioState(hashState);
   }
 
-  return buildScenarioState(readPersistedFormValues(), false);
+  const persisted = readPersistedScenarioSnapshot();
+
+  if (persisted.projectionInputs !== undefined) {
+    try {
+      return buildScenarioState(persisted.formValues, false, persisted.projectionInputs);
+    } catch {
+      return buildScenarioState(persisted.formValues, false);
+    }
+  }
+
+  return buildScenarioState(persisted.formValues, false);
 }
 
-function buildScenarioState(values: unknown, hasRunProjection: boolean): ScenarioStoreState {
+function buildScenarioState(
+  values: unknown,
+  hasRunProjection: boolean,
+  projectionInputs?: ProjectionInputState,
+): ScenarioStoreState {
   const formValues = sanitizeBasicFormValues(values);
-  const { scenario, plan } = mapBasicFormToProjectionInputs(formValues);
-
-  return {
+  const mappedInputs = projectionInputs ?? mapBasicFormToProjectionInputs(formValues);
+  const customLaw = projectionInputs?.customLaw ?? projectionInputs?.scenario.customLaw;
+  const customLawActive = projectionInputs?.customLawActive === true && isCustomLawActive(customLaw);
+  const scenario =
+    projectionInputs === undefined
+      ? mappedInputs.scenario
+      : scenarioWithCustomLawState(mappedInputs.scenario, customLaw, customLawActive);
+  const { plan } = mappedInputs;
+  const projectionResults = runProjection(scenario, plan);
+  const state = {
     formValues,
     hasRunProjection,
     selectedStarterStateLaw: STARTER_STATE_LAWS[formValues.stateCode],
     scenario,
     plan,
-    projectionResults: runProjection(scenario, plan),
+    customLaw,
+    customLawActive,
+    projectionResults,
   };
+
+  return state;
 }
 
 function buildScenarioStateFromHash(hash: string): ScenarioStoreState | null {
@@ -117,7 +190,7 @@ function buildScenarioStateFromHash(hash: string): ScenarioStoreState | null {
   try {
     const formValues = inferBasicFormValuesFromHashPayload(payload);
 
-    return formValues === null ? null : buildScenarioState(formValues, true);
+    return formValues === null ? null : buildScenarioState(formValues, true, payload);
   } catch {
     return null;
   }
@@ -215,32 +288,30 @@ function healthcarePhaseForYear(scenario: Scenario, year: number): BasicHealthca
   return isHealthcarePhase(phase) ? phase : DEFAULT_BASIC_FORM_VALUES.healthcarePhase;
 }
 
-function readPersistedFormValues(): BasicFormValues {
+function readPersistedScenarioSnapshot(): PersistedScenarioSnapshot {
   const storage = getLocalStorage();
 
   if (storage === null) {
-    return DEFAULT_BASIC_FORM_VALUES;
+    return { formValues: DEFAULT_BASIC_FORM_VALUES };
   }
 
   try {
     const raw = storage.getItem(SCENARIO_STORAGE_KEY);
 
     if (raw === null) {
-      return DEFAULT_BASIC_FORM_VALUES;
+      return { formValues: DEFAULT_BASIC_FORM_VALUES };
     }
 
     const parsed: unknown = JSON.parse(raw);
-    const maybeFormValues = isRecord(parsed)
-      ? isRecord(parsed.formValues)
-        ? parsed.formValues
-        : isRecord(parsed.state) && isRecord(parsed.state.formValues)
-          ? parsed.state.formValues
-          : parsed
-      : {};
+    const parsedRecord = isRecord(parsed) ? parsed : {};
+    const stateRecord = isRecord(parsedRecord.state) ? parsedRecord.state : parsedRecord;
+    const maybeFormValues = isRecord(stateRecord.formValues) ? stateRecord.formValues : parsedRecord;
+    const formValues = sanitizeBasicFormValues(maybeFormValues);
+    const projectionInputs = projectionInputsFromRecord(stateRecord);
 
-    return sanitizeBasicFormValues(maybeFormValues);
+    return projectionInputs === undefined ? { formValues } : { formValues, projectionInputs };
   } catch {
-    return DEFAULT_BASIC_FORM_VALUES;
+    return { formValues: DEFAULT_BASIC_FORM_VALUES };
   }
 }
 
@@ -248,15 +319,91 @@ function persistScenarioState(state: ScenarioStoreState): ScenarioStoreState {
   const storage = getLocalStorage();
 
   if (storage !== null) {
+    const persisted =
+      state.customLaw === undefined
+        ? {
+            formValues: state.formValues,
+            scenario: state.scenario,
+            plan: state.plan,
+            customLawActive: state.customLawActive,
+          }
+        : {
+            formValues: state.formValues,
+            scenario: state.scenario,
+            plan: state.plan,
+            customLaw: state.customLaw,
+            customLawActive: state.customLawActive,
+          };
+
     storage.setItem(
       SCENARIO_STORAGE_KEY,
-      JSON.stringify({
-        formValues: state.formValues,
-      }),
+      JSON.stringify(persisted),
     );
   }
 
   return state;
+}
+
+function persistAndMaybeSaveDefaultScenario(state: ScenarioStoreState): ScenarioStoreState {
+  const persistedState = persistScenarioState(state);
+
+  useScenariosStore.getState().saveDefaultScenarioOnce({
+    scenario: persistedState.scenario,
+    plan: persistedState.plan,
+  });
+
+  return persistedState;
+}
+
+function projectionInputsFromRecord(record: Record<string, unknown>): ProjectionInputState | undefined {
+  if (!isRecord(record.scenario) || !isRecord(record.plan)) {
+    return undefined;
+  }
+
+  const customLaw = customLawFromRecord(record, record.scenario);
+  const customLawActive = record.customLawActive === true && isCustomLawActive(customLaw);
+  const projectionInputs = {
+    scenario: record.scenario as Scenario,
+    plan: record.plan as WithdrawalPlan,
+    customLawActive,
+  };
+
+  return customLaw === undefined ? projectionInputs : { ...projectionInputs, customLaw };
+}
+
+function customLawFromRecord(record: Record<string, unknown>, scenario: Record<string, unknown>): CustomLaw | undefined {
+  if (isRecord(record.customLaw)) {
+    return record.customLaw as CustomLaw;
+  }
+
+  if (isRecord(scenario.customLaw)) {
+    return scenario.customLaw as CustomLaw;
+  }
+
+  return undefined;
+}
+
+function scenarioWithCustomLawState(
+  scenario: Scenario,
+  customLaw: CustomLaw | undefined,
+  customLawActive: boolean,
+): Scenario {
+  const { customLaw: _ignoredCustomLaw, ...scenarioWithoutCustomLaw } = scenario;
+
+  if (!customLawActive || customLaw === undefined) {
+    return scenarioWithoutCustomLaw;
+  }
+
+  return {
+    ...scenarioWithoutCustomLaw,
+    customLaw,
+  };
+}
+
+function scenarioWithoutCustomLaw(scenario: Scenario): Scenario {
+  const { customLaw: _ignoredCustomLaw, ...scenarioWithoutOverride } = scenario;
+
+  return scenarioWithoutOverride;
 }
 
 function sanitizeBasicFormValues(value: unknown): BasicFormValues {

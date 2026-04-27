@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-export type PlannerMode = 'basic' | 'advanced';
+export type PlannerMode = 'basic' | 'advanced' | 'compare';
 export type DisplayUnit = 'real' | 'nominal';
 
 export const UI_STORAGE_KEY = 'fire-planner.ui.v1';
@@ -84,7 +84,7 @@ function persistUiState(state: UiStoreState): UiStoreState {
 }
 
 function isPlannerMode(value: unknown): value is PlannerMode {
-  return value === 'basic' || value === 'advanced';
+  return value === 'basic' || value === 'advanced' || value === 'compare';
 }
 
 function isDisplayUnit(value: unknown): value is DisplayUnit {

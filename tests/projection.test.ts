@@ -154,6 +154,76 @@ describe('Gate 2 multi-year projection engine', () => {
     expect(year?.warnings.join(' ')).toContain('ACA MAGI');
   });
 
+  it('treats absent advanced plan actions the same as explicit empty actions', () => {
+    const scenario = makeScenario({
+      balances: {
+        cash: 5_000,
+        taxableBrokerage: 100_000,
+        traditional: 50_000,
+        roth: 25_000,
+      },
+      basis: {
+        taxableBrokerage: 60_000,
+      },
+    });
+    const basePlan = makePlan({
+      annualSpending: [{ year: 2026, amount: 20_000 }],
+    });
+
+    const baseResults = runProjection(scenario, basePlan);
+    const explicitEmptyResults = runProjection(scenario, {
+      ...basePlan,
+      rothConversions: [],
+      brokerageHarvests: [],
+    });
+
+    expect(baseResults).toEqual(explicitEmptyResults);
+    expect(baseResults[0]?.brokerageHarvests).toBe(0);
+  });
+
+  it('flows manual Roth conversions and brokerage harvests through projection outputs', () => {
+    const [year] = runProjection(
+      makeScenario({
+        balances: {
+          cash: 0,
+          taxableBrokerage: 100_000,
+          traditional: 50_000,
+          roth: 0,
+        },
+        basis: {
+          taxableBrokerage: 60_000,
+        },
+      }),
+      makePlan({
+        rothConversions: [{ year: 2026, amount: 10_000 }],
+        brokerageHarvests: [{ year: 2026, amount: 8_000 }],
+      }),
+    );
+
+    expect(year?.withdrawals).toEqual({
+      cash: 0,
+      taxableBrokerage: 0,
+      traditional: 0,
+      roth: 0,
+    });
+    expect(year?.conversions).toBe(10_000);
+    expect(year?.brokerageHarvests).toBe(8_000);
+    expect(year?.agi).toBe(18_000);
+    expect(year?.brokerageBasis).toEqual({
+      opening: 60_000,
+      sold: 12_000,
+      realizedGainOrLoss: 8_000,
+      closing: 68_000,
+    });
+    expect(year?.closingBalances).toEqual({
+      cash: 0,
+      taxableBrokerage: 100_000,
+      traditional: 40_000,
+      roth: 10_000,
+    });
+    expect(year?.ltcgTax).toBe(0);
+  });
+
   it('appends annual IRMAA MAGI so later Medicare years use lagged projection history', () => {
     const results = runProjection(
       makeScenario({

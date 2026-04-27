@@ -94,7 +94,11 @@ describe('BasicPlannerPage', () => {
     expect(screen.getByRole('heading', { name: /projection summary/i })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: /year-by-year projection/i })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: /account balances/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /magi thresholds/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /tax breakdown/i })).toBeInTheDocument();
     expect(screen.getByRole('img', { name: /stacked account balances/i })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: /magi compared with aca fpl bands/i })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: /annual tax breakdown/i })).toBeInTheDocument();
     expect(screen.getByText('Net worth at retirement').nextElementSibling).toHaveClass('tabular-nums');
     expect(useScenarioStore.getState().hasRunProjection).toBe(true);
   });
@@ -118,6 +122,8 @@ describe('BasicPlannerPage', () => {
     expect(screen.getByRole('heading', { name: /projection summary/i })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: /year-by-year projection/i })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: /account balances/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /magi thresholds/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /tax breakdown/i })).toBeInTheDocument();
   });
 
   it('ignores malformed URL hashes without crashing and keeps the page empty before run', async () => {

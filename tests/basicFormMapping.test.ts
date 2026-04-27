@@ -41,6 +41,8 @@ describe('basic form projection mapping', () => {
 
     expect(scenario.startYear).toBe(2026);
     expect(plan.endYear).toBe(2033);
+    expect(plan).not.toHaveProperty('rothConversions');
+    expect(plan).not.toHaveProperty('brokerageHarvests');
     expect(scenario.filingStatus).toBe('mfj');
     expect(scenario.state.incomeTaxLaw.stateCode).toBe('CA');
     expect(scenario.age65Plus).toBe(false);
