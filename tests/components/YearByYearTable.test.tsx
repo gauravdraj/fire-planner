@@ -5,6 +5,7 @@ import { YearByYearTable } from '@/components/YearByYearTable';
 import { balanceYearToZero } from '@/core/balanceYearToZero';
 import { CONSTANTS_2026 } from '@/core/constants/2026';
 import type { AccountBalances, YearBreakdown } from '@/core/projection';
+import { yearByYearColumnBands, yearByYearColumns } from '@/lib/yearByYearColumns';
 import { useScenarioStore } from '@/store/scenarioStore';
 import { useUiStore } from '@/store/uiStore';
 
@@ -229,12 +230,18 @@ describe('YearByYearTable', () => {
     const { container } = render(<YearByYearTable now={dateAtTaxDataAge(0)} />);
 
     expect(screen.getByRole('heading', { name: 'Year-by-year projection' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Download CSV' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Download JSON' })).toBeInTheDocument();
     expect(screen.getByTestId('year-table-scroll')).toHaveClass('overflow-x-auto');
     expect(container.querySelectorAll('thead tr')).toHaveLength(2);
 
     const bandHeaders = Array.from(container.querySelectorAll('thead tr:first-child th'));
-    expect(bandHeaders.map((header) => header.textContent)).toEqual(['Identity', 'Balances', 'Income', 'Tax', 'KPIs']);
-    expect(bandHeaders.map((header) => header.getAttribute('colspan'))).toEqual(['3', '7', '8', '6', '6']);
+    expect(bandHeaders.map((header) => header.textContent)).toEqual([...yearByYearColumnBands]);
+    expect(bandHeaders.map((header) => header.getAttribute('colspan'))).toEqual(
+      yearByYearColumnBands.map(
+        (band) => `${yearByYearColumns.filter((column) => column.band === band).length}`,
+      ),
+    );
 
     expect(screen.getByRole('columnheader', { name: 'Year' })).toHaveClass('sticky', 'left-0');
     expect(screen.getByRole('columnheader', { name: 'Age' })).toHaveClass('sticky', 'left-20');
@@ -270,7 +277,9 @@ describe('YearByYearTable', () => {
     const secondHeaderRow = container.querySelector('thead tr:nth-child(2)');
 
     expect(secondHeaderRow).not.toBeNull();
-    expect(within(secondHeaderRow as HTMLElement).getAllByRole('button', { name: /About / })).toHaveLength(30);
+    expect(within(secondHeaderRow as HTMLElement).getAllByRole('button', { name: /About / })).toHaveLength(
+      yearByYearColumns.length,
+    );
 
     fireEvent.focus(screen.getByRole('button', { name: 'About ACA MAGI' }));
     expect(
@@ -320,6 +329,84 @@ describe('YearByYearTable', () => {
     expect(cellFor(2026, 'acaPremiumCredit')).toHaveTextContent('—');
     expect(cellFor(2027, 'age')).toHaveClass('text-right', 'tabular-nums');
     expect(cellFor(2027, 'phase')).toHaveClass('text-left');
+  });
+
+  it('downloads year-by-year rows as a CSV Blob', () => {
+    const createObjectURL = vi.fn(() => 'blob:fire-planner-csv');
+    const revokeObjectURL = vi.fn();
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+    const originalCreateObjectURL = URL.createObjectURL;
+    const originalRevokeObjectURL = URL.revokeObjectURL;
+
+    Object.defineProperty(URL, 'createObjectURL', {
+      configurable: true,
+      value: createObjectURL,
+    });
+    Object.defineProperty(URL, 'revokeObjectURL', {
+      configurable: true,
+      value: revokeObjectURL,
+    });
+
+    try {
+      render(<YearByYearTable now={dateAtTaxDataAge(0)} />);
+
+      fireEvent.click(screen.getByRole('button', { name: 'Download CSV' }));
+
+      expect(createObjectURL).toHaveBeenCalledWith(expect.any(Blob));
+      expect(click).toHaveBeenCalledTimes(1);
+      expect(revokeObjectURL).toHaveBeenCalledWith('blob:fire-planner-csv');
+    } finally {
+      Object.defineProperty(URL, 'createObjectURL', {
+        configurable: true,
+        value: originalCreateObjectURL,
+      });
+      Object.defineProperty(URL, 'revokeObjectURL', {
+        configurable: true,
+        value: originalRevokeObjectURL,
+      });
+      click.mockRestore();
+    }
+  });
+
+  it('downloads the active scenario as a JSON Blob', () => {
+    const createObjectURL = vi.fn((blob: Blob) => {
+      expect(blob).toBeInstanceOf(Blob);
+      return 'blob:fire-planner-json';
+    });
+    const revokeObjectURL = vi.fn();
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+    const originalCreateObjectURL = URL.createObjectURL;
+    const originalRevokeObjectURL = URL.revokeObjectURL;
+
+    Object.defineProperty(URL, 'createObjectURL', {
+      configurable: true,
+      value: createObjectURL,
+    });
+    Object.defineProperty(URL, 'revokeObjectURL', {
+      configurable: true,
+      value: revokeObjectURL,
+    });
+
+    try {
+      render(<YearByYearTable now={dateAtTaxDataAge(0)} />);
+
+      fireEvent.click(screen.getByRole('button', { name: 'Download JSON' }));
+
+      expect(createObjectURL).toHaveBeenCalledWith(expect.any(Blob));
+      expect(createObjectURL.mock.calls[0]?.[0].type).toBe('application/json;charset=utf-8');
+      expect(click).toHaveBeenCalledTimes(1);
+      expect(revokeObjectURL).toHaveBeenCalledWith('blob:fire-planner-json');
+    } finally {
+      Object.defineProperty(URL, 'createObjectURL', {
+        configurable: true,
+        value: originalCreateObjectURL,
+      });
+      Object.defineProperty(URL, 'revokeObjectURL', {
+        configurable: true,
+        value: originalRevokeObjectURL,
+      });
+      click.mockRestore();
+    }
   });
 
   it('renders and colors FPL percentage for non-ACA rows using the filing-status fallback', () => {

@@ -9,6 +9,7 @@ import {
   tableColumnIds,
   type TableColumnId,
 } from '@/lib/columnExplanations';
+import { visibleYearByYearColumnIds, yearByYearColumnBands, yearByYearColumns } from '@/lib/yearByYearColumns';
 
 const REQUIRED_PHASE_0_5_COLUMNS: readonly TableColumnId[] = [
   'fplPercentage',
@@ -39,6 +40,19 @@ describe('columnExplanations', () => {
   it('covers the Phase 0.5 threshold and tax explanation columns', () => {
     for (const columnId of REQUIRED_PHASE_0_5_COLUMNS) {
       expect(columnExplanations[columnId]).toBeDefined();
+    }
+  });
+
+  it('keeps the visible year table column contract ordered and sourced from known explanations', () => {
+    expect(visibleYearByYearColumnIds).toHaveLength(yearByYearColumns.length);
+    expect(new Set(visibleYearByYearColumnIds).size).toBe(visibleYearByYearColumnIds.length);
+    expect(yearByYearColumns[0]?.id).toBe('year');
+    expect(yearByYearColumns[1]?.id).toBe('age');
+    expect(yearByYearColumns[2]?.id).toBe('phase');
+
+    for (const column of yearByYearColumns) {
+      expect(yearByYearColumnBands).toContain(column.band);
+      expect(columnExplanations[column.id]).toBeDefined();
     }
   });
 

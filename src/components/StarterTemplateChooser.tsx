@@ -39,7 +39,7 @@ export function StarterTemplateChooser() {
         )}
       </div>
 
-      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+      <div className="mt-4 grid grid-cols-[repeat(auto-fit,minmax(min(100%,15rem),1fr))] gap-3">
         {STARTER_TEMPLATES.map((template) => (
           <button
             className="rounded-lg border border-indigo-300 bg-white p-4 text-left shadow-sm transition hover:border-indigo-500 hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-600"

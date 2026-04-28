@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import {
   computeAverageBridgeAcaMagi,
+  computeBridgeAcaCliffYearCount,
+  computeBridgeIrmaaTouchedYearCount,
   computeFederalBracketProximity,
   computeFplBand,
   computeFplPercentage,
@@ -133,6 +135,79 @@ describe('projection metric helpers', () => {
     expect(computeAverageBridgeAcaMagi(window.years)).toBe(20_000);
     expect(computeMaxBridgeGrossBucketDrawPercentage(window.years)).toBe(0.2);
     expect(computeTotalBridgeTax(window.years)).toBe(600.6);
+  });
+
+  it('counts bridge years above the ACA 400% FPL cliff using ACA household size', () => {
+    const scenario = makeScenario({
+      filingStatus: 'single',
+      healthcare: [
+        { year: 2027, kind: 'aca', householdSize: 2, annualBenchmarkPremium: 12_000 },
+        { year: 2028, kind: 'aca', householdSize: 2, annualBenchmarkPremium: 12_000 },
+      ],
+    });
+    const bridgeYears = [
+      makeBreakdown({
+        year: 2027,
+        acaMagi: CONSTANTS_2026.fpl.contiguous.householdSize[2] * 4,
+      }),
+      makeBreakdown({
+        year: 2028,
+        acaMagi: CONSTANTS_2026.fpl.contiguous.householdSize[2] * 4.01,
+      }),
+    ];
+
+    expect(computeBridgeAcaCliffYearCount(bridgeYears, scenario)).toBe(1);
+  });
+
+  it('counts single-filer bridge years above the ACA cliff from filing-status household size', () => {
+    const scenario = makeScenario({ filingStatus: 'single' });
+    const bridgeYears = [
+      makeBreakdown({
+        year: 2027,
+        acaMagi: CONSTANTS_2026.fpl.contiguous.householdSize[1] * 3.99,
+      }),
+      makeBreakdown({
+        year: 2028,
+        acaMagi: CONSTANTS_2026.fpl.contiguous.householdSize[1] * 4.25,
+      }),
+    ];
+
+    expect(computeBridgeAcaCliffYearCount(bridgeYears, scenario)).toBe(1);
+  });
+
+  it('returns zero ACA cliff years when bridge MAGI stays at or below 400% FPL', () => {
+    const scenario = makeScenario({ filingStatus: 'mfj' });
+    const bridgeYears = [
+      makeBreakdown({
+        year: 2027,
+        acaMagi: CONSTANTS_2026.fpl.contiguous.householdSize[2] * 2.5,
+      }),
+      makeBreakdown({
+        year: 2028,
+        acaMagi: CONSTANTS_2026.fpl.contiguous.householdSize[2] * 4,
+      }),
+    ];
+
+    expect(computeBridgeAcaCliffYearCount(bridgeYears, scenario)).toBe(0);
+  });
+
+  it('counts bridge years where IRMAA premiums exceed the standard Part B premium', () => {
+    const bridgeYears = [
+      makeBreakdown({ year: 2027, irmaaPremium: null }),
+      makeBreakdown({ year: 2028, irmaaPremium: makeIrmaaPremium(0) }),
+      makeBreakdown({ year: 2029, irmaaPremium: makeIrmaaPremium(1) }),
+    ];
+
+    expect(computeBridgeIrmaaTouchedYearCount(bridgeYears)).toBe(1);
+  });
+
+  it('returns zero IRMAA-touched years when premiums do not exceed the standard premium', () => {
+    const bridgeYears = [
+      makeBreakdown({ year: 2027, irmaaPremium: null }),
+      makeBreakdown({ year: 2028, irmaaPremium: makeIrmaaPremium(0) }),
+    ];
+
+    expect(computeBridgeIrmaaTouchedYearCount(bridgeYears)).toBe(0);
   });
 
   it('selects the Social Security bridge window when Medicare is not applicable', () => {

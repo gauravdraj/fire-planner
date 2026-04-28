@@ -11,7 +11,7 @@ export type ScenarioHashPayload = Readonly<{
   customLawActive: boolean;
 }>;
 
-type ScenarioHashInput = Readonly<{
+export type ScenarioHashInput = Readonly<{
   scenario: Scenario;
   plan: WithdrawalPlan;
   customLaw?: CustomLaw;

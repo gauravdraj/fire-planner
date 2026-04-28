@@ -1,9 +1,27 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { SHARE_LINK_PRIVACY_TEXT } from '@/components/ShareLinkModal';
 
 import { installMemoryLocalStorage } from '../store/memoryStorage';
+
+vi.mock('recharts', () => ({
+  Area: () => null,
+  AreaChart: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  Bar: () => null,
+  BarChart: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  CartesianGrid: () => null,
+  Legend: () => null,
+  Line: () => null,
+  LineChart: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  ReferenceArea: () => null,
+  ReferenceLine: () => null,
+  ResponsiveContainer: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  Tooltip: () => null,
+  XAxis: () => null,
+  YAxis: () => null,
+}));
 
 let clipboardWrites: string[];
 let consoleErrorSpy: ReturnType<typeof vi.spyOn>;

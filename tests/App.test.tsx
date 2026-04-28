@@ -103,6 +103,20 @@ describe('App', () => {
     expect(JSON.parse(window.localStorage.getItem(UI_STORAGE_KEY) ?? '{}')).toMatchObject({ mode: 'compare' });
   });
 
+  it('routes to methodology as a top-level view without rendering planner content', () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Methodology' }));
+
+    expect(useUiStore.getState().mode).toBe('methodology');
+    expect(screen.getByRole('heading', { name: 'Methodology' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'What Fire Planner Is' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Basic planner' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Advanced planner' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Compare two scenarios' })).not.toBeInTheDocument();
+    expect(JSON.parse(window.localStorage.getItem(UI_STORAGE_KEY) ?? '{}')).toMatchObject({ mode: 'methodology' });
+  });
+
   it('launches compare from the advanced scenario manager', () => {
     const first = saveNamedScenario('Baseline', BASE_FORM_VALUES);
     const second = saveNamedScenario('Harvest plan', {

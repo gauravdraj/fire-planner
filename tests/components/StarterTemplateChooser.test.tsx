@@ -25,10 +25,12 @@ describe('StarterTemplateChooser', () => {
     vi.useRealTimers();
   });
 
-  it('renders both starter template buttons and the bridge-strategy explanation', () => {
+  it('renders all five starter template buttons and the bridge-strategy explanation', () => {
     render(<StarterTemplateChooser />);
 
     expect(screen.getByRole('heading', { name: /try a sample scenario/i })).toBeInTheDocument();
+    expect(STARTER_TEMPLATES).toHaveLength(5);
+    expect(screen.getAllByRole('button')).toHaveLength(5);
 
     for (const template of STARTER_TEMPLATES) {
       const button = screen.getByRole('button', { name: new RegExp(escapeRegExp(template.label), 'i') });
@@ -46,19 +48,18 @@ describe('StarterTemplateChooser', () => {
     );
   });
 
-  it('loads a selected template into the scenario store and confirms the selection', () => {
-    const brokerageBridgeTemplate = STARTER_TEMPLATES[0];
+  it.each(STARTER_TEMPLATES)('loads $label into the scenario store and confirms the selection', (template) => {
     render(<StarterTemplateChooser />);
 
-    fireEvent.click(screen.getByRole('button', { name: /brokerage bridge with 72\(t\) context/i }));
+    fireEvent.click(screen.getByRole('button', { name: new RegExp(escapeRegExp(template.label), 'i') }));
 
     expect(useScenarioStore.getState().formValues).toEqual({
       ...DEFAULT_BASIC_FORM_VALUES,
-      ...brokerageBridgeTemplate.formValues,
+      ...template.formValues,
     });
 
     const status = screen.getByRole('status');
-    expect(status).toHaveTextContent(`Loaded '${brokerageBridgeTemplate.label}'`);
+    expect(status).toHaveTextContent(`Loaded '${template.label}'`);
     expect(status).toHaveTextContent(/change any field to customize/i);
   });
 

@@ -9,11 +9,21 @@ import {
   type YearDisplayMetrics,
 } from '@/core/metrics';
 import type { Scenario, YearBreakdown } from '@/core/projection';
-import { columnExplanations, type TableColumnId } from '@/lib/columnExplanations';
+import { columnExplanations } from '@/lib/columnExplanations';
+import { buildYearByYearCsv } from '@/lib/csvExport';
+import { buildScenarioJsonExport } from '@/lib/jsonExport';
 import { toReal } from '@/lib/realDollars';
 import { getStalenessLevel } from '@/lib/staleness';
 import { useChangePulse } from '@/lib/useChangePulse';
 import { useDebouncedCallback } from '@/lib/useDebouncedCallback';
+import {
+  getYearByYearColumnLabel,
+  yearByYearColumnBands,
+  yearByYearColumns,
+  type VisibleYearByYearColumnId,
+  type YearByYearColumnBand,
+  type YearByYearColumnDefinition,
+} from '@/lib/yearByYearColumns';
 import { useScenarioStore } from '@/store/scenarioStore';
 import type { DisplayUnit } from '@/store/uiStore';
 import { useUiStore } from '@/store/uiStore';
@@ -24,10 +34,6 @@ import { MetricCell, type MetricCellBandType } from './MetricCell';
 type YearByYearTableProps = {
   now?: Date | string;
 };
-
-type TableBand = 'Identity' | 'Balances' | 'Income' | 'Tax' | 'KPIs';
-
-type StickyColumn = 'year' | 'age' | 'phase';
 
 type TableRenderContext = Readonly<{
   balanceHints: ReadonlyMap<number, BalanceHint>;
@@ -53,13 +59,8 @@ type CellModel = Readonly<{
   hint?: string;
 }>;
 
-type TableColumn = Readonly<{
-  id: TableColumnId;
-  band: TableBand;
-  label?: string;
-  align?: 'left' | 'right';
-  sticky?: StickyColumn;
-  dividerBefore?: boolean;
+type TableColumn = YearByYearColumnDefinition &
+  Readonly<{
   getCell: (row: DisplayRow, context: TableRenderContext) => CellModel;
 }>;
 
@@ -75,7 +76,6 @@ const PERCENT_FORMATTER = new Intl.NumberFormat('en-US', {
 });
 
 const EM_DASH = '—';
-const HEADER_BANDS = ['Identity', 'Balances', 'Income', 'Tax', 'KPIs'] as const satisfies readonly TableBand[];
 const NEAR_BRACKET_THRESHOLD = 5_000;
 const BALANCE_HINT_ROW_CAP = 15;
 const BALANCE_HINT_DEBOUNCE_MS = 150;
@@ -95,206 +95,64 @@ type BalanceHint =
       kind: 'shortfall';
     }>;
 
-const TABLE_COLUMNS: readonly TableColumn[] = [
-  {
-    id: 'year',
-    band: 'Identity',
-    sticky: 'year',
-    getCell: (row) => textCell(String(row.metrics.year), row.metrics.year),
-  },
-  {
-    id: 'age',
-    band: 'Identity',
-    sticky: 'age',
-    getCell: (row) => textCell(String(row.metrics.age), row.metrics.age),
-  },
-  {
-    id: 'phase',
-    band: 'Identity',
-    sticky: 'phase',
-    align: 'left',
-    getCell: (row) => textCell(row.metrics.phaseLabel, row.metrics.phaseLabel),
-  },
-  {
-    id: 'traditionalBalance',
-    band: 'Balances',
-    label: 'Trad',
-    dividerBefore: true,
-    getCell: (row, context) => moneyCell(row.breakdown.closingBalances.traditional, row.breakdown.year, context),
-  },
-  {
-    id: 'rothBalance',
-    band: 'Balances',
-    label: 'Roth',
-    getCell: (row, context) => moneyCell(row.breakdown.closingBalances.roth, row.breakdown.year, context),
-  },
-  {
-    id: 'hsaBalance',
-    band: 'Balances',
-    label: 'HSA',
-    getCell: (row, context) => moneyCell(row.breakdown.closingBalances.hsa, row.breakdown.year, context),
-  },
-  {
-    id: 'taxableBrokerageBalance',
-    band: 'Balances',
-    label: 'Taxable',
-    getCell: (row, context) => moneyCell(row.breakdown.closingBalances.taxableBrokerage, row.breakdown.year, context),
-  },
-  {
-    id: 'cashBalance',
-    band: 'Balances',
-    label: 'Cash',
-    getCell: (row, context) => moneyCell(row.breakdown.closingBalances.cash, row.breakdown.year, context),
-  },
-  {
-    id: 'endingBalance',
-    band: 'Balances',
-    label: 'Total',
-    getCell: (row, context) => moneyCell(row.metrics.totalClosingBalance, row.breakdown.year, context),
-  },
-  {
-    id: 'brokerageBasisRemaining',
-    band: 'Balances',
-    label: 'Basis',
-    getCell: (row, context) => moneyCell(row.breakdown.brokerageBasis.closing, row.breakdown.year, context),
-  },
-  {
-    id: 'spending',
-    band: 'Income',
-    dividerBefore: true,
-    getCell: (row, context) => moneyCell(row.breakdown.spending, row.breakdown.year, context),
-  },
-  {
-    id: 'wages',
-    band: 'Income',
-    getCell: (row, context) => optionalMoneyCell(row.metrics.wages, row.breakdown.year, context),
-  },
-  {
-    id: 'taxableSocialSecurity',
-    band: 'Income',
-    label: 'Taxable SS',
-    getCell: (row, context) =>
-      moneyCell(
-        row.breakdown.taxableSocialSecurity > 0 || row.metrics.phaseLabel === 'SS claimed'
-          ? row.breakdown.taxableSocialSecurity
-          : null,
-        row.breakdown.year,
-        context,
-      ),
-  },
-  {
-    id: 'traditionalWithdrawals',
-    band: 'Income',
-    label: 'IRA dist.',
-    getCell: (row, context) => optionalMoneyCell(row.breakdown.withdrawals.traditional, row.breakdown.year, context),
-  },
-  {
-    id: 'rothConversions',
-    band: 'Income',
-    label: 'Roth conv.',
-    getCell: (row, context) => optionalMoneyCell(row.breakdown.conversions, row.breakdown.year, context),
-  },
-  {
-    id: 'brokerageWithdrawals',
-    band: 'Income',
-    label: 'Brokerage wd.',
-    getCell: (row, context) => optionalMoneyCell(row.breakdown.withdrawals.taxableBrokerage, row.breakdown.year, context),
-  },
-  {
-    id: 'realizedLtcg',
-    band: 'Income',
-    label: 'Realized gain/loss',
-    getCell: (row, context) => optionalMoneyCell(row.metrics.ltcgRealized, row.breakdown.year, context),
-  },
-  {
-    id: 'agi',
-    band: 'Income',
-    label: 'AGI',
-    getCell: (row, context) => moneyCell(row.metrics.totalDisplayedIncome, row.breakdown.year, context),
-  },
-  {
-    id: 'federalTax',
-    band: 'Tax',
-    label: 'Federal',
-    dividerBefore: true,
-    getCell: (row, context) => federalTaxCell(row, context),
-  },
-  {
-    id: 'stateTax',
-    band: 'Tax',
-    label: 'State',
-    getCell: (row, context) => moneyCell(row.breakdown.stateTax, row.breakdown.year, context),
-  },
-  {
-    id: 'ltcgTax',
-    band: 'Tax',
-    label: 'LTCG',
-    getCell: (row, context) => moneyCell(row.breakdown.ltcgTax, row.breakdown.year, context),
-  },
-  {
-    id: 'niit',
-    band: 'Tax',
-    label: 'NIIT',
-    getCell: (row, context) => moneyCell(row.breakdown.niit, row.breakdown.year, context),
-  },
-  {
-    id: 'seTax',
-    band: 'Tax',
-    label: 'SE',
-    getCell: (row, context) => moneyCell(row.breakdown.seTax, row.breakdown.year, context),
-  },
-  {
-    id: 'totalTax',
-    band: 'Tax',
-    label: 'Total tax',
-    getCell: (row, context) => moneyCell(row.breakdown.totalTax, row.breakdown.year, context),
-  },
-  {
-    id: 'acaMagi',
-    band: 'KPIs',
-    label: 'ACA MAGI',
-    dividerBefore: true,
-    getCell: (row, context) => moneyCell(row.breakdown.acaMagi, row.breakdown.year, context),
-  },
-  {
-    id: 'fplPercentage',
-    band: 'KPIs',
-    label: 'FPL %',
-    getCell: (row) => fplCell(row.metrics.fplPercentage, row.metrics.fplBand),
-  },
-  {
-    id: 'withdrawalRate',
-    band: 'KPIs',
-    label: 'Withdrawal rate',
-    getCell: (row) => withdrawalRateCell(row.metrics.withdrawalRate, row.metrics.withdrawalRateBand),
-  },
-  {
-    id: 'acaPremiumCredit',
-    band: 'KPIs',
-    label: 'ACA PTC',
-    getCell: (row, context) =>
-      moneyCell(row.breakdown.acaPremiumCredit?.premiumTaxCredit ?? null, row.breakdown.year, context),
-  },
-  {
-    id: 'irmaaPremium',
-    band: 'KPIs',
-    label: 'IRMAA',
-    getCell: (row, context) =>
-      moneyCell(row.breakdown.irmaaPremium?.annualIrmaaSurcharge ?? null, row.breakdown.year, context),
-  },
-  {
-    id: 'afterTaxCashFlow',
-    band: 'KPIs',
-    label: 'After-tax cash flow',
-    getCell: (row, context) => cashflowCell(row.breakdown.afterTaxCashFlow, row.breakdown.year, context),
-  },
-];
+const TABLE_CELL_RENDERERS = {
+  year: (row) => textCell(String(row.metrics.year), row.metrics.year),
+  age: (row) => textCell(String(row.metrics.age), row.metrics.age),
+  phase: (row) => textCell(row.metrics.phaseLabel, row.metrics.phaseLabel),
+  traditionalBalance: (row, context) =>
+    moneyCell(row.breakdown.closingBalances.traditional, row.breakdown.year, context),
+  rothBalance: (row, context) => moneyCell(row.breakdown.closingBalances.roth, row.breakdown.year, context),
+  hsaBalance: (row, context) => moneyCell(row.breakdown.closingBalances.hsa, row.breakdown.year, context),
+  taxableBrokerageBalance: (row, context) =>
+    moneyCell(row.breakdown.closingBalances.taxableBrokerage, row.breakdown.year, context),
+  cashBalance: (row, context) => moneyCell(row.breakdown.closingBalances.cash, row.breakdown.year, context),
+  endingBalance: (row, context) => moneyCell(row.metrics.totalClosingBalance, row.breakdown.year, context),
+  brokerageBasisRemaining: (row, context) => moneyCell(row.breakdown.brokerageBasis.closing, row.breakdown.year, context),
+  spending: (row, context) => moneyCell(row.breakdown.spending, row.breakdown.year, context),
+  wages: (row, context) => optionalMoneyCell(row.metrics.wages, row.breakdown.year, context),
+  taxableSocialSecurity: (row, context) =>
+    moneyCell(
+      row.breakdown.taxableSocialSecurity > 0 || row.metrics.phaseLabel === 'SS claimed'
+        ? row.breakdown.taxableSocialSecurity
+        : null,
+      row.breakdown.year,
+      context,
+    ),
+  traditionalWithdrawals: (row, context) =>
+    optionalMoneyCell(row.breakdown.withdrawals.traditional, row.breakdown.year, context),
+  rothConversions: (row, context) => optionalMoneyCell(row.breakdown.conversions, row.breakdown.year, context),
+  brokerageWithdrawals: (row, context) =>
+    optionalMoneyCell(row.breakdown.withdrawals.taxableBrokerage, row.breakdown.year, context),
+  realizedLtcg: (row, context) => optionalMoneyCell(row.metrics.ltcgRealized, row.breakdown.year, context),
+  agi: (row, context) => moneyCell(row.metrics.totalDisplayedIncome, row.breakdown.year, context),
+  federalTax: (row, context) => federalTaxCell(row, context),
+  stateTax: (row, context) => moneyCell(row.breakdown.stateTax, row.breakdown.year, context),
+  ltcgTax: (row, context) => moneyCell(row.breakdown.ltcgTax, row.breakdown.year, context),
+  niit: (row, context) => moneyCell(row.breakdown.niit, row.breakdown.year, context),
+  seTax: (row, context) => moneyCell(row.breakdown.seTax, row.breakdown.year, context),
+  totalTax: (row, context) => moneyCell(row.breakdown.totalTax, row.breakdown.year, context),
+  acaMagi: (row, context) => moneyCell(row.breakdown.acaMagi, row.breakdown.year, context),
+  fplPercentage: (row) => fplCell(row.metrics.fplPercentage, row.metrics.fplBand),
+  withdrawalRate: (row) => withdrawalRateCell(row.metrics.withdrawalRate, row.metrics.withdrawalRateBand),
+  acaPremiumCredit: (row, context) =>
+    moneyCell(row.breakdown.acaPremiumCredit?.premiumTaxCredit ?? null, row.breakdown.year, context),
+  irmaaPremium: (row, context) =>
+    moneyCell(row.breakdown.irmaaPremium?.annualIrmaaSurcharge ?? null, row.breakdown.year, context),
+  afterTaxCashFlow: (row, context) => cashflowCell(row.breakdown.afterTaxCashFlow, row.breakdown.year, context),
+} satisfies Record<VisibleYearByYearColumnId, TableColumn['getCell']>;
+
+const TABLE_COLUMNS = yearByYearColumns.map((column) => ({
+  ...column,
+  getCell: TABLE_CELL_RENDERERS[column.id],
+})) satisfies readonly TableColumn[];
 
 export function YearByYearTable({ now = new Date() }: YearByYearTableProps) {
   const projectionResults = useScenarioStore((state) => state.projectionResults);
   const scenario = useScenarioStore((state) => state.scenario);
   const plan = useScenarioStore((state) => state.plan);
   const formValues = useScenarioStore((state) => state.formValues);
+  const customLaw = useScenarioStore((state) => state.customLaw);
+  const customLawActive = useScenarioStore((state) => state.customLawActive);
   const displayUnit = useUiStore((state) => state.displayUnit);
   const isStale = getStalenessLevel(CONSTANTS_2026.retrievedAt, now) !== 'fresh';
   const rows = useMemo(
@@ -322,6 +180,14 @@ export function YearByYearTable({ now = new Date() }: YearByYearTableProps) {
     setBalanceHints(nextHints);
   }, BALANCE_HINT_DEBOUNCE_MS);
   const context = { balanceHints, displayUnit, scenario };
+  const handleDownloadCsv = () => {
+    const csv = buildYearByYearCsv(projectionResults, scenario, formValues, displayUnit);
+    downloadCsv(csv, `fire-planner-year-by-year-${scenario.startYear}-${plan.endYear}.csv`);
+  };
+  const handleDownloadJson = () => {
+    const json = buildScenarioJsonExport(formValues, scenario, plan, customLaw, customLawActive);
+    downloadJson(json, `fire-planner-scenario-${scenario.startYear}-${plan.endYear}.json`);
+  };
 
   useEffect(() => {
     setBalanceHints(new Map());
@@ -333,14 +199,32 @@ export function YearByYearTable({ now = new Date() }: YearByYearTableProps) {
 
   return (
     <section aria-labelledby="year-by-year-heading" className="mt-6">
-      <h2 className="text-lg font-semibold" id="year-by-year-heading">
-        Year-by-year projection
-      </h2>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="text-lg font-semibold" id="year-by-year-heading">
+          Year-by-year projection
+        </h2>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+            onClick={handleDownloadCsv}
+            type="button"
+          >
+            Download CSV
+          </button>
+          <button
+            className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+            onClick={handleDownloadJson}
+            type="button"
+          >
+            Download JSON
+          </button>
+        </div>
+      </div>
       <div className="mt-3 overflow-x-auto rounded-lg border border-slate-200" data-testid="year-table-scroll">
         <table className="min-w-[2700px] w-full border-separate border-spacing-0 text-xs">
           <thead className="text-slate-600">
             <tr>
-              {HEADER_BANDS.map((band) => (
+              {yearByYearColumnBands.map((band) => (
                 <BandHeader band={band} key={band} />
               ))}
             </tr>
@@ -415,7 +299,7 @@ function buildBalanceHintTargets(rows: readonly DisplayRow[], retirementYear: nu
     }));
 }
 
-function BandHeader({ band }: { band: TableBand }) {
+function BandHeader({ band }: { band: YearByYearColumnBand }) {
   const columns = TABLE_COLUMNS.filter((column) => column.band === band);
   const firstColumn = columns[0];
 
@@ -437,7 +321,7 @@ function BandHeader({ band }: { band: TableBand }) {
 
 function ColumnHeader({ column }: { column: TableColumn }) {
   const explanation = columnExplanations[column.id];
-  const label = column.label ?? explanation.label;
+  const label = getYearByYearColumnLabel(column);
   const labelId = `year-by-year-column-${column.id}`;
 
   return (
@@ -708,4 +592,27 @@ function withdrawalRateBandDescription(band: WithdrawalRateBand): string {
 
 function classNames(...values: Array<string | false | null | undefined>): string {
   return values.filter(Boolean).join(' ');
+}
+
+function downloadCsv(csv: string, filename: string): void {
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  downloadBlob(blob, filename);
+}
+
+function downloadJson(json: string, filename: string): void {
+  const blob = new Blob([json], { type: 'application/json;charset=utf-8' });
+  downloadBlob(blob, filename);
+}
+
+function downloadBlob(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.style.display = 'none';
+  document.body.append(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
 }

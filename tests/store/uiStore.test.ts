@@ -33,4 +33,18 @@ describe('uiStore', () => {
     expect(reloadedUiStore.getState().mode).toBe('advanced');
     expect(reloadedUiStore.getState().displayUnit).toBe('nominal');
   });
+
+  it('accepts Methodology as a persisted planner mode', async () => {
+    const { UI_STORAGE_KEY, useUiStore } = await import('@/store/uiStore');
+
+    useUiStore.getState().setMode('methodology');
+
+    expect(JSON.parse(window.localStorage.getItem(UI_STORAGE_KEY) ?? '{}')).toMatchObject({ mode: 'methodology' });
+
+    vi.resetModules();
+
+    const { useUiStore: reloadedUiStore } = await import('@/store/uiStore');
+
+    expect(reloadedUiStore.getState().mode).toBe('methodology');
+  });
 });

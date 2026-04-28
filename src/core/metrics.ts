@@ -232,6 +232,22 @@ export function computeTotalBridgeTax(bridgeYears: readonly YearBreakdown[]): nu
   return roundToCents(sumBy(bridgeYears, (breakdown) => breakdown.totalTax));
 }
 
+export function computeBridgeAcaCliffYearCount(bridgeYears: readonly YearBreakdown[], scenario: Scenario): number {
+  return bridgeYears.filter((breakdown) => {
+    const fplPercentage = computeDisplayFplPercentage(breakdown, scenario);
+
+    return fplPercentage !== null && computeFplBand(fplPercentage) === 'above-cliff';
+  }).length;
+}
+
+export function computeBridgeIrmaaTouchedYearCount(bridgeYears: readonly YearBreakdown[]): number {
+  const annualStandardPartBPremium = roundToCents(CONSTANTS_2026.irmaa.standardPartBPremium * 12);
+
+  return bridgeYears.filter(
+    (breakdown) => (breakdown.irmaaPremium?.annualTotal ?? annualStandardPartBPremium) > annualStandardPartBPremium,
+  ).length;
+}
+
 export function computeFplPercentage(
   householdIncome: number,
   householdSize: number,

@@ -1,5 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
+  computeAverageBridgeAcaMagi,
+  computeBridgeAcaCliffYearCount,
+  computeBridgeIrmaaTouchedYearCount,
+  computeMaxBridgeGrossBucketDrawPercentage,
+  computeTotalBridgeTax,
+} from '@/core/metrics';
+import {
   CartesianGrid,
   Legend,
   Line,
@@ -10,10 +17,12 @@ import {
   YAxis,
 } from 'recharts';
 
-import { runProjection, type AccountBalances, type WithdrawalPlan, type YearBreakdown } from '@/core/projection';
+import { runProjection, type AccountBalances, type Scenario, type WithdrawalPlan, type YearBreakdown } from '@/core/projection';
 import { toReal } from '@/lib/realDollars';
 import { type SavedScenario, useScenariosStore } from '@/store/scenariosStore';
 import { type DisplayUnit, useUiStore } from '@/store/uiStore';
+
+import { MetricCell } from '../MetricCell';
 
 type ScenarioIdPair = readonly [string, string];
 
@@ -32,6 +41,25 @@ type SummaryCard = Readonly<{
   title: string;
   value: string;
   detail: string;
+}>;
+
+type AccountMixKey = 'traditional' | 'roth' | 'taxableBrokerage' | 'hsa';
+
+type AccountMixShare = Readonly<{
+  key: AccountMixKey;
+  label: string;
+  percentage: number;
+}>;
+
+type HeadlineMetrics = Readonly<{
+  averageBridgeMagi: number | null;
+  bridgeYears: readonly YearBreakdown[];
+  brokerageBasisAtRetirement: Readonly<{ amount: number; year: number }> | null;
+  cliffYearCount: number;
+  endingAccountMix: readonly AccountMixShare[];
+  irmaaTouchedYearCount: number;
+  maxWithdrawalRate: number | null;
+  totalBridgeTax: number | null;
 }>;
 
 type TaxComponentKey =
@@ -54,6 +82,12 @@ const TAX_COMPONENTS: ReadonlyArray<Readonly<{ key: TaxComponentKey; label: stri
 ];
 
 const BALANCE_KEYS = ['cash', 'hsa', 'taxableBrokerage', 'traditional', 'roth'] as const;
+const ACCOUNT_MIX_KEYS: ReadonlyArray<Readonly<{ key: AccountMixKey; label: string; colorClassName: string }>> = [
+  { key: 'traditional', label: 'Trad', colorClassName: 'bg-sky-500' },
+  { key: 'roth', label: 'Roth', colorClassName: 'bg-violet-500' },
+  { key: 'taxableBrokerage', label: 'Brokerage', colorClassName: 'bg-emerald-500' },
+  { key: 'hsa', label: 'HSA', colorClassName: 'bg-amber-500' },
+];
 const MAGI_LABELS: Record<MagiVariant, string> = {
   acaMagi: 'ACA MAGI',
   irmaaMagi: 'IRMAA MAGI',
@@ -63,6 +97,11 @@ const DOLLAR_FORMATTER = new Intl.NumberFormat('en-US', {
   currency: 'USD',
   maximumFractionDigits: 0,
   style: 'currency',
+});
+
+const PERCENT_FORMATTER = new Intl.NumberFormat('en-US', {
+  maximumFractionDigits: 1,
+  style: 'percent',
 });
 
 export function CompareView({ initialScenarioIds }: CompareViewProps) {
@@ -148,6 +187,7 @@ export function CompareView({ initialScenarioIds }: CompareViewProps) {
           ) : (
             <>
               <SummaryComparison comparedScenarios={comparedScenarios} displayUnit={displayUnit} />
+              <HeadlineMetricsComparison comparedScenarios={comparedScenarios} displayUnit={displayUnit} />
               <CombinedYearTable comparedScenarios={comparedScenarios} displayUnit={displayUnit} />
               <MagiOverlay
                 comparedScenarios={comparedScenarios}
@@ -230,6 +270,171 @@ function SummaryComparison({
         ))}
       </div>
     </section>
+  );
+}
+
+function HeadlineMetricsComparison({
+  comparedScenarios,
+  displayUnit,
+}: {
+  comparedScenarios: readonly ComparedScenario[];
+  displayUnit: DisplayUnit;
+}) {
+  const metricsByScenario = comparedScenarios.map((entry) => ({
+    entry,
+    metrics: buildHeadlineMetrics(entry),
+  }));
+
+  return (
+    <section aria-labelledby="compare-headline-metrics-heading" className="mt-6">
+      <h4 className="text-base font-semibold" id="compare-headline-metrics-heading">
+        Headline metrics
+      </h4>
+      <div className="mt-3 overflow-x-auto rounded-lg border border-slate-200">
+        <table className="min-w-[760px] w-full border-collapse text-sm">
+          <thead className="bg-slate-50 text-slate-600">
+            <tr>
+              <th className="px-3 py-2 text-left font-medium">Metric</th>
+              {metricsByScenario.map(({ entry }) => (
+                <th className="px-3 py-2 text-right font-medium" key={entry.saved.id}>
+                  {entry.saved.name}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-200 bg-white">
+            <tr>
+              <th className="px-3 py-2 text-left font-medium text-slate-700" scope="row">
+                Total bridge tax
+              </th>
+              {metricsByScenario.map(({ entry, metrics }) => (
+                <td className="px-3 py-2 text-right tabular-nums" key={entry.saved.id}>
+                  {formatNullableMoney(
+                    displayUnit === 'real'
+                      ? computeTotalDisplayAmount(metrics.bridgeYears, entry, (breakdown) => breakdown.totalTax)
+                      : metrics.totalBridgeTax,
+                  )}
+                </td>
+              ))}
+            </tr>
+            <tr>
+              <th className="px-3 py-2 text-left font-medium text-slate-700" scope="row">
+                Average bridge MAGI
+              </th>
+              {metricsByScenario.map(({ entry, metrics }) => (
+                <td className="px-3 py-2 text-right tabular-nums" key={entry.saved.id}>
+                  {formatNullableMoney(
+                    displayUnit === 'real'
+                      ? computeAverageDisplayAmount(metrics.bridgeYears, entry, (breakdown) => breakdown.acaMagi)
+                      : metrics.averageBridgeMagi,
+                  )}
+                </td>
+              ))}
+            </tr>
+            <tr>
+              <th className="px-3 py-2 text-left font-medium text-slate-700" scope="row">
+                Max withdrawal rate
+              </th>
+              {metricsByScenario.map(({ entry, metrics }) => (
+                <td className="px-3 py-2 text-right" key={entry.saved.id}>
+                  <MetricCell
+                    bandType="wdRate"
+                    className="rounded px-1"
+                    displayText={formatNullablePercentage(metrics.maxWithdrawalRate)}
+                    label="Max withdrawal rate"
+                    rawNumeric={metrics.maxWithdrawalRate}
+                  />
+                </td>
+              ))}
+            </tr>
+            <tr>
+              <th className="px-3 py-2 text-left font-medium text-slate-700" scope="row">
+                Years above 400% FPL cliff
+              </th>
+              {metricsByScenario.map(({ entry, metrics }) => (
+                <td className="px-3 py-2 text-right" key={entry.saved.id}>
+                  <MetricCell
+                    bandType="fpl"
+                    className="rounded px-1"
+                    displayText={formatYears(metrics.cliffYearCount)}
+                    label="ACA cliff years"
+                    rawNumeric={metrics.cliffYearCount > 0 ? 4.01 : null}
+                  />
+                </td>
+              ))}
+            </tr>
+            <tr>
+              <th className="px-3 py-2 text-left font-medium text-slate-700" scope="row">
+                Years touching IRMAA
+              </th>
+              {metricsByScenario.map(({ entry, metrics }) => (
+                <td className="px-3 py-2 text-right tabular-nums" key={entry.saved.id}>
+                  {formatYears(metrics.irmaaTouchedYearCount)}
+                </td>
+              ))}
+            </tr>
+            <tr>
+              <th className="px-3 py-2 text-left font-medium text-slate-700" scope="row">
+                Brokerage basis remaining at retirement
+              </th>
+              {metricsByScenario.map(({ entry, metrics }) => (
+                <td className="px-3 py-2 text-right tabular-nums" key={entry.saved.id}>
+                  {metrics.brokerageBasisAtRetirement === null
+                    ? '-'
+                    : formatMoney(metrics.brokerageBasisAtRetirement.amount, metrics.brokerageBasisAtRetirement.year, entry, displayUnit)}
+                </td>
+              ))}
+            </tr>
+            <tr>
+              <th className="px-3 py-2 text-left font-medium text-slate-700" scope="row">
+                Ending account mix
+              </th>
+              {metricsByScenario.map(({ entry, metrics }) => (
+                <td className="px-3 py-2 text-right" key={entry.saved.id}>
+                  <EndingAccountMix entry={entry} shares={metrics.endingAccountMix} />
+                </td>
+              ))}
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+function EndingAccountMix({ entry, shares }: { entry: ComparedScenario; shares: readonly AccountMixShare[] }) {
+  const hasPositiveMix = shares.some((share) => share.percentage > 0);
+
+  return (
+    <div
+      aria-label={`Ending account mix for ${entry.saved.name}`}
+      className="ml-auto max-w-72"
+      data-testid={`ending-account-mix-${entry.saved.id}`}
+    >
+      {hasPositiveMix ? (
+        <div className="flex h-2 overflow-hidden rounded-full bg-slate-100" role="presentation">
+          {shares.map((share) => {
+            const colorClassName = ACCOUNT_MIX_KEYS.find((candidate) => candidate.key === share.key)?.colorClassName ?? 'bg-slate-300';
+
+            return (
+              <span
+                aria-hidden="true"
+                className={colorClassName}
+                key={share.key}
+                style={{ width: `${share.percentage}%` }}
+              />
+            );
+          })}
+        </div>
+      ) : null}
+      <div className="mt-1 grid grid-cols-2 gap-x-2 gap-y-0.5 text-[0.7rem] leading-snug text-slate-600">
+        {shares.map((share) => (
+          <span data-account-share={share.key} data-share-value={share.percentage} key={share.key}>
+            {share.label} {share.percentage}%
+          </span>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -532,6 +737,120 @@ function buildSummaryCards(entry: ComparedScenario, displayUnit: DisplayUnit): r
   ];
 }
 
+function buildHeadlineMetrics(entry: ComparedScenario): HeadlineMetrics {
+  const bridgeYears = selectComparableBridgeYears(entry);
+  const retirementYear = inferRetirementYear(entry);
+  const retirementBreakdown = entry.results.find((breakdown) => breakdown.year === retirementYear) ?? null;
+
+  return {
+    averageBridgeMagi: computeAverageBridgeAcaMagi(bridgeYears),
+    bridgeYears,
+    brokerageBasisAtRetirement:
+      retirementBreakdown === null
+        ? null
+        : {
+            amount: retirementBreakdown.brokerageBasis.opening,
+            year: retirementBreakdown.year,
+          },
+    cliffYearCount: computeBridgeAcaCliffYearCount(bridgeYears, entry.saved.scenario),
+    endingAccountMix: computeEndingAccountMix(entry.results.at(-1)?.closingBalances ?? null),
+    irmaaTouchedYearCount: computeBridgeIrmaaTouchedYearCount(bridgeYears),
+    maxWithdrawalRate: computeMaxBridgeGrossBucketDrawPercentage(bridgeYears),
+    totalBridgeTax: computeTotalBridgeTax(bridgeYears),
+  };
+}
+
+function selectComparableBridgeYears(entry: ComparedScenario): readonly YearBreakdown[] {
+  const retirementYear = inferRetirementYear(entry);
+  const bridgeEndYear = inferBridgeEndYear(entry.saved.scenario, retirementYear);
+
+  return entry.results.filter((breakdown) => breakdown.year >= retirementYear && breakdown.year <= bridgeEndYear);
+}
+
+function inferRetirementYear(entry: ComparedScenario): number {
+  const configuredRetirementYear = entry.saved.scenario.autoDepleteBrokerage?.retirementYear;
+  if (typeof configuredRetirementYear === 'number' && Number.isFinite(configuredRetirementYear)) {
+    return Math.trunc(configuredRetirementYear);
+  }
+
+  const years = entry.results.map((breakdown) => breakdown.year);
+  const inferredFromEarnedIncome = years.find((year, index) => {
+    if (earnedIncomeForYear(entry.saved.scenario, year) > 0) {
+      return false;
+    }
+
+    const hadPriorEarnedIncome = years.slice(0, index).some((priorYear) => earnedIncomeForYear(entry.saved.scenario, priorYear) > 0);
+    const laterYearsStayRetired = years.slice(index).every((candidateYear) => earnedIncomeForYear(entry.saved.scenario, candidateYear) <= 0);
+
+    return hadPriorEarnedIncome && laterYearsStayRetired;
+  });
+
+  return inferredFromEarnedIncome ?? entry.saved.scenario.startYear;
+}
+
+function inferBridgeEndYear(scenario: Scenario, retirementYear: number): number {
+  const medicareYear =
+    scenario.healthcare
+      .filter((phase) => phase.kind === 'medicare' && phase.year > retirementYear)
+      .map((phase) => phase.year)
+      .sort((left, right) => left - right)[0] ?? null;
+
+  if (medicareYear !== null) {
+    return medicareYear - 1;
+  }
+
+  if (
+    scenario.socialSecurity !== undefined &&
+    scenario.socialSecurity.annualBenefit > 0 &&
+    scenario.socialSecurity.claimYear > retirementYear
+  ) {
+    return scenario.socialSecurity.claimYear - 1;
+  }
+
+  return retirementYear + 9;
+}
+
+function earnedIncomeForYear(scenario: Scenario, year: number): number {
+  return sumAnnualAmounts(scenario.w2Income, year) + sumAnnualAmounts(scenario.consultingIncome, year);
+}
+
+function computeEndingAccountMix(balances: AccountBalances | null): readonly AccountMixShare[] {
+  const endingBalances = balances ?? {
+    cash: 0,
+    hsa: 0,
+    taxableBrokerage: 0,
+    traditional: 0,
+    roth: 0,
+  };
+  const total = ACCOUNT_MIX_KEYS.reduce((sum, account) => sum + endingBalances[account.key], 0);
+  const rawPercentages = ACCOUNT_MIX_KEYS.map((account) => (total <= 0 ? 0 : (endingBalances[account.key] / total) * 100));
+  const percentages = roundPercentagesToHundred(rawPercentages);
+
+  return ACCOUNT_MIX_KEYS.map((account, index) => ({
+    key: account.key,
+    label: account.label,
+    percentage: percentages[index] ?? 0,
+  }));
+}
+
+function roundPercentagesToHundred(rawPercentages: readonly number[]): readonly number[] {
+  if (rawPercentages.every((percentage) => percentage <= 0)) {
+    return rawPercentages.map(() => 0);
+  }
+
+  const floors = rawPercentages.map((percentage) => Math.floor(percentage));
+  const remaining = 100 - floors.reduce((total, percentage) => total + percentage, 0);
+  const rankedFractions = rawPercentages
+    .map((percentage, index) => ({ fraction: percentage - Math.floor(percentage), index }))
+    .sort((left, right) => right.fraction - left.fraction);
+
+  return floors.map((percentage, index) => {
+    const extraPoint = rankedFractions.slice(0, remaining).some((fraction) => fraction.index === index) ? 1 : 0;
+
+    return percentage + extraPoint;
+  });
+}
+
 function allProjectionYears(comparedScenarios: readonly ComparedScenario[]): readonly number[] {
   return Array.from(new Set(comparedScenarios.flatMap((entry) => entry.results.map((breakdown) => breakdown.year)))).sort(
     (left, right) => left - right,
@@ -599,14 +918,56 @@ function taxAndPremiumAmount(breakdown: YearBreakdown): number {
   return breakdown.totalTax + (breakdown.irmaaPremium?.annualIrmaaSurcharge ?? 0) + taxComponentAmount(breakdown, 'acaPremiumCredit');
 }
 
+function computeAverageDisplayAmount(
+  years: readonly YearBreakdown[],
+  entry: ComparedScenario,
+  getAmount: (breakdown: YearBreakdown) => number,
+): number | null {
+  if (years.length === 0) {
+    return null;
+  }
+
+  const total = computeTotalDisplayAmount(years, entry, getAmount);
+
+  return total === null ? null : total / years.length;
+}
+
+function computeTotalDisplayAmount(
+  years: readonly YearBreakdown[],
+  entry: ComparedScenario,
+  getAmount: (breakdown: YearBreakdown) => number,
+): number | null {
+  if (years.length === 0) {
+    return null;
+  }
+
+  return years.reduce((total, breakdown) => total + displayAmount(getAmount(breakdown), breakdown.year, entry, 'real'), 0);
+}
+
 function formatMoney(amount: number, year: number, entry: ComparedScenario, displayUnit: DisplayUnit): string {
   return DOLLAR_FORMATTER.format(displayAmount(amount, year, entry, displayUnit));
+}
+
+function formatNullableMoney(amount: number | null): string {
+  return amount === null ? '-' : DOLLAR_FORMATTER.format(amount);
+}
+
+function formatNullablePercentage(amount: number | null): string {
+  return amount === null ? '-' : PERCENT_FORMATTER.format(amount);
+}
+
+function formatYears(years: number): string {
+  return `${years} ${years === 1 ? 'year' : 'years'}`;
 }
 
 function displayAmount(amount: number, year: number, entry: ComparedScenario, displayUnit: DisplayUnit): number {
   return displayUnit === 'real'
     ? toReal(amount, year, entry.saved.scenario.startYear, entry.saved.scenario.inflationRate)
     : amount;
+}
+
+function sumAnnualAmounts(entries: readonly { year: number; amount: number }[], year: number): number {
+  return entries.reduce((total, entry) => total + (entry.year === year ? entry.amount : 0), 0);
 }
 
 function sumBalances(balances: AccountBalances): number {

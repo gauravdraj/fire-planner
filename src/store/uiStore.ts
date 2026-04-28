@@ -3,7 +3,7 @@ import { create } from 'zustand';
 import type { ProjectionMetricFormValues } from '@/core/metrics';
 import type { Scenario, YearBreakdown } from '@/core/projection';
 
-export type PlannerMode = 'basic' | 'advanced' | 'compare';
+export type PlannerMode = 'basic' | 'advanced' | 'compare' | 'methodology';
 export type DisplayUnit = 'real' | 'nominal';
 
 export const UI_STORAGE_KEY = 'fire-planner.ui.v1';
@@ -100,7 +100,7 @@ function persistUiState(state: UiStoreState): UiStoreState {
 }
 
 function isPlannerMode(value: unknown): value is PlannerMode {
-  return value === 'basic' || value === 'advanced' || value === 'compare';
+  return value === 'basic' || value === 'advanced' || value === 'compare' || value === 'methodology';
 }
 
 function isDisplayUnit(value: unknown): value is DisplayUnit {

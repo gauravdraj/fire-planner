@@ -1,4 +1,5 @@
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { App } from '@/App';
@@ -7,6 +8,23 @@ import { useScenarioStore } from '@/store/scenarioStore';
 import { useUiStore } from '@/store/uiStore';
 
 import { installMemoryLocalStorage } from '../store/memoryStorage';
+
+vi.mock('recharts', () => ({
+  Area: () => null,
+  AreaChart: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  Bar: () => null,
+  BarChart: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  CartesianGrid: () => null,
+  Legend: () => null,
+  Line: () => null,
+  LineChart: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  ReferenceArea: () => null,
+  ReferenceLine: () => null,
+  ResponsiveContainer: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  Tooltip: () => null,
+  XAxis: () => null,
+  YAxis: () => null,
+}));
 
 const MONEY_FORMATTER = new Intl.NumberFormat('en-US', {
   currency: 'USD',

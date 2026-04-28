@@ -1,11 +1,18 @@
 import type { AnnualAmount, WithdrawalPlan } from '@/core/projection';
+import { balanceSweepContract } from '@/lib/exportContracts';
 import { useScenarioStore } from '@/store/scenarioStore';
 
 export function ManualWithdrawalTable() {
   const scenario = useScenarioStore((state) => state.scenario);
   const plan = useScenarioStore((state) => state.plan);
+  const projectionResults = useScenarioStore((state) => state.projectionResults);
   const setPlan = useScenarioStore((state) => state.setPlan);
   const years = buildYearRange(scenario.startYear, plan.endYear);
+  const hasProjection = projectionResults.length > 0;
+  const canRunBalanceSweep = balanceSweepContract.supported && hasProjection;
+  const balanceSweepUnavailableReason = hasProjection
+    ? 'Account-specific manual withdrawal overrides are deferred because they would require projection engine contract changes. Annual spending is a spending override, so Balance all years will not write brokerage withdrawals into it.'
+    : 'Balance all years needs an active scenario and projection before it can run.';
 
   function updateSpending(year: number, value: string) {
     setPlan({
@@ -57,6 +64,21 @@ export function ManualWithdrawalTable() {
       </div>
 
       <div className="overflow-x-auto rounded-lg border border-slate-200">
+        <div className="flex flex-col gap-2 border-b border-slate-200 bg-slate-50 px-3 py-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <button
+              aria-describedby="balance-all-years-explanation"
+              className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-500 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+              disabled={!canRunBalanceSweep}
+              type="button"
+            >
+              Balance all years
+            </button>
+          </div>
+          <p className="max-w-2xl text-sm text-slate-600" id="balance-all-years-explanation">
+            {balanceSweepUnavailableReason}
+          </p>
+        </div>
         <table className="min-w-full divide-y divide-slate-200 text-sm">
           <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">
             <tr>

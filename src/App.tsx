@@ -6,6 +6,7 @@ import { CompareView } from '@/components/compare/CompareView';
 import { Disclaimer } from '@/components/Disclaimer';
 import { Footer } from '@/components/Footer';
 import { Header } from '@/components/Header';
+import { MethodologyPage } from '@/components/MethodologyPage';
 import { StalenessGate } from '@/components/StalenessGate';
 import { useScenarioStore } from '@/store/scenarioStore';
 import { useUiStore } from '@/store/uiStore';
@@ -33,7 +34,9 @@ export function App() {
       <Header />
       {customLawActive ? <CustomLawBanner /> : null}
       <main className="mx-auto w-full max-w-5xl px-4 py-8">
-        {mode === 'compare' ? (
+        {mode === 'methodology' ? (
+          <MethodologyPage />
+        ) : mode === 'compare' ? (
           <CompareView {...(compareScenarioIds === undefined ? {} : { initialScenarioIds: compareScenarioIds })} />
         ) : mode === 'advanced' ? (
           <AdvancedView onCompare={launchCompare} />
