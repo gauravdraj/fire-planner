@@ -74,7 +74,7 @@ describe('BasicForm', () => {
     expect(screen.getByLabelText('Roth expected return')).toHaveValue('0.05');
     expect(screen.getByLabelText('Brokerage expected return')).toHaveValue('0.05');
     expect(screen.getByLabelText('HSA expected return')).toHaveValue('0.05');
-    expect(screen.getByLabelText('Brokerage dividend yield')).toHaveValue('0');
+    expect(screen.getByLabelText('Brokerage dividend yield')).toHaveValue('0.015');
     expect(screen.getByLabelText('Qualified dividend percentage')).toHaveValue('0.95');
     expect(
       screen.getByText(
@@ -244,16 +244,16 @@ describe('BasicForm', () => {
   it('renders derived chips and updates them after valid debounced edits', () => {
     render(<BasicForm />);
 
-    expect(screen.getByText('→ Age 64 in 9 yrs')).toHaveClass(
+    expect(screen.getByText('→ Age 58 in 3 yrs')).toHaveClass(
       'text-xs',
       'uppercase',
       'tracking-wide',
       'text-slate-500',
     );
-    expect(screen.getByText(/→ Year 1 \$100,000 -> 2066 \$/)).toBeInTheDocument();
-    expect(screen.getByText('→ Stops in 2035')).toBeInTheDocument();
+    expect(screen.getByText(/→ Year 1 \$220,000 -> 2066 \$/)).toBeInTheDocument();
+    expect(screen.getByText('→ Stops in 2029')).toBeInTheDocument();
     expect(screen.getByText('→ No mortgage modeled')).toBeInTheDocument();
-    expect(screen.getByText('→ Claims in 2038 at age 67')).toBeInTheDocument();
+    expect(screen.getByText('→ Claims in 2041 at age 70')).toBeInTheDocument();
     expect(screen.getByText('→ Subsidy band unavailable')).toBeInTheDocument();
 
     changeField('Retirement target year', '2030');
@@ -269,7 +269,7 @@ describe('BasicForm', () => {
     expect(screen.getByText('→ 5 yrs of payments through 2030')).toBeInTheDocument();
     expect(screen.getByText('→ Stops in 2030')).toBeInTheDocument();
     expect(screen.getByText('→ Claims in 2039 at age 68')).toBeInTheDocument();
-    expect(screen.getByText('→ Subsidy band: below 138% FPL')).toBeInTheDocument();
+    expect(screen.getByText('→ Subsidy band: above 500% FPL')).toBeInTheDocument();
 
     changeField('Annual spending', '');
     advanceLiveDebounce();
@@ -293,7 +293,7 @@ describe('BasicForm', () => {
     expect(screen.getAllByText('Enter an age from 18 to 110.')).toHaveLength(2);
     expect(screen.getByText('Enter 2026 or later.')).toBeInTheDocument();
     expect(screen.getByText('Enter a claim age from 62 to 70.')).toBeInTheDocument();
-    expect(useScenarioStore.getState().formValues.annualSpendingToday).toBe(100_000);
+    expect(useScenarioStore.getState().formValues.annualSpendingToday).toBe(220_000);
   });
 
   it('requires plan-end age to be greater than primary age', () => {
@@ -412,7 +412,7 @@ describe('BasicForm', () => {
     advanceLiveDebounce();
 
     expect(screen.getByText('Annual spending is required.')).toBeInTheDocument();
-    expect(useScenarioStore.getState().formValues.annualSpendingToday).toBe(100_000);
+    expect(useScenarioStore.getState().formValues.annualSpendingToday).toBe(220_000);
     expect(useScenarioStore.getState().formValues.annualW2Income).toBe(12_345);
   });
 });

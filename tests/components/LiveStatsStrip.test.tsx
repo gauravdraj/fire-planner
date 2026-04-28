@@ -102,12 +102,12 @@ describe('LiveStatsStrip', () => {
     expect(cellAt(cells, 3)).toHaveTextContent('Average MAGI');
     expect(cellAt(cells, 4)).toHaveTextContent('Max gross bucket draw');
     expect(cellAt(cells, 5)).toHaveTextContent('Total bridge tax');
-    expect(within(cellAt(cells, 0)).getByText('$0')).toHaveClass('tabular-nums');
-    expect(within(cellAt(cells, 1)).getByText('$0')).toHaveClass('tabular-nums');
-    expect(within(cellAt(cells, 2)).getByText('1 year')).toHaveClass('tabular-nums');
-    expect(within(cellAt(cells, 3)).getByText('$0')).toHaveClass('tabular-nums');
-    expect(within(cellAt(cells, 4)).getByText('0%')).toHaveClass('tabular-nums');
-    expect(within(cellAt(cells, 5)).getByText('$0')).toHaveClass('tabular-nums');
+    expect(within(cellAt(cells, 0)).getByText(/\$[\d,]+/)).toHaveClass('tabular-nums');
+    expect(within(cellAt(cells, 1)).getByText(/\$[\d,]+/)).toHaveClass('tabular-nums');
+    expect(within(cellAt(cells, 2)).getByText(/\d+ years?/)).toHaveClass('tabular-nums');
+    expect(within(cellAt(cells, 3)).getByText(/\$[\d,]+/)).toHaveClass('tabular-nums');
+    expect(within(cellAt(cells, 4)).getByText(/\d+(\.\d+)?%/)).toHaveClass('tabular-nums');
+    expect(within(cellAt(cells, 5)).getByText(/\$[\d,]+/)).toHaveClass('tabular-nums');
   });
 
   it('renders the rail variant without sticky positioning', () => {
@@ -130,14 +130,18 @@ describe('LiveStatsStrip', () => {
     act(() => {
       useScenarioStore.getState().setFormValues({
         annualSpendingToday: 0,
+        annualSocialSecurityBenefit: 0,
+        annualW2Income: 0,
         brokerageAndCashBalance: 100_000,
         currentYear: 2026,
+        hsaBalance: 0,
         planEndAge: 63,
         primaryAge: 60,
         retirementYear: 2028,
         rothBalance: 30_000,
         taxableBrokerageBasis: 100_000,
         traditionalBalance: 20_000,
+        brokerageDividendYield: 0,
       });
     });
 

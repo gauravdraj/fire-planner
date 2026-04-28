@@ -25,10 +25,10 @@ describe('StarterTemplateChooser', () => {
     vi.useRealTimers();
   });
 
-  it('renders all five starter template buttons and the bridge-strategy explanation', () => {
+  it('renders all five starter template buttons and compact sample explanation', () => {
     render(<StarterTemplateChooser />);
 
-    expect(screen.getByRole('heading', { name: /try a sample scenario/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /sample scenarios/i })).toBeInTheDocument();
     expect(STARTER_TEMPLATES).toHaveLength(5);
     expect(screen.getAllByRole('button')).toHaveLength(5);
 
@@ -39,13 +39,9 @@ describe('StarterTemplateChooser', () => {
       expect(within(button).getByText(template.shortDescription)).toBeInTheDocument();
     }
 
-    const explanation = screen.getByText(/These examples show two common FIRE bridge strategies/i);
+    const explanation = screen.getByText(/Samples update the projection instantly/i);
     expect(explanation.tagName).toBe('P');
-    expect(explanation).toHaveTextContent(/update the projection instantly/i);
-    expect(explanation).toHaveTextContent(/72\(t\) context scenario illustrates using taxable brokerage as a 10-year bridge/i);
-    expect(explanation).toHaveTextContent(
-      /Roth ladder scenario shows a shorter brokerage bridge that preserves room to manage future conversions/i,
-    );
+    expect(explanation).toHaveTextContent(/quick contrasts after reviewing the default household/i);
   });
 
   it.each(STARTER_TEMPLATES)('loads $label into the scenario store and confirms the selection', (template) => {

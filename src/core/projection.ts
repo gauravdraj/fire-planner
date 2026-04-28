@@ -243,6 +243,7 @@ type YearComputation = Readonly<{
   breakdown: YearBreakdown;
   closingBrokerageBasis: number;
   cashIncomeBeforeWithdrawals: number;
+  healthcarePremiumOutflow: number;
   spendableCashTax: number;
 }>;
 
@@ -260,6 +261,7 @@ type YearTaxComputation = Readonly<{
   acaPremiumCredit: PremiumTaxCreditResult | null;
   aptcReconciliation: AptcReconciliationResult | null;
   irmaaPremium: IrmaaResult | null;
+  healthcarePremiumOutflow: number;
   totalTax: number;
 }>;
 
@@ -405,6 +407,7 @@ export function runProjection(scenario: Scenario, plan: WithdrawalPlan): YearBre
       const nextWithdrawalTarget = Math.max(
         0,
         computation.breakdown.spending +
+          computation.healthcarePremiumOutflow +
           Math.max(0, computation.spendableCashTax) -
           computation.cashIncomeBeforeWithdrawals,
       );
@@ -662,6 +665,7 @@ function computeProjectionYear(
           magiHistory,
         })
       : null;
+    const healthcarePremiumOutflow = roundToCents(irmaaPremium?.annualIrmaaSurcharge ?? 0);
     const totalTax = roundToCents(
       federalTax +
         ltcgTax +
@@ -686,6 +690,7 @@ function computeProjectionYear(
       acaPremiumCredit,
       aptcReconciliation,
       irmaaPremium,
+      healthcarePremiumOutflow,
       totalTax,
     };
   }
@@ -732,6 +737,7 @@ function computeProjectionYear(
     cashIncomeBeforeWithdrawals +
       sumBalanceAmounts(allocation.withdrawals) -
       spending -
+      taxComputation.healthcarePremiumOutflow -
       spendableCashTax,
   );
 
@@ -795,6 +801,7 @@ function computeProjectionYear(
     },
     closingBrokerageBasis,
     cashIncomeBeforeWithdrawals: roundToCents(cashIncomeBeforeWithdrawals),
+    healthcarePremiumOutflow: taxComputation.healthcarePremiumOutflow,
     spendableCashTax,
   };
 }

@@ -68,8 +68,13 @@ describe('advanced planner controls', () => {
       ...DEFAULT_BASIC_FORM_VALUES,
       annualSpendingToday: 0,
       annualSocialSecurityBenefit: 30_000,
+      socialSecurityClaimAge: 67,
+      annualW2Income: 0,
       brokerageAndCashBalance: 0,
+      hsaBalance: 0,
       traditionalBalance: 250_000,
+      rothBalance: 0,
+      brokerageDividendYield: 0,
     });
 
     render(<AdvancedView />);
@@ -101,9 +106,16 @@ describe('advanced planner controls', () => {
     useScenarioStore.getState().replaceFormValues({
       ...DEFAULT_BASIC_FORM_VALUES,
       planEndAge: 60,
+      retirementYear: 2026,
       annualSpendingToday: 0,
+      annualSocialSecurityBenefit: 0,
+      annualW2Income: 0,
       brokerageAndCashBalance: 200_000,
       taxableBrokerageBasis: 100_000,
+      hsaBalance: 0,
+      traditionalBalance: 0,
+      rothBalance: 0,
+      brokerageDividendYield: 0,
       healthcarePhase: 'aca',
     });
 

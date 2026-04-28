@@ -27,20 +27,23 @@ export function StarterTemplateChooser() {
   return (
     <section
       aria-labelledby="starter-template-heading"
-      className="mt-6 rounded-xl border border-indigo-200/80 bg-indigo-50/70 p-4 shadow-sm shadow-indigo-950/5 dark:border-indigo-400/20 dark:bg-indigo-950/20 dark:shadow-none"
+      className="mt-6 rounded-xl border border-slate-200 bg-slate-50/70 p-3 shadow-sm shadow-slate-900/5 dark:border-slate-800 dark:bg-slate-950/35 dark:shadow-none"
     >
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-        <div className="max-w-2xl">
-          <h3 className="text-sm font-semibold text-slate-950 dark:text-slate-50" id="starter-template-heading">
-            Try a sample scenario:
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="max-w-xl">
+          <h3
+            className="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-400"
+            id="starter-template-heading"
+          >
+            Sample scenarios
           </h3>
-          <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-400">
-            Load a complete basic form first, then adjust any assumption. Templates do not add advanced plan state.
+          <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
+            Optional shortcuts that load a complete basic form without adding advanced plan state.
           </p>
         </div>
         {loadConfirmation === null ? null : (
           <p
-            className="rounded-lg border border-indigo-200 bg-white px-3 py-2 text-sm font-medium text-indigo-700 shadow-sm shadow-indigo-950/5 dark:border-indigo-400/30 dark:bg-indigo-950/50 dark:text-indigo-200 dark:shadow-none"
+            className="rounded-lg border border-emerald-200 bg-white px-3 py-2 text-xs font-medium text-emerald-700 shadow-sm shadow-emerald-950/5 dark:border-emerald-400/30 dark:bg-emerald-950/30 dark:text-emerald-200 dark:shadow-none"
             role="status"
           >
             Loaded '{loadConfirmation.label}' — change any field to customize.
@@ -48,23 +51,23 @@ export function StarterTemplateChooser() {
         )}
       </div>
 
-      <div className="mt-4 grid grid-cols-[repeat(auto-fit,minmax(min(100%,15rem),1fr))] gap-3">
+      <div className="mt-3 flex flex-wrap gap-2">
         {STARTER_TEMPLATES.map((template) => (
           <button
-            className="rounded-xl border border-indigo-200 bg-white p-4 text-left shadow-sm shadow-indigo-950/5 transition-colors hover:border-indigo-500 hover:bg-indigo-50 active:border-indigo-700 active:bg-indigo-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 motion-reduce:transition-none dark:border-indigo-400/30 dark:bg-slate-950/70 dark:shadow-none dark:hover:border-indigo-300 dark:hover:bg-indigo-950/40 dark:active:bg-indigo-950/60 dark:focus-visible:outline-indigo-400"
+            className="max-w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-left shadow-sm shadow-slate-900/5 transition-colors hover:border-indigo-300 hover:bg-indigo-50/60 active:border-indigo-500 active:bg-indigo-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 motion-reduce:transition-none dark:border-slate-700 dark:bg-slate-950/70 dark:shadow-none dark:hover:border-indigo-400/60 dark:hover:bg-indigo-950/25 dark:active:bg-indigo-950/40 dark:focus-visible:outline-indigo-400"
             key={template.id}
             onClick={() => loadTemplate(template)}
             type="button"
           >
-            <span className="block text-sm font-semibold text-indigo-800 dark:text-indigo-200">{template.label}</span>
-            <span className="mt-1 block text-sm leading-6 text-slate-600 dark:text-slate-400">{template.shortDescription}</span>
+            <span className="block text-sm font-medium text-slate-900 dark:text-slate-100">{template.label}</span>
+            <span className="mt-0.5 block max-w-[18rem] text-xs leading-5 text-slate-500 dark:text-slate-400">
+              {template.shortDescription}
+            </span>
           </button>
         ))}
       </div>
-      <p className="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-400">
-        These examples show two common FIRE bridge strategies and update the projection instantly when loaded. The
-        72(t) context scenario illustrates using taxable brokerage as a 10-year bridge around SEPP planning, while the
-        Roth ladder scenario shows a shorter brokerage bridge that preserves room to manage future conversions.
+      <p className="mt-2 text-xs leading-5 text-slate-500 dark:text-slate-400">
+        Samples update the projection instantly; use them as quick contrasts after reviewing the default household.
       </p>
     </section>
   );

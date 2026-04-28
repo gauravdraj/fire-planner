@@ -178,11 +178,12 @@ describe('multi-year projection integration', () => {
      *   investment income includes interest, qualified dividends, brokerage gain,
      *   and passive rental net income.
      * - Selected worksheet values:
-     *   opening cash $13,199.84 + brokerage sale $73,310.69 = $86,510.53 withdrawals;
-     *   brokerage basis sold $43,986.41 and gain $29,324.28 at the 60% basis ratio;
-     *   ordinary income before Social Security $255,462.01, taxable Social Security
-     *   $46,750.00, AGI $302,212.01, taxable income $270,012.01, preferential income
-     *   $51,834.46, ordinary taxable income $218,177.55, NIIT base $52,212.01.
+     *   opening cash $13,199.84 + brokerage sale $76,560.73 = $89,760.57 withdrawals,
+     *   including the $2,884.80 IRMAA surcharge cash outflow;
+     *   brokerage basis sold $45,936.44 and gain $30,624.29 at the 60% basis ratio;
+     *   ordinary income before Social Security $256,762.02, taxable Social Security
+     *   $46,750.00, AGI $303,512.02, taxable income $271,312.02, preferential income
+     *   $53,134.47, ordinary taxable income $218,177.55, NIIT base $53,512.02.
      */
     const expectedYearFive: Pick<
       YearBreakdown,
@@ -199,29 +200,29 @@ describe('multi-year projection integration', () => {
       | 'stateTax'
       | 'totalTax'
     > = {
-      agi: 302_212.01,
-      acaMagi: 310_462.01,
-      irmaaMagi: 302_212.01,
+      agi: 303_512.02,
+      acaMagi: 311_762.02,
+      irmaaMagi: 303_512.02,
       taxableSocialSecurity: 46_750,
       withdrawals: {
         cash: 13_199.84,
         hsa: 0,
-        taxableBrokerage: 73_310.69,
+        taxableBrokerage: 76_560.73,
         traditional: 0,
         roth: 0,
       },
       conversions: 180_000,
       brokerageBasis: {
         opening: 965_221.16,
-        sold: 43_986.41,
-        realizedGainOrLoss: 29_324.28,
-        closing: 921_234.75,
+        sold: 45_936.44,
+        realizedGainOrLoss: 30_624.29,
+        closing: 919_284.72,
       },
       federalTax: 36_095.68,
-      ltcgTax: 7_775.17,
-      niit: 1_984.06,
-      stateTax: 17_988.39,
-      totalTax: 63_843.3,
+      ltcgTax: 7_970.17,
+      niit: 2_033.46,
+      stateTax: 18_109.29,
+      totalTax: 64_208.6,
     };
 
     expect(yearFive.acaPremiumCredit).toBeNull();
@@ -233,7 +234,7 @@ describe('multi-year projection integration', () => {
     expectWithinProjectionTolerance(yearFive.irmaaPremium?.annualIrmaaSurcharge ?? 0, 2_884.8);
 
     const yearFiveTaxableIncome = roundToCents(Math.max(0, yearFive.agi - 32_200));
-    expectWithinProjectionTolerance(yearFiveTaxableIncome, 270_012.01);
+    expectWithinProjectionTolerance(yearFiveTaxableIncome, 271_312.02);
     expectWithinProjectionTolerance(yearFive.agi, expectedYearFive.agi);
     expectWithinProjectionTolerance(yearFive.acaMagi, expectedYearFive.acaMagi);
     expectWithinProjectionTolerance(yearFive.irmaaMagi, expectedYearFive.irmaaMagi);

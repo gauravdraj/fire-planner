@@ -99,13 +99,20 @@ describe('scenarioStore', () => {
 
     expect(state.formValues).toEqual(DEFAULT_BASIC_FORM_VALUES);
     expect(state.formValues.stateCode).toBe('CA');
+    expect(state.formValues.annualW2Income).toBe(550_000);
+    expect(state.formValues.brokerageAndCashBalance).toBe(1_000_000);
     expect(state.selectedStarterStateLaw.stateCode).toBe('CA');
     expect(state.scenario.state.incomeTaxLaw.stateCode).toBe('CA');
     expect(state.plan.endYear).toBe(2066);
     expect(state.customLaw).toBeUndefined();
     expect(state.customLawActive).toBe(false);
     expect(state.projectionResults).toHaveLength(41);
-    expect(state.scenario.balances.hsa).toBe(0);
+    expect(state.scenario.balances).toMatchObject({
+      hsa: 100_000,
+      taxableBrokerage: 1_000_000,
+      traditional: 2_000_000,
+      roth: 1_000_000,
+    });
     expect(state).not.toHaveProperty('hasRunProjection');
   });
 

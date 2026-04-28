@@ -208,11 +208,9 @@ describe('BasicPlannerPage', () => {
 
     render(<BasicPlannerPage />);
 
-    expect(screen.getByRole('heading', { name: /try a sample scenario/i })).toBeInTheDocument();
-    const explanation = screen.getByText(/These examples show two common FIRE bridge strategies/i);
-    expect(explanation).toHaveTextContent(/update the projection instantly/i);
-    expect(explanation).toHaveTextContent(/72\(t\) context scenario/i);
-    expect(explanation).toHaveTextContent(/Roth ladder scenario/i);
+    expect(screen.getByRole('heading', { name: /sample scenarios/i })).toBeInTheDocument();
+    const explanation = screen.getByText(/Samples update the projection instantly/i);
+    expect(explanation).toHaveTextContent(/quick contrasts after reviewing the default household/i);
     expect(explanation.tagName).toBe('P');
 
     const initialProjectionResults = useScenarioStore.getState().projectionResults;

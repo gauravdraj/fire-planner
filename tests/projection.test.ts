@@ -583,6 +583,29 @@ describe('Gate 2 multi-year projection engine', () => {
     });
   });
 
+  it('funds Medicare IRMAA surcharges as modeled cash outflows', () => {
+    const [year] = runProjection(
+      makeScenario({
+        startYear: 2028,
+        healthcare: [{ year: 2028, kind: 'medicare' }],
+        magiHistory: [{ year: 2026, magi: 500_000 }],
+        balances: {
+          cash: 50_000,
+          hsa: 0,
+          taxableBrokerage: 0,
+          traditional: 0,
+          roth: 0,
+        },
+      }),
+      makePlan({ endYear: 2028 }),
+    );
+
+    expect(year?.irmaaPremium?.annualIrmaaSurcharge).toBe(6_936);
+    expect(year?.withdrawals.cash).toBe(6_936);
+    expect(year?.afterTaxCashFlow).toBe(0);
+    expect(year?.closingBalances.cash).toBe(43_064);
+  });
+
   it('uses indexed ordinary brackets inside projection years after 2026', () => {
     const [year] = runProjection(
       makeScenario({

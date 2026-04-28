@@ -191,11 +191,11 @@ export const columnExplanations = {
   },
   totalTax: {
     label: 'Total tax',
-    description: 'Combined annual tax estimate after included federal, state, NIIT, SE tax, ACA credit, and IRMAA effects.',
+    description: 'Combined annual tax estimate after included federal, state, NIIT, SE tax, and ACA credit effects.',
   },
   afterTaxCashFlow: {
     label: 'After-tax cash flow',
-    description: 'Cash available after modeled income, withdrawals, taxes, healthcare credits, and premiums are applied.',
+    description: 'Cash available after modeled income, withdrawals, taxes, ACA credits, and IRMAA surcharges are applied.',
   },
   fplPercentage: {
     label: 'FPL %',

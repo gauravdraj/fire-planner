@@ -24,7 +24,6 @@ export function BasicPlannerPage() {
           below stay tied to the form without a separate run step.
         </p>
       </div>
-      <StarterTemplateChooser />
       <div
         className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(22rem,28rem)] xl:items-start"
         data-testid="basic-workstation-layout"
@@ -35,6 +34,7 @@ export function BasicPlannerPage() {
         <BasicResultsRail />
       </div>
       <ProjectionResults />
+      <StarterTemplateChooser />
       <section
         aria-labelledby="seventy-two-t-heading"
         className="mt-6 rounded-xl border border-slate-200 bg-slate-50/80 p-4 shadow-sm shadow-slate-900/5 dark:border-slate-800 dark:bg-slate-950/50 dark:shadow-none"
