@@ -9,7 +9,10 @@ coverage/
 # Build-process artifacts (operator-only, not product docs)
 DESIGN.md
 COUNCIL.md
+COUNCIL_*.md
+ADR_*.md
 AIZEN_SPEC_*.md
+UAT_*.md
 .aizen/
 
 # IDE-specific
