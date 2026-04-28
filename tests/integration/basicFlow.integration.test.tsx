@@ -111,7 +111,7 @@ function expectedFplClassForPercent(percentLabel: string): readonly string[] {
     return ['bg-amber-100', 'text-amber-900'];
   }
 
-  return ['bg-rose-300', 'text-rose-950', 'font-bold'];
+  return ['bg-rose-200', 'text-rose-950', 'font-bold'];
 }
 
 function firstBridgeFplCell(table: HTMLElement): HTMLElement {
@@ -203,9 +203,10 @@ describe('basic Gate 3 app flow', () => {
 
     expect(within(table).getAllByRole('row')).toHaveLength(expectedProjectionYears + 2);
 
-    const scrollableRegions = container.querySelectorAll('.overflow-x-auto');
-    expect(scrollableRegions).toHaveLength(1);
-    expect(scrollableRegions[0]?.querySelector('table')).toBe(table);
+    const tableScrollRegion = table.closest('.overflow-x-auto');
+
+    expect(tableScrollRegion).not.toBeNull();
+    expect(tableScrollRegion?.querySelector('table')).toBe(table);
     expect(within(table).getByRole('columnheader', { name: 'Year' })).toHaveClass('sticky', 'left-0');
     expect(within(table).getAllByRole('rowheader')[0]).toHaveClass('sticky', 'left-0');
 
@@ -332,10 +333,10 @@ describe('basic Gate 3 app flow', () => {
 
   it('keeps the rich year table horizontally scrollable with sticky year headers', async () => {
     const { container, table } = await renderFilledRealisticPlanner();
-    const scrollableRegions = container.querySelectorAll('.overflow-x-auto');
+    const tableScrollRegion = table.closest('.overflow-x-auto');
 
-    expect(scrollableRegions).toHaveLength(1);
-    expect(scrollableRegions[0]?.querySelector('table')).toBe(table);
+    expect(tableScrollRegion).not.toBeNull();
+    expect(tableScrollRegion?.querySelector('table')).toBe(table);
     expect(within(table).getByRole('columnheader', { name: 'Year' })).toHaveClass('sticky', 'left-0');
     expect(within(table).getAllByRole('rowheader')[0]).toHaveClass('sticky', 'left-0');
   }, 10_000);

@@ -15,7 +15,10 @@ import { CONSTANTS_2026 } from '@/core/constants/2026';
 import type { Scenario, YearBreakdown } from '@/core/projection';
 import { getFPLForCoverageYear, type FplRegion, type FplTable } from '@/core/tax/aca';
 import type { FilingStatus } from '@/core/types';
+import { getChartPalette, getThresholdBandColor, type ChartPalette } from '@/lib/chartPalette';
+import { useResolvedTheme } from '@/lib/theme';
 import { useScenarioStore } from '@/store/scenarioStore';
+import { useUiStore } from '@/store/uiStore';
 
 type MagiChartPoint = Readonly<{
   year: number;
@@ -28,7 +31,6 @@ type AcaBand = Readonly<{
   label: string;
   from: number;
   to: number;
-  fill: string;
 }>;
 
 type IrmaaThreshold = Readonly<{
@@ -41,11 +43,11 @@ type TooltipPayloadItem = Readonly<{
   value?: number | string;
 }>;
 
-const ACA_BAND_DEFINITIONS: ReadonlyArray<Readonly<{ label: string; from: number; to: number; fill: string }>> = [
-  { label: '100-150% FPL', from: 1, to: 1.5, fill: '#dcfce7' },
-  { label: '150-200% FPL', from: 1.5, to: 2, fill: '#bbf7d0' },
-  { label: '200-300% FPL', from: 2, to: 3, fill: '#86efac' },
-  { label: '300-400% FPL', from: 3, to: 4, fill: '#4ade80' },
+const ACA_BAND_DEFINITIONS: ReadonlyArray<Readonly<{ label: string; from: number; to: number }>> = [
+  { label: '100-150% FPL', from: 1, to: 1.5 },
+  { label: '150-200% FPL', from: 1.5, to: 2 },
+  { label: '200-300% FPL', from: 2, to: 3 },
+  { label: '300-400% FPL', from: 3, to: 4 },
 ];
 
 const DOLLAR_FORMATTER = new Intl.NumberFormat('en-US', {
@@ -57,50 +59,55 @@ const DOLLAR_FORMATTER = new Intl.NumberFormat('en-US', {
 export function MagiChart() {
   const projectionResults = useScenarioStore((state) => state.projectionResults);
   const scenario = useScenarioStore((state) => state.scenario);
+  const themePreference = useUiStore((state) => state.themePreference);
+  const resolvedTheme = useResolvedTheme(themePreference);
+  const palette = getChartPalette(resolvedTheme);
   const chartData = buildMagiChartData(projectionResults);
   const acaBands = buildAcaFplBands({ projectionResults, scenario });
   const irmaaThresholds = buildIrmaaThresholds(scenario.filingStatus);
 
   return (
-    <section aria-labelledby="magi-chart-heading" className="mt-6">
+    <section aria-labelledby="magi-chart-heading" className="mt-6 min-w-0">
       <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h2 className="text-lg font-semibold" id="magi-chart-heading">
+          <h2 className="text-lg font-semibold text-slate-950 dark:text-slate-50" id="magi-chart-heading">
             MAGI thresholds
           </h2>
-          <p className="text-sm text-slate-600">ACA and IRMAA MAGI compared with major planning thresholds.</p>
+          <p className="text-sm leading-6 text-slate-600 dark:text-slate-400">
+            ACA and IRMAA MAGI compared with major planning thresholds.
+          </p>
         </div>
-        <p className="text-xs text-slate-500">nominal dollars</p>
+        <p className="text-xs font-medium text-slate-500 dark:text-slate-400">nominal dollars</p>
       </div>
       <div
         aria-label="MAGI compared with ACA FPL bands and IRMAA thresholds"
-        className="mt-3 rounded-lg border border-slate-200 bg-white"
+        className="mt-3 max-w-full overflow-x-auto overscroll-x-contain rounded-xl border border-slate-200 bg-white shadow-sm shadow-slate-900/5 [contain:paint] dark:border-slate-800 dark:bg-slate-950 dark:shadow-none"
         role="img"
       >
-        <div className="h-72 w-full p-3">
+        <div className="h-72 min-w-[40rem] p-3">
           {chartData.length === 0 ? (
-            <p className="p-4 text-sm text-slate-600">No projection data available.</p>
+            <p className="p-4 text-sm text-slate-600 dark:text-slate-400">No projection data available.</p>
           ) : (
             <ResponsiveContainer height="100%" width="100%">
               <LineChart data={chartData} margin={{ bottom: 4, left: 4, right: 28, top: 12 }}>
-                <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" />
+                <CartesianGrid stroke={palette.grid} strokeDasharray="3 3" />
                 <XAxis
                   axisLine={false}
                   dataKey="year"
-                  tick={{ fill: '#475569', fontSize: 12 }}
+                  tick={{ fill: palette.axis, fontSize: 12 }}
                   tickLine={false}
                 />
                 <YAxis
                   axisLine={false}
-                  tick={{ fill: '#475569', fontSize: 12 }}
+                  tick={{ fill: palette.axis, fontSize: 12 }}
                   tickFormatter={formatCompactDollarTick}
                   tickLine={false}
                   width={72}
                 />
-                {acaBands.map((band) => (
+                {acaBands.map((band, index) => (
                   <ReferenceArea
-                    fill={band.fill}
-                    fillOpacity={0.28}
+                    fill={getThresholdBandColor(palette, index)}
+                    fillOpacity={palette.thresholdBandOpacity}
                     ifOverflow="extendDomain"
                     key={band.id}
                     y1={band.from}
@@ -112,24 +119,27 @@ export function MagiChart() {
                     ifOverflow="extendDomain"
                     key={threshold.label}
                     label={{
-                      fill: '#7c2d12',
+                      fill: palette.referenceLabel,
                       fontSize: 11,
                       position: 'right',
                       value: threshold.label,
                     }}
-                    stroke="#f97316"
+                    stroke={palette.referenceLine}
                     strokeDasharray="4 3"
                     y={threshold.value}
                   />
                 ))}
-                <Tooltip content={<MagiChartTooltip />} />
-                <Legend formatter={(value) => String(value)} wrapperStyle={{ fontSize: 12 }} />
+                <Tooltip content={<MagiChartTooltip palette={palette} />} />
+                <Legend
+                  formatter={(value) => <span style={{ color: palette.legend }}>{String(value)}</span>}
+                  wrapperStyle={{ color: palette.legend, fontSize: 12 }}
+                />
                 <Line
                   dataKey="acaMagi"
                   dot={false}
                   isAnimationActive={false}
                   name="ACA MAGI"
-                  stroke="#047857"
+                  stroke={palette.series.magi.acaMagi.stroke}
                   strokeWidth={2}
                   type="linear"
                 />
@@ -138,7 +148,7 @@ export function MagiChart() {
                   dot={false}
                   isAnimationActive={false}
                   name="IRMAA MAGI"
-                  stroke="#7c3aed"
+                  stroke={palette.series.magi.irmaaMagi.stroke}
                   strokeWidth={2}
                   type="linear"
                 />
@@ -147,9 +157,9 @@ export function MagiChart() {
           )}
         </div>
       </div>
-      <div className="mt-3 grid gap-3 text-xs text-slate-600 md:grid-cols-2">
+      <div className="mt-3 grid gap-3 text-xs text-slate-600 dark:text-slate-400 md:grid-cols-2">
         <div>
-          <p className="font-medium text-slate-700">ACA FPL bands</p>
+          <p className="font-medium text-slate-700 dark:text-slate-300">ACA FPL bands</p>
           {acaBands.length === 0 ? (
             <p className="mt-1">No ACA coverage years in this scenario.</p>
           ) : (
@@ -163,7 +173,7 @@ export function MagiChart() {
           )}
         </div>
         <div>
-          <p className="font-medium text-slate-700">IRMAA threshold lines</p>
+          <p className="font-medium text-slate-700 dark:text-slate-300">IRMAA threshold lines</p>
           <ul className="mt-1 flex flex-wrap gap-x-3 gap-y-1">
             {irmaaThresholds.map((threshold) => (
               <li key={threshold.label}>
@@ -217,7 +227,6 @@ export function buildAcaFplBands({
     label: band.label,
     from: povertyGuideline * band.from,
     to: povertyGuideline * band.to,
-    fill: band.fill,
   }));
 }
 
@@ -266,10 +275,12 @@ export function formatCompactDollarTick(value: number | string): string {
 export function MagiChartTooltip({
   active,
   label,
+  palette = getChartPalette('light'),
   payload,
 }: {
   active?: boolean;
   label?: number | string;
+  palette?: ChartPalette;
   payload?: readonly TooltipPayloadItem[];
 }) {
   if (active !== true || payload === undefined || payload.length === 0) {
@@ -277,18 +288,25 @@ export function MagiChartTooltip({
   }
 
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-3 text-sm">
-      <p className="font-medium text-slate-950">{label}</p>
+    <div
+      className="rounded-lg p-3 text-sm shadow-lg shadow-slate-950/10"
+      style={{
+        backgroundColor: palette.tooltip.background,
+        border: `1px solid ${palette.tooltip.border}`,
+        color: palette.tooltip.text,
+      }}
+    >
+      <p className="font-medium">{label}</p>
       <dl className="mt-2 grid grid-cols-[auto_auto] gap-x-4 gap-y-1">
         <div className="contents">
-          <dt className="text-slate-600">ACA MAGI</dt>
-          <dd className="text-right font-medium tabular-nums text-slate-950">
+          <dt style={{ color: palette.tooltip.mutedText }}>ACA MAGI</dt>
+          <dd className="text-right font-medium tabular-nums">
             {DOLLAR_FORMATTER.format(valueForSeries(payload, 'acaMagi'))}
           </dd>
         </div>
         <div className="contents">
-          <dt className="text-slate-600">IRMAA MAGI</dt>
-          <dd className="text-right font-medium tabular-nums text-slate-950">
+          <dt style={{ color: palette.tooltip.mutedText }}>IRMAA MAGI</dt>
+          <dd className="text-right font-medium tabular-nums">
             {DOLLAR_FORMATTER.format(valueForSeries(payload, 'irmaaMagi'))}
           </dd>
         </div>

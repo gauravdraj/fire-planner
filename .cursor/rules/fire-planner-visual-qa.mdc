@@ -1,0 +1,21 @@
+---
+description: fire-planner visual QA checklist for AI-produced UI changes.
+globs:
+  - "src/**/*.tsx"
+  - "src/index.css"
+  - "tailwind.config.*"
+---
+
+# fire-planner Visual QA
+
+Before considering UI work done, review the changed screens as a user would:
+
+- Check visual hierarchy: the main action/result should be obvious, secondary controls should not compete, and dense financial tables should remain scannable.
+- Check spacing rhythm: section gaps, card padding, inline control gaps, and table cell padding should feel intentional rather than mechanically uniform.
+- Check alignment: card edges, headings, controls, tables, and chart panels should line up across the page where reasonable.
+- Check copy hierarchy: labels, helper text, warnings, and disclaimers should use consistent sizes and weights.
+- Check light and dark mode: no low-contrast text, invisible borders, harsh pure-black/pure-white fields, or chart colors that disappear.
+- Check responsive breakpoints: mobile wrapping, tablet tab bars, wide desktop max widths, and horizontal scrolling for data-heavy tables/charts.
+- Check accessible states: keyboard focus is visible, active tabs/modes are announced, and disabled controls remain understandable.
+
+When UI changes are broad, prefer a quick browser pass after tests: run the app, inspect at least the default basic view, advanced view, compare/methodology navigation if touched, and both themes when dark mode is involved.

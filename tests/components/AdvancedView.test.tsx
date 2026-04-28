@@ -57,6 +57,29 @@ describe('AdvancedView', () => {
     expect(screen.queryByRole('heading', { name: 'Compare two scenarios' })).not.toBeInTheDocument();
   });
 
+  it('supports keyboard navigation across advanced tabs', () => {
+    useUiStore.getState().setMode('advanced');
+
+    render(<AdvancedView />);
+
+    const customLawTab = screen.getByRole('tab', { name: 'Custom law' });
+    const manualPlanTab = screen.getByRole('tab', { name: 'Manual plan' });
+    const scenariosTab = screen.getByRole('tab', { name: 'Scenarios' });
+
+    customLawTab.focus();
+    fireEvent.keyDown(customLawTab, { key: 'ArrowRight' });
+
+    expect(manualPlanTab).toHaveFocus();
+    expect(manualPlanTab).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('heading', { name: 'Manual withdrawal planning' })).toBeInTheDocument();
+
+    fireEvent.keyDown(manualPlanTab, { key: 'End' });
+
+    expect(scenariosTab).toHaveFocus();
+    expect(scenariosTab).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('heading', { name: 'Scenario manager' })).toBeInTheDocument();
+  });
+
   it('saves sparse standard deduction overrides while showing defaults as placeholders', () => {
     useUiStore.getState().setMode('advanced');
 
@@ -67,6 +90,9 @@ describe('AdvancedView', () => {
     expect(mfjDeductionInput).toHaveValue(null);
 
     fireEvent.change(mfjDeductionInput, { target: { value: '35000' } });
+    expect(useScenarioStore.getState().customLaw).toBeUndefined();
+    expect(useScenarioStore.getState().customLawActive).toBe(false);
+
     fireEvent.click(screen.getByRole('button', { name: 'Save custom law edits' }));
 
     expect(useScenarioStore.getState().customLaw).toEqual({

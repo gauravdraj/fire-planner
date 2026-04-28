@@ -11,12 +11,18 @@ export function RealNominalToggle() {
   const setDisplayUnit = useUiStore((state) => state.setDisplayUnit);
 
   return (
-    <div aria-label="Display dollars" className="inline-flex rounded-md border border-slate-300 bg-white p-1">
+    <div
+      aria-label="Display dollars"
+      className="inline-flex max-w-full flex-wrap gap-1 rounded-xl border border-slate-300 bg-white p-1 shadow-sm shadow-slate-900/5 dark:border-slate-700 dark:bg-slate-900 dark:shadow-none"
+      role="group"
+    >
       {DISPLAY_UNITS.map((option) => (
         <button
           aria-pressed={displayUnit === option.value}
-          className={`rounded px-3 py-1.5 text-sm font-medium ${
-            displayUnit === option.value ? 'bg-indigo-700 text-white' : 'text-slate-700 hover:bg-slate-100'
+          className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 motion-reduce:transition-none dark:focus-visible:outline-indigo-400 ${
+            displayUnit === option.value
+              ? 'bg-indigo-700 text-white shadow-sm ring-1 ring-indigo-700 dark:bg-indigo-400 dark:text-slate-950 dark:ring-indigo-300'
+              : 'text-slate-700 hover:bg-slate-100 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-50'
           }`}
           key={option.value}
           onClick={() => setDisplayUnit(option.value)}

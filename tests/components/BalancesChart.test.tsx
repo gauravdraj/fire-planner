@@ -9,6 +9,7 @@ import {
 } from '@/components/BalancesChart';
 import { CONSTANTS_2026 } from '@/core/constants/2026';
 import type { AccountBalances, YearBreakdown } from '@/core/projection';
+import { getChartPalette } from '@/lib/chartPalette';
 import { useScenarioStore } from '@/store/scenarioStore';
 import { useUiStore } from '@/store/uiStore';
 
@@ -116,13 +117,31 @@ describe('BalancesChart', () => {
     const { container } = render(<BalancesChart now={dateAtTaxDataAge(0)} />);
 
     expect(screen.getByRole('heading', { name: 'Account balances' })).toBeInTheDocument();
-    expect(screen.getByRole('img', { name: /stacked account balances/i })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: /stacked account balances/i })).toHaveClass('overflow-x-auto');
     expect(container.querySelectorAll('.recharts-area')).toHaveLength(5);
     expect(screen.getByText('Traditional')).toBeInTheDocument();
     expect(screen.getByText('Roth')).toBeInTheDocument();
     expect(screen.getByText('HSA')).toBeInTheDocument();
     expect(screen.getByText('Taxable brokerage')).toBeInTheDocument();
     expect(screen.getByText('Cash')).toBeInTheDocument();
+  });
+
+  it('drives dark chart internals from the resolved chart palette', () => {
+    const palette = getChartPalette('dark');
+    useUiStore.getState().setThemePreference('dark');
+
+    const { container } = render(<BalancesChart now={dateAtTaxDataAge(0)} />);
+
+    expect(container.querySelector('.recharts-cartesian-grid line')).toHaveAttribute('stroke', palette.grid);
+    expect(container.querySelector('.recharts-area-curve')).toHaveAttribute(
+      'stroke',
+      palette.series.balances.traditional.stroke,
+    );
+    expect(container.querySelector('.recharts-area-area')).toHaveAttribute(
+      'fill',
+      palette.series.balances.traditional.fill,
+    );
+    expect(screen.getByText('Traditional')).toHaveStyle({ color: palette.legend });
   });
 
   it('builds nominal and real chart points with all supported series', () => {
@@ -169,10 +188,13 @@ describe('BalancesChart', () => {
   });
 
   it('shows per-bucket tooltip values and a total', () => {
+    const palette = getChartPalette('dark');
+
     render(
       <BalancesChartTooltip
         active
         label={2027}
+        palette={palette}
         payload={[
           { dataKey: 'cash', value: 10_000 },
           { dataKey: 'hsa', value: 15_000 },
@@ -184,6 +206,10 @@ describe('BalancesChart', () => {
     );
 
     expect(screen.getByText('2027')).toBeInTheDocument();
+    expect(screen.getByText('2027').parentElement).toHaveStyle({
+      backgroundColor: palette.tooltip.background,
+      color: palette.tooltip.text,
+    });
     expect(screen.getByText('Traditional')).toBeInTheDocument();
     expect(screen.getByText('Roth')).toBeInTheDocument();
     expect(screen.getByText('HSA')).toBeInTheDocument();

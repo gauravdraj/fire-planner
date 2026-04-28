@@ -77,9 +77,8 @@ describe('advanced planner controls', () => {
 
     expect(screen.getByLabelText('Roth start year')).toHaveValue(2026);
     expect(screen.getByLabelText('Roth end year')).toHaveValue(2038);
-    expect(screen.getByTitle('Year T IRMAA MAGI drives the year T+2 Medicare premium bill.')).toHaveTextContent(
-      'IRMAA T+2:',
-    );
+    expect(screen.getByText(/IRMAA T\+2:/)).toBeInTheDocument();
+    expect(screen.queryByTitle('Year T IRMAA MAGI drives the year T+2 Medicare premium bill.')).not.toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText('Binding constraint'), { target: { value: 'irmaaTier' } });
     expect(screen.getByLabelText('Maximum IRMAA tier')).toBeInTheDocument();
@@ -95,6 +94,7 @@ describe('advanced planner controls', () => {
     expect(state.plan.rothConversions?.[0]?.amount ?? 0).toBeGreaterThan(0);
     expect(state.projectionResults[0]?.conversions ?? 0).toBeGreaterThan(0);
     expect(screen.getByText(/Generated Roth ladder actions for/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/premium bill/i).length).toBeGreaterThan(0);
   });
 
   it('generates capped LTCG harvests with optional ACA and IRMAA guard controls', () => {

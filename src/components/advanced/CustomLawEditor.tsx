@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { CONSTANTS_2026 } from '@/core/constants/2026';
 import { isCustomLawActive, type CustomLaw, type LawConstants } from '@/core/constants/customLaw';
 import type { Bracket, FilingStatus } from '@/core/types';
+import { classNames, formControlClassName } from '@/components/ui/controlStyles';
 import { useScenarioStore } from '@/store/scenarioStore';
 
 const FILING_STATUSES: readonly FilingStatus[] = ['single', 'mfj', 'hoh', 'mfs'];
@@ -35,6 +36,13 @@ type MutableCustomLaw = {
 };
 
 const DEFAULTS = CONSTANTS_2026 as LawConstants;
+const fieldsetClassName = 'rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950';
+const legendClassName = 'px-1 text-base font-semibold text-slate-950 dark:text-slate-50';
+const labelClassName = 'block text-sm font-medium text-slate-800 dark:text-slate-200';
+const secondaryButtonClassName =
+  'rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:border-slate-400 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 motion-reduce:transition-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 dark:hover:border-slate-600 dark:hover:bg-slate-900 dark:focus-visible:outline-indigo-400';
+const primaryButtonClassName =
+  'rounded-lg bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-slate-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 motion-reduce:transition-none dark:bg-indigo-400 dark:text-slate-950 dark:hover:bg-indigo-300 dark:focus-visible:outline-indigo-400';
 
 export function CustomLawEditor() {
   const customLaw = useScenarioStore((state) => state.customLaw);
@@ -104,7 +112,7 @@ export function CustomLawEditor() {
         saveDraft();
       }}
     >
-      <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+      <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950 dark:border-amber-500/40 dark:bg-amber-950/30 dark:text-amber-100">
         <p className="font-medium">Custom law overrides are optional.</p>
         <p className="mt-1">
           Blank fields use the sealed 2026 defaults shown as placeholders. Saving writes only values that differ from
@@ -112,17 +120,17 @@ export function CustomLawEditor() {
         </p>
       </div>
 
-      <fieldset className="rounded-lg border border-slate-200 p-4">
-        <legend className="px-1 text-base font-semibold text-slate-900">Federal standard deduction</legend>
+      <fieldset className={fieldsetClassName}>
+        <legend className={legendClassName}>Federal standard deduction</legend>
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           {FILING_STATUSES.map((status) => (
             <div key={status}>
-              <label className="block text-sm font-medium text-slate-800" htmlFor={`standard-deduction-${status}`}>
+              <label className={labelClassName} htmlFor={`standard-deduction-${status}`}>
                 {FILING_STATUS_LABELS[status]}
               </label>
               <div className="mt-1 flex gap-2">
                 <input
-                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                  className={formControlClassName()}
                   id={`standard-deduction-${status}`}
                   inputMode="decimal"
                   min="0"
@@ -135,7 +143,7 @@ export function CustomLawEditor() {
                 />
                 <button
                   aria-label={`Reset standard deduction ${FILING_STATUS_LABELS[status]}`}
-                  className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
+                  className={secondaryButtonClassName}
                   onClick={() => resetStandardDeduction(status)}
                   type="button"
                 >
@@ -163,15 +171,15 @@ export function CustomLawEditor() {
         table={DEFAULTS.ltcg.brackets}
       />
 
-      <fieldset className="rounded-lg border border-slate-200 p-4">
-        <legend className="px-1 text-base font-semibold text-slate-900">NIIT rate</legend>
+      <fieldset className={fieldsetClassName}>
+        <legend className={legendClassName}>NIIT rate</legend>
         <div className="mt-3 max-w-sm">
-          <label className="block text-sm font-medium text-slate-800" htmlFor="niit-rate">
+          <label className={labelClassName} htmlFor="niit-rate">
             Net investment income tax rate
           </label>
           <div className="mt-1 flex gap-2">
             <input
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+              className={formControlClassName()}
               id="niit-rate"
               inputMode="decimal"
               min="0"
@@ -182,7 +190,7 @@ export function CustomLawEditor() {
               value={niitRateDraft}
             />
             <button
-              className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
+              className={secondaryButtonClassName}
               onClick={resetNiitRate}
               type="button"
             >
@@ -192,19 +200,19 @@ export function CustomLawEditor() {
         </div>
       </fieldset>
 
-      <div className="flex flex-col gap-3 border-t border-slate-200 pt-4 sm:flex-row sm:items-center sm:justify-between">
-        <div aria-live="polite" className="min-h-5 text-sm text-slate-600">
+      <div className="flex flex-col gap-3 border-t border-slate-200 pt-4 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
+        <div aria-live="polite" className="min-h-5 text-sm text-slate-600 dark:text-slate-300">
           {saveMessage}
         </div>
         <div className="flex flex-wrap gap-2">
           <button
-            className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
+            className={classNames(secondaryButtonClassName, 'px-4')}
             onClick={resetAll}
             type="button"
           >
             Reset all custom-law overrides
           </button>
-          <button className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white" type="submit">
+          <button className={primaryButtonClassName} type="submit">
             Save custom law edits
           </button>
         </div>
@@ -227,15 +235,15 @@ function BracketEditor({
   table: Record<FilingStatus, readonly Bracket[]>;
 }) {
   return (
-    <fieldset className="rounded-lg border border-slate-200 p-4">
-      <legend className="px-1 text-base font-semibold text-slate-900">{label}</legend>
+    <fieldset className={fieldsetClassName}>
+      <legend className={legendClassName}>{label}</legend>
       <div className="mt-4 space-y-5">
         {FILING_STATUSES.map((status) => (
-          <div className="rounded-md border border-slate-100 p-3" key={status}>
+          <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3 dark:border-slate-800 dark:bg-slate-900/50" key={status}>
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <h4 className="font-medium text-slate-900">{FILING_STATUS_LABELS[status]}</h4>
+              <h4 className="font-medium text-slate-950 dark:text-slate-50">{FILING_STATUS_LABELS[status]}</h4>
               <button
-                className="self-start rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100 sm:self-auto"
+                className={classNames(secondaryButtonClassName, 'self-start py-1.5 sm:self-auto')}
                 onClick={() => onReset(status)}
                 type="button"
               >
@@ -245,11 +253,11 @@ function BracketEditor({
             <div className="mt-3 grid gap-2">
               {table[status].map((bracket, index) => (
                 <div className="grid gap-2 sm:grid-cols-2" key={`${status}-${index}`}>
-                  <label className="text-sm text-slate-700">
+                  <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
                     Bracket {index + 1} floor
                     <input
                       aria-label={`${label} ${FILING_STATUS_LABELS[status]} bracket ${index + 1} floor`}
-                      className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                      className={formControlClassName({ className: 'mt-1' })}
                       inputMode="decimal"
                       min="0"
                       onChange={(event) => {
@@ -260,11 +268,11 @@ function BracketEditor({
                       value={draft[status][index]?.from ?? ''}
                     />
                   </label>
-                  <label className="text-sm text-slate-700">
+                  <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
                     Bracket {index + 1} rate
                     <input
                       aria-label={`${label} ${FILING_STATUS_LABELS[status]} bracket ${index + 1} rate`}
-                      className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                      className={formControlClassName({ className: 'mt-1' })}
                       inputMode="decimal"
                       min="0"
                       onChange={(event) => {

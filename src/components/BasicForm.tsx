@@ -8,6 +8,7 @@ import { useDebouncedCallback } from '@/lib/useDebouncedCallback';
 import { useScenarioStore } from '@/store/scenarioStore';
 
 import { InfoTooltip } from './InfoTooltip';
+import { checkboxControlClassName, classNames, formControlClassName } from './ui/controlStyles';
 
 type BasicFormDraft = {
   [Field in keyof BasicFormValues]: string;
@@ -139,7 +140,7 @@ export function BasicForm() {
   }
 
   return (
-    <div aria-label="Basic scenario form" className="mt-6 grid gap-4 sm:grid-cols-2" role="form">
+    <div aria-label="Basic scenario form" className="mt-6 grid items-start gap-4 sm:grid-cols-2" role="form">
       <SectionFieldset sectionId="household">
         <Field error={errors.filingStatus} id="filingStatus" label="Filing status">
           <select
@@ -235,7 +236,7 @@ export function BasicForm() {
       </SectionFieldset>
 
       <SectionFieldset sectionId="growthDividends">
-        <p className="sm:col-span-2 text-sm text-slate-600">
+        <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm leading-6 text-slate-600 dark:border-slate-800 dark:bg-slate-950/60 dark:text-slate-400 sm:col-span-2">
           Expected returns are annual decimals for each modeled account bucket. Brokerage expected return is price
           appreciation when dividend yield is modeled; price return plus after-tax reinvested dividends make up modeled
           brokerage growth.
@@ -457,13 +458,19 @@ function SectionFieldset({
   const label = explanation.label;
 
   return (
-    <fieldset className="rounded-md border border-slate-200 p-4 sm:col-span-2">
-      <legend className="px-2 text-sm font-semibold text-slate-700">
+    <fieldset
+      aria-describedby={`${sectionId}-description`}
+      className="rounded-xl border border-slate-200 bg-white/90 p-4 shadow-sm shadow-slate-900/5 dark:border-slate-800 dark:bg-slate-900/60 dark:shadow-none sm:col-span-2"
+    >
+      <legend className="-ml-2 px-2 text-sm font-semibold text-slate-800 dark:text-slate-100">
         <span className="inline-flex items-center gap-1.5">
           {label}
           <InfoTooltip ariaLabel={`About ${label}`}>{explanation.description}</InfoTooltip>
         </span>
       </legend>
+      <p id={`${sectionId}-description`} className="mb-4 text-sm leading-6 text-slate-600 dark:text-slate-400">
+        {explanation.description}
+      </p>
       <div className="grid gap-4 sm:grid-cols-2">{children}</div>
     </fieldset>
   );
@@ -484,13 +491,13 @@ function Field({
 }) {
   return (
     <div className="flex flex-col gap-1.5">
-      <label className="text-sm font-medium text-slate-800" htmlFor={id}>
+      <label className="text-sm font-medium text-slate-800 dark:text-slate-200" htmlFor={id}>
         {label}
       </label>
       {children}
       {chip === undefined ? null : <DerivedChip>{chip}</DerivedChip>}
       {error === undefined ? null : (
-        <p className="text-sm text-red-700" id={`${id}-error`}>
+        <p className="text-sm font-medium text-red-700 dark:text-red-300" id={`${id}-error`}>
           {error}
         </p>
       )}
@@ -499,7 +506,11 @@ function Field({
 }
 
 function DerivedChip({ children }: { children: string }) {
-  return <p className="text-xs font-medium uppercase tracking-wide text-slate-500">→ {children}</p>;
+  return (
+    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+      → {children}
+    </p>
+  );
 }
 
 function visibleErrors(errors: BasicFormErrors, touched: BasicFormTouched): BasicFormErrors {
@@ -694,7 +705,7 @@ function renderCheckboxField(
         aria-describedby={error ? `${field}-error` : undefined}
         aria-invalid={error ? 'true' : undefined}
         checked={draft[field] === 'true'}
-        className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600"
+        className={checkboxControlClassName()}
         id={field}
         onChange={handleCheckboxChange(field)}
         type="checkbox"
@@ -704,9 +715,7 @@ function renderCheckboxField(
 }
 
 function inputClassName(error: string | undefined): string {
-  return `w-full rounded-md border bg-white px-3 py-2 text-sm text-slate-950 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-600 ${
-    error === undefined ? 'border-slate-300' : 'border-red-600'
-  }`;
+  return classNames(formControlClassName({ invalid: error !== undefined }), 'tabular-nums');
 }
 
 function parseIntegerField(

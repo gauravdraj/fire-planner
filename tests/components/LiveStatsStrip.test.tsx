@@ -94,7 +94,7 @@ describe('LiveStatsStrip', () => {
     const strip = screen.getByLabelText('Live projection stats');
     const cells = statCells();
 
-    expect(strip).toHaveClass('sticky', 'top-0', 'z-10', 'bg-white/90', 'backdrop-blur');
+    expect(strip).toHaveClass('sticky', 'top-0', 'z-10', 'bg-white/90', 'dark:bg-slate-950/90', 'backdrop-blur');
     expect(cells).toHaveLength(6);
     expect(cellAt(cells, 0)).toHaveTextContent('Net worth at retirement');
     expect(cellAt(cells, 1)).toHaveTextContent('Plan-end balance');
@@ -211,14 +211,11 @@ describe('LiveStatsStrip', () => {
     render(<LiveStatsStrip />);
 
     expect(within(statCell('average-bridge-magi')).getByText('$65,000')).toHaveClass(
-      'bg-rose-300',
+      'bg-rose-200',
       'text-rose-950',
       'font-bold',
     );
-    expect(within(statCell('max-bridge-draw-percentage')).getByText('5%')).toHaveClass(
-      'bg-rose-200',
-      'text-rose-900',
-    );
+    expect(within(statCell('max-bridge-draw-percentage')).getByText('5%')).toHaveClass('bg-rose-100', 'text-rose-800');
 
     for (const value of [
       within(statCell('plan-end-balance')).getByText('$95,000'),

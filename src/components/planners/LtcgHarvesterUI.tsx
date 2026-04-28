@@ -1,9 +1,18 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import { effectiveConstants } from '@/core/constants/customLaw';
-import { generateLtcgHarvestPlan, type LtcgHarvestYearResult } from '@/core/planners/ltcgHarvester';
+import { generateLtcgHarvestPlan, type LtcgHarvestStatus, type LtcgHarvestYearResult } from '@/core/planners/ltcgHarvester';
 import type { Scenario, WithdrawalPlan } from '@/core/projection';
+import { checkboxControlClassName, classNames, formControlClassName } from '@/components/ui/controlStyles';
 import { useScenarioStore } from '@/store/scenarioStore';
+
+const plannerPanelClassName = 'rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950';
+const eyebrowClassName = 'text-sm font-medium text-indigo-700 dark:text-indigo-300';
+const headingClassName = 'mt-1 text-base font-semibold text-slate-950 dark:text-slate-50';
+const helpTextClassName = 'text-sm leading-6 text-slate-600 dark:text-slate-300';
+const labelClassName = 'text-sm font-medium text-slate-800 dark:text-slate-200';
+const primaryButtonClassName =
+  'rounded-lg bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-slate-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 motion-reduce:transition-none dark:bg-indigo-400 dark:text-slate-950 dark:hover:bg-indigo-300 dark:focus-visible:outline-indigo-400';
 
 export function LtcgHarvesterUI() {
   const scenario = useScenarioStore((state) => state.scenario);
@@ -58,13 +67,13 @@ export function LtcgHarvesterUI() {
   }
 
   return (
-    <section aria-labelledby="ltcg-harvester-heading" className="rounded-lg border border-slate-200 p-4">
+    <section aria-labelledby="ltcg-harvester-heading" className={plannerPanelClassName}>
       <div>
-        <p className="text-sm font-medium text-indigo-700">0% LTCG harvester</p>
-        <h3 className="mt-1 text-base font-semibold text-slate-900" id="ltcg-harvester-heading">
+        <p className={eyebrowClassName}>0% LTCG harvester</p>
+        <h3 className={headingClassName} id="ltcg-harvester-heading">
           Generate brokerage harvests
         </h3>
-        <p className="mt-1 text-sm text-slate-600">
+        <p className={classNames(helpTextClassName, 'mt-1')}>
           Fill available long-term capital gain headroom while respecting optional caps and MAGI guards.
         </p>
       </div>
@@ -72,10 +81,10 @@ export function LtcgHarvesterUI() {
       <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <NumberField label="LTCG start year" onChange={setStartYear} value={startYear} />
         <NumberField label="LTCG end year" onChange={setEndYear} value={endYear} />
-        <label className="text-sm font-medium text-slate-800">
+        <label className={labelClassName}>
           Max harvest per year
           <input
-            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+            className={formControlClassName({ className: 'mt-1 tabular-nums' })}
             inputMode="decimal"
             min="0"
             onChange={(event) => setMaxHarvest(event.target.value)}
@@ -84,10 +93,10 @@ export function LtcgHarvesterUI() {
             value={maxHarvest}
           />
         </label>
-        <label className="text-sm font-medium text-slate-800">
+        <label className={labelClassName}>
           Remaining unrealized gain floor
           <input
-            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+            className={formControlClassName({ className: 'mt-1 tabular-nums' })}
             inputMode="decimal"
             min="0"
             onChange={(event) => setRemainingGainFloor(event.target.value)}
@@ -99,15 +108,20 @@ export function LtcgHarvesterUI() {
       </div>
 
       <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <label className="flex items-center gap-2 text-sm font-medium text-slate-800">
-          <input checked={acaGuardEnabled} onChange={(event) => setAcaGuardEnabled(event.target.checked)} type="checkbox" />
+        <label className="flex items-center gap-2 text-sm font-medium text-slate-800 dark:text-slate-200">
+          <input
+            checked={acaGuardEnabled}
+            className={checkboxControlClassName()}
+            onChange={(event) => setAcaGuardEnabled(event.target.checked)}
+            type="checkbox"
+          />
           Apply ACA FPL guard
         </label>
         {acaGuardEnabled ? (
-          <label className="text-sm font-medium text-slate-800">
+          <label className={labelClassName}>
             Maximum ACA FPL multiple
             <input
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+              className={formControlClassName({ className: 'mt-1 tabular-nums' })}
               inputMode="decimal"
               min="0"
               onChange={(event) => setAcaFplPercent(event.target.value)}
@@ -117,15 +131,20 @@ export function LtcgHarvesterUI() {
             />
           </label>
         ) : null}
-        <label className="flex items-center gap-2 text-sm font-medium text-slate-800">
-          <input checked={irmaaGuardEnabled} onChange={(event) => setIrmaaGuardEnabled(event.target.checked)} type="checkbox" />
+        <label className="flex items-center gap-2 text-sm font-medium text-slate-800 dark:text-slate-200">
+          <input
+            checked={irmaaGuardEnabled}
+            className={checkboxControlClassName()}
+            onChange={(event) => setIrmaaGuardEnabled(event.target.checked)}
+            type="checkbox"
+          />
           Apply IRMAA guard
         </label>
         {irmaaGuardEnabled ? (
-          <label className="text-sm font-medium text-slate-800">
+          <label className={labelClassName}>
             Maximum IRMAA tier
             <select
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+              className={formControlClassName({ className: 'mt-1' })}
               onChange={(event) => setIrmaaTier(Number(event.target.value))}
               value={irmaaTier}
             >
@@ -140,10 +159,10 @@ export function LtcgHarvesterUI() {
       </div>
 
       <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div aria-live="polite" className="min-h-5 text-sm text-slate-600">
+        <div aria-live="polite" className={messageClassName(message)}>
           {message}
         </div>
-        <button className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white" onClick={generatePlan} type="button">
+        <button className={primaryButtonClassName} onClick={generatePlan} type="button">
           Generate LTCG harvest plan
         </button>
       </div>
@@ -155,9 +174,9 @@ export function LtcgHarvesterUI() {
 
 function LtcgOutputTable({ years }: { years: readonly LtcgHarvestYearResult[] }) {
   return (
-    <div className="mt-4 overflow-x-auto rounded-lg border border-slate-200">
-      <table className="min-w-full divide-y divide-slate-200 text-sm">
-        <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">
+    <div className="mt-4 overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
+      <table className="min-w-[48rem] divide-y divide-slate-200 text-sm dark:divide-slate-800">
+        <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:bg-slate-900/60 dark:text-slate-300">
           <tr>
             <th className="px-3 py-2" scope="col">
               Year
@@ -179,17 +198,23 @@ function LtcgOutputTable({ years }: { years: readonly LtcgHarvestYearResult[] })
             </th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-slate-100 bg-white">
+        <tbody className="divide-y divide-slate-100 bg-white dark:divide-slate-800 dark:bg-slate-950">
           {years.map((year) => (
-            <tr key={year.year}>
-              <th className="px-3 py-2 text-left font-medium text-slate-900" scope="row">
+            <tr className="transition-colors hover:bg-slate-50/80 motion-reduce:transition-none dark:hover:bg-slate-900/50" key={year.year}>
+              <th className="px-3 py-2 text-left font-medium tabular-nums text-slate-950 dark:text-slate-50" scope="row">
                 {year.year}
               </th>
-              <td className="px-3 py-2">{formatCurrency(year.harvestAmount)}</td>
-              <td className="px-3 py-2">{formatCurrency(year.ltcg0PctHeadroom)}</td>
-              <td className="px-3 py-2">{year.acaGuardMargin === null ? 'n/a' : formatCurrency(year.acaGuardMargin)}</td>
-              <td className="px-3 py-2">{year.irmaaGuardMargin === null ? 'n/a' : formatCurrency(year.irmaaGuardMargin)}</td>
-              <td className="px-3 py-2">{statusLabel(year.status)}</td>
+              <td className="px-3 py-2 tabular-nums text-slate-700 dark:text-slate-200">{formatCurrency(year.harvestAmount)}</td>
+              <td className="px-3 py-2 tabular-nums text-slate-700 dark:text-slate-200">{formatCurrency(year.ltcg0PctHeadroom)}</td>
+              <td className="px-3 py-2 tabular-nums text-slate-700 dark:text-slate-200">
+                {year.acaGuardMargin === null ? 'n/a' : formatCurrency(year.acaGuardMargin)}
+              </td>
+              <td className="px-3 py-2 tabular-nums text-slate-700 dark:text-slate-200">
+                {year.irmaaGuardMargin === null ? 'n/a' : formatCurrency(year.irmaaGuardMargin)}
+              </td>
+              <td className="px-3 py-2">
+                <span className={statusBadgeClassName(year.status)}>{statusLabel(year.status)}</span>
+              </td>
             </tr>
           ))}
         </tbody>
@@ -200,10 +225,10 @@ function LtcgOutputTable({ years }: { years: readonly LtcgHarvestYearResult[] })
 
 function NumberField({ label, onChange, value }: { label: string; onChange: (value: number) => void; value: number }) {
   return (
-    <label className="text-sm font-medium text-slate-800">
+    <label className={labelClassName}>
       {label}
       <input
-        className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+        className={formControlClassName({ className: 'mt-1 tabular-nums' })}
         inputMode="numeric"
         onChange={(event) => onChange(Number(event.target.value))}
         type="number"
@@ -266,4 +291,28 @@ function formatCurrency(value: number): string {
 
 function statusLabel(status: string): string {
   return status.replaceAll('-', ' ');
+}
+
+function messageClassName(message: string): string {
+  return classNames(
+    'min-h-5 text-sm',
+    message.startsWith('Generated')
+      ? 'text-emerald-700 dark:text-emerald-300'
+      : message.length > 0
+        ? 'text-red-700 dark:text-red-300'
+        : 'text-slate-600 dark:text-slate-300',
+  );
+}
+
+function statusBadgeClassName(status: LtcgHarvestStatus): string {
+  const tone =
+    status === 'harvested'
+      ? 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-500/40 dark:bg-emerald-950/30 dark:text-emerald-200'
+      : status.startsWith('already-over')
+        ? 'border-red-200 bg-red-50 text-red-800 dark:border-red-500/40 dark:bg-red-950/30 dark:text-red-200'
+        : status.startsWith('limited-by')
+          ? 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-500/40 dark:bg-amber-950/30 dark:text-amber-100'
+          : 'border-slate-200 bg-slate-100 text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300';
+
+  return classNames('inline-flex whitespace-nowrap rounded-full border px-2 py-0.5 text-xs font-medium', tone);
 }

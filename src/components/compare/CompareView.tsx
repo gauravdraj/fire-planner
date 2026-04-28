@@ -17,8 +17,11 @@ import {
   YAxis,
 } from 'recharts';
 
+import { classNames, formControlClassName } from '@/components/ui/controlStyles';
 import { runProjection, type AccountBalances, type Scenario, type WithdrawalPlan, type YearBreakdown } from '@/core/projection';
+import { getChartPalette, type ChartPalette } from '@/lib/chartPalette';
 import { toReal } from '@/lib/realDollars';
+import { useResolvedTheme } from '@/lib/theme';
 import { type SavedScenario, useScenariosStore } from '@/store/scenariosStore';
 import { type DisplayUnit, useUiStore } from '@/store/uiStore';
 
@@ -36,6 +39,11 @@ type ComparedScenario = Readonly<{
   saved: SavedScenario & { plan: WithdrawalPlan };
   results: readonly YearBreakdown[];
 }>;
+
+type CompareBuildResult =
+  | Readonly<{ comparedScenarios: readonly ComparedScenario[]; kind: 'ready' }>
+  | Readonly<{ kind: 'incomplete'; message: string; title: string }>
+  | Readonly<{ kind: 'error'; message: string; title: string }>;
 
 type SummaryCard = Readonly<{
   title: string;
@@ -71,6 +79,13 @@ type TaxComponentKey =
   | 'irmaaPremium'
   | 'acaPremiumCredit';
 
+type TooltipPayloadItem = Readonly<{
+  color?: string;
+  dataKey?: string | number;
+  name?: string;
+  value?: number | string;
+}>;
+
 const TAX_COMPONENTS: ReadonlyArray<Readonly<{ key: TaxComponentKey; label: string }>> = [
   { key: 'federalTax', label: 'Federal tax' },
   { key: 'stateTax', label: 'State tax' },
@@ -93,6 +108,18 @@ const MAGI_LABELS: Record<MagiVariant, string> = {
   irmaaMagi: 'IRMAA MAGI',
 };
 
+const panelClassName =
+  'rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-900/5 dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-none';
+const sectionHeadingClassName = 'text-base font-semibold text-slate-950 dark:text-slate-50';
+const mutedTextClassName = 'text-sm leading-6 text-slate-600 dark:text-slate-400';
+const tableShellClassName =
+  'mt-3 max-w-full overflow-x-auto overscroll-x-contain rounded-xl border border-slate-200 bg-white shadow-sm shadow-slate-900/5 [contain:paint] dark:border-slate-800 dark:bg-slate-950 dark:shadow-none';
+const tableClassName = 'w-full border-separate border-spacing-0 text-sm text-slate-700 dark:text-slate-200';
+const tableHeadClassName = 'bg-slate-100 text-slate-600 dark:bg-slate-900 dark:text-slate-300';
+const tableBodyClassName = 'divide-y divide-slate-200 bg-white dark:divide-slate-800 dark:bg-slate-950';
+const tableHeaderCellClassName = 'border-b border-slate-200 px-3 py-2 font-medium dark:border-slate-800';
+const tableCellClassName = 'border-b border-slate-200 px-3 py-2 dark:border-slate-800';
+
 const DOLLAR_FORMATTER = new Intl.NumberFormat('en-US', {
   currency: 'USD',
   maximumFractionDigits: 0,
@@ -107,6 +134,9 @@ const PERCENT_FORMATTER = new Intl.NumberFormat('en-US', {
 export function CompareView({ initialScenarioIds }: CompareViewProps) {
   const scenarios = useScenariosStore((state) => state.scenarios);
   const displayUnit = useUiStore((state) => state.displayUnit);
+  const themePreference = useUiStore((state) => state.themePreference);
+  const resolvedTheme = useResolvedTheme(themePreference);
+  const palette = getChartPalette(resolvedTheme);
   const [firstId, setFirstId] = useState(initialScenarioIds?.[0] ?? '');
   const [secondId, setSecondId] = useState(initialScenarioIds?.[1] ?? '');
   const [firstMagiVariant, setFirstMagiVariant] = useState<MagiVariant>('acaMagi');
@@ -137,33 +167,58 @@ export function CompareView({ initialScenarioIds }: CompareViewProps) {
 
   const firstScenario = scenarios.find((scenario) => scenario.id === firstId);
   const secondScenario = scenarios.find((scenario) => scenario.id === secondId);
-  const comparedScenarios = useMemo(
+  const compareState = useMemo(
     () => buildComparedScenarios(firstScenario, secondScenario),
     [firstScenario, secondScenario],
   );
   const unitLabel = displayUnit === 'real' ? "today's dollars" : 'nominal dollars';
+  const scenarioCountLabel = scenarios.length === 1 ? '1 saved scenario' : `${scenarios.length} saved scenarios`;
 
   return (
-    <section aria-labelledby="compare-view-heading" className="mt-5 rounded-lg border border-slate-200 bg-white p-4">
-      <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h3 className="text-lg font-semibold" id="compare-view-heading">
+    <section aria-labelledby="compare-view-heading" className={classNames('mt-5 min-w-0', panelClassName)}>
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="max-w-3xl">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-indigo-700 dark:border-indigo-400/30 dark:bg-indigo-950/40 dark:text-indigo-200">
+              Local comparison
+            </p>
+            <p className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+              {scenarioCountLabel}
+            </p>
+          </div>
+          <h2 className="mt-3 text-xl font-semibold tracking-tight text-slate-950 dark:text-slate-50" id="compare-view-heading">
             Compare two scenarios
-          </h3>
-          <p className="text-sm text-slate-600">
-            Pick exactly two saved local scenarios to compare summaries, annual results, MAGI, and taxes.
+          </h2>
+          <p className={classNames('mt-2', mutedTextClassName)}>
+            Pick exactly two browser-local snapshots to compare summary outcomes, bridge-year risk, annual data, MAGI,
+            and tax components.
           </p>
         </div>
-        <p className="text-xs text-slate-500">{unitLabel}</p>
+        <div className="flex flex-wrap gap-2 lg:justify-end">
+          <p className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+            {unitLabel}
+          </p>
+          <p className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-400">
+            saved IDs stay local
+          </p>
+        </div>
       </div>
 
-      {scenarios.length < 2 ? (
-        <p className="mt-4 rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-600">
-          Save at least two scenarios before comparing.
-        </p>
+      {scenarios.length === 0 ? (
+        <CompareStateCallout
+          message="Save the active planner as a local named scenario, then save one alternate plan before using compare."
+          title="No saved scenarios yet"
+          tone="neutral"
+        />
+      ) : scenarios.length === 1 ? (
+        <CompareStateCallout
+          message="You have one local snapshot. Save one more scenario to unlock side-by-side comparison."
+          title="One more saved scenario needed"
+          tone="warning"
+        />
       ) : (
         <>
-          <div className="mt-4 grid gap-3 md:grid-cols-2">
+          <div className="mt-5 grid gap-3 md:grid-cols-2">
             <ScenarioSelect
               label="First saved scenario"
               onChange={setFirstId}
@@ -180,24 +235,30 @@ export function CompareView({ initialScenarioIds }: CompareViewProps) {
             />
           </div>
 
-          {comparedScenarios.length !== 2 ? (
-            <p className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
-              Select two different scenarios that both have saved withdrawal plans.
-            </p>
-          ) : (
+          {compareState.kind === 'ready' ? (
             <>
-              <SummaryComparison comparedScenarios={comparedScenarios} displayUnit={displayUnit} />
-              <HeadlineMetricsComparison comparedScenarios={comparedScenarios} displayUnit={displayUnit} />
-              <CombinedYearTable comparedScenarios={comparedScenarios} displayUnit={displayUnit} />
+              <CompareStateCallout
+                message={`${compareState.comparedScenarios[0]?.saved.name ?? 'First scenario'} and ${
+                  compareState.comparedScenarios[1]?.saved.name ?? 'second scenario'
+                } are projected with the saved inputs and withdrawal plans from local storage.`}
+                title="Exactly two scenarios selected"
+                tone="success"
+              />
+              <SummaryComparison comparedScenarios={compareState.comparedScenarios} displayUnit={displayUnit} />
+              <HeadlineMetricsComparison comparedScenarios={compareState.comparedScenarios} displayUnit={displayUnit} />
+              <CombinedYearTable comparedScenarios={compareState.comparedScenarios} displayUnit={displayUnit} />
               <MagiOverlay
-                comparedScenarios={comparedScenarios}
+                comparedScenarios={compareState.comparedScenarios}
                 firstMagiVariant={firstMagiVariant}
                 onFirstMagiVariantChange={setFirstMagiVariant}
                 onSecondMagiVariantChange={setSecondMagiVariant}
+                palette={palette}
                 secondMagiVariant={secondMagiVariant}
               />
-              <TaxBreakdownComparison comparedScenarios={comparedScenarios} displayUnit={displayUnit} />
+              <TaxBreakdownComparison comparedScenarios={compareState.comparedScenarios} displayUnit={displayUnit} />
             </>
+          ) : (
+            <CompareStateCallout message={compareState.message} title={compareState.title} tone={compareState.kind === 'error' ? 'error' : 'warning'} />
           )}
         </>
       )}
@@ -222,11 +283,11 @@ function ScenarioSelect({
 
   return (
     <div>
-      <label className="text-sm font-medium text-slate-700" htmlFor={id}>
+      <label className="text-sm font-semibold text-slate-800 dark:text-slate-200" htmlFor={id}>
         {label}
       </label>
       <select
-        className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+        className={classNames(formControlClassName(), 'mt-2')}
         id={id}
         onChange={(event) => onChange(event.target.value)}
         value={value}
@@ -241,6 +302,46 @@ function ScenarioSelect({
   );
 }
 
+function CompareStateCallout({
+  message,
+  title,
+  tone,
+}: {
+  message: string;
+  title: string;
+  tone: 'error' | 'neutral' | 'success' | 'warning';
+}) {
+  return (
+    <div
+      className={classNames(
+        'mt-5 rounded-xl border p-4 text-sm leading-6',
+        tone === 'neutral' &&
+          'border-dashed border-slate-300 bg-slate-50 text-slate-600 dark:border-slate-700 dark:bg-slate-900/50 dark:text-slate-400',
+        tone === 'warning' &&
+          'border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-500/40 dark:bg-amber-950/30 dark:text-amber-100',
+        tone === 'success' &&
+          'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-500/40 dark:bg-emerald-950/30 dark:text-emerald-200',
+        tone === 'error' &&
+          'border-red-200 bg-red-50 text-red-800 dark:border-red-500/40 dark:bg-red-950/30 dark:text-red-200',
+      )}
+      role={tone === 'error' ? 'alert' : 'status'}
+    >
+      <p
+        className={classNames(
+          'font-semibold',
+          tone === 'neutral' && 'text-slate-800 dark:text-slate-200',
+          tone === 'warning' && 'text-amber-950 dark:text-amber-100',
+          tone === 'success' && 'text-emerald-900 dark:text-emerald-100',
+          tone === 'error' && 'text-red-900 dark:text-red-100',
+        )}
+      >
+        {title}
+      </p>
+      <p className="mt-1">{message}</p>
+    </div>
+  );
+}
+
 function SummaryComparison({
   comparedScenarios,
   displayUnit,
@@ -249,20 +350,31 @@ function SummaryComparison({
   displayUnit: DisplayUnit;
 }) {
   return (
-    <section aria-labelledby="compare-summary-heading" className="mt-6">
-      <h4 className="text-base font-semibold" id="compare-summary-heading">
+    <section aria-labelledby="compare-summary-heading" className="mt-6 min-w-0">
+      <h3 className={sectionHeadingClassName} id="compare-summary-heading">
         Scenario summaries
-      </h4>
+      </h3>
       <div className="mt-3 grid gap-4 lg:grid-cols-2">
         {comparedScenarios.map((entry) => (
-          <article className="rounded-lg border border-slate-200 p-4" key={entry.saved.id}>
-            <h5 className="font-semibold text-slate-950">{entry.saved.name}</h5>
+          <article
+            className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4 dark:border-slate-800 dark:bg-slate-900/50"
+            key={entry.saved.id}
+          >
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <h4 className="break-words font-semibold text-slate-950 dark:text-slate-50">{entry.saved.name}</h4>
+              <p className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-400">
+                {entry.saved.scenario.startYear}-{entry.saved.plan.endYear}
+              </p>
+            </div>
             <div className="mt-3 grid gap-3 sm:grid-cols-3">
               {buildSummaryCards(entry, displayUnit).map((card) => (
-                <div className="rounded-lg bg-slate-50 p-3" key={card.title}>
-                  <p className="text-xs font-medium text-slate-600">{card.title}</p>
-                  <p className="mt-1 text-lg font-semibold tabular-nums text-slate-950">{card.value}</p>
-                  <p className="mt-1 text-xs text-slate-500">{card.detail}</p>
+                <div
+                  className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm shadow-slate-900/5 dark:border-slate-800 dark:bg-slate-950 dark:shadow-none"
+                  key={card.title}
+                >
+                  <p className="text-xs font-medium text-slate-600 dark:text-slate-400">{card.title}</p>
+                  <p className="mt-1 text-lg font-semibold tabular-nums text-slate-950 dark:text-slate-50">{card.value}</p>
+                  <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">{card.detail}</p>
                 </div>
               ))}
             </div>
@@ -286,29 +398,32 @@ function HeadlineMetricsComparison({
   }));
 
   return (
-    <section aria-labelledby="compare-headline-metrics-heading" className="mt-6">
-      <h4 className="text-base font-semibold" id="compare-headline-metrics-heading">
+    <section aria-labelledby="compare-headline-metrics-heading" className="mt-6 min-w-0">
+      <h3 className={sectionHeadingClassName} id="compare-headline-metrics-heading">
         Headline metrics
-      </h4>
-      <div className="mt-3 overflow-x-auto rounded-lg border border-slate-200">
-        <table className="min-w-[760px] w-full border-collapse text-sm">
-          <thead className="bg-slate-50 text-slate-600">
+      </h3>
+      <p className={classNames('mt-1', mutedTextClassName)}>
+        Bridge-period metrics use the saved projection rows for each scenario. Scroll sideways on smaller screens.
+      </p>
+      <div className={tableShellClassName}>
+        <table className={classNames(tableClassName, 'min-w-[760px]')}>
+          <thead className={tableHeadClassName}>
             <tr>
-              <th className="px-3 py-2 text-left font-medium">Metric</th>
+              <th className={classNames(tableHeaderCellClassName, 'text-left')}>Metric</th>
               {metricsByScenario.map(({ entry }) => (
-                <th className="px-3 py-2 text-right font-medium" key={entry.saved.id}>
+                <th className={classNames(tableHeaderCellClassName, 'text-right')} key={entry.saved.id}>
                   {entry.saved.name}
                 </th>
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-200 bg-white">
+          <tbody className={tableBodyClassName}>
             <tr>
-              <th className="px-3 py-2 text-left font-medium text-slate-700" scope="row">
+              <th className={classNames(tableCellClassName, 'text-left font-medium text-slate-700 dark:text-slate-200')} scope="row">
                 Total bridge tax
               </th>
               {metricsByScenario.map(({ entry, metrics }) => (
-                <td className="px-3 py-2 text-right tabular-nums" key={entry.saved.id}>
+                <td className={classNames(tableCellClassName, 'text-right tabular-nums')} key={entry.saved.id}>
                   {formatNullableMoney(
                     displayUnit === 'real'
                       ? computeTotalDisplayAmount(metrics.bridgeYears, entry, (breakdown) => breakdown.totalTax)
@@ -318,11 +433,11 @@ function HeadlineMetricsComparison({
               ))}
             </tr>
             <tr>
-              <th className="px-3 py-2 text-left font-medium text-slate-700" scope="row">
+              <th className={classNames(tableCellClassName, 'text-left font-medium text-slate-700 dark:text-slate-200')} scope="row">
                 Average bridge MAGI
               </th>
               {metricsByScenario.map(({ entry, metrics }) => (
-                <td className="px-3 py-2 text-right tabular-nums" key={entry.saved.id}>
+                <td className={classNames(tableCellClassName, 'text-right tabular-nums')} key={entry.saved.id}>
                   {formatNullableMoney(
                     displayUnit === 'real'
                       ? computeAverageDisplayAmount(metrics.bridgeYears, entry, (breakdown) => breakdown.acaMagi)
@@ -332,11 +447,11 @@ function HeadlineMetricsComparison({
               ))}
             </tr>
             <tr>
-              <th className="px-3 py-2 text-left font-medium text-slate-700" scope="row">
+              <th className={classNames(tableCellClassName, 'text-left font-medium text-slate-700 dark:text-slate-200')} scope="row">
                 Max withdrawal rate
               </th>
               {metricsByScenario.map(({ entry, metrics }) => (
-                <td className="px-3 py-2 text-right" key={entry.saved.id}>
+                <td className={classNames(tableCellClassName, 'text-right')} key={entry.saved.id}>
                   <MetricCell
                     bandType="wdRate"
                     className="rounded px-1"
@@ -348,11 +463,11 @@ function HeadlineMetricsComparison({
               ))}
             </tr>
             <tr>
-              <th className="px-3 py-2 text-left font-medium text-slate-700" scope="row">
+              <th className={classNames(tableCellClassName, 'text-left font-medium text-slate-700 dark:text-slate-200')} scope="row">
                 Years above 400% FPL cliff
               </th>
               {metricsByScenario.map(({ entry, metrics }) => (
-                <td className="px-3 py-2 text-right" key={entry.saved.id}>
+                <td className={classNames(tableCellClassName, 'text-right')} key={entry.saved.id}>
                   <MetricCell
                     bandType="fpl"
                     className="rounded px-1"
@@ -364,21 +479,21 @@ function HeadlineMetricsComparison({
               ))}
             </tr>
             <tr>
-              <th className="px-3 py-2 text-left font-medium text-slate-700" scope="row">
+              <th className={classNames(tableCellClassName, 'text-left font-medium text-slate-700 dark:text-slate-200')} scope="row">
                 Years touching IRMAA
               </th>
               {metricsByScenario.map(({ entry, metrics }) => (
-                <td className="px-3 py-2 text-right tabular-nums" key={entry.saved.id}>
+                <td className={classNames(tableCellClassName, 'text-right tabular-nums')} key={entry.saved.id}>
                   {formatYears(metrics.irmaaTouchedYearCount)}
                 </td>
               ))}
             </tr>
             <tr>
-              <th className="px-3 py-2 text-left font-medium text-slate-700" scope="row">
+              <th className={classNames(tableCellClassName, 'text-left font-medium text-slate-700 dark:text-slate-200')} scope="row">
                 Brokerage basis remaining at retirement
               </th>
               {metricsByScenario.map(({ entry, metrics }) => (
-                <td className="px-3 py-2 text-right tabular-nums" key={entry.saved.id}>
+                <td className={classNames(tableCellClassName, 'text-right tabular-nums')} key={entry.saved.id}>
                   {metrics.brokerageBasisAtRetirement === null
                     ? '-'
                     : formatMoney(metrics.brokerageBasisAtRetirement.amount, metrics.brokerageBasisAtRetirement.year, entry, displayUnit)}
@@ -386,11 +501,11 @@ function HeadlineMetricsComparison({
               ))}
             </tr>
             <tr>
-              <th className="px-3 py-2 text-left font-medium text-slate-700" scope="row">
+              <th className={classNames(tableCellClassName, 'text-left font-medium text-slate-700 dark:text-slate-200')} scope="row">
                 Ending account mix
               </th>
               {metricsByScenario.map(({ entry, metrics }) => (
-                <td className="px-3 py-2 text-right" key={entry.saved.id}>
+                <td className={classNames(tableCellClassName, 'text-right')} key={entry.saved.id}>
                   <EndingAccountMix entry={entry} shares={metrics.endingAccountMix} />
                 </td>
               ))}
@@ -412,7 +527,7 @@ function EndingAccountMix({ entry, shares }: { entry: ComparedScenario; shares: 
       data-testid={`ending-account-mix-${entry.saved.id}`}
     >
       {hasPositiveMix ? (
-        <div className="flex h-2 overflow-hidden rounded-full bg-slate-100" role="presentation">
+        <div className="flex h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800" role="presentation">
           {shares.map((share) => {
             const colorClassName = ACCOUNT_MIX_KEYS.find((candidate) => candidate.key === share.key)?.colorClassName ?? 'bg-slate-300';
 
@@ -427,7 +542,7 @@ function EndingAccountMix({ entry, shares }: { entry: ComparedScenario; shares: 
           })}
         </div>
       ) : null}
-      <div className="mt-1 grid grid-cols-2 gap-x-2 gap-y-0.5 text-[0.7rem] leading-snug text-slate-600">
+      <div className="mt-1 grid grid-cols-2 gap-x-2 gap-y-0.5 text-[0.7rem] leading-snug text-slate-600 dark:text-slate-400">
         {shares.map((share) => (
           <span data-account-share={share.key} data-share-value={share.percentage} key={share.key}>
             {share.label} {share.percentage}%
@@ -448,32 +563,45 @@ function CombinedYearTable({
   const years = allProjectionYears(comparedScenarios);
 
   return (
-    <section aria-labelledby="compare-year-table-heading" className="mt-6">
-      <h4 className="text-base font-semibold" id="compare-year-table-heading">
+    <section aria-labelledby="compare-year-table-heading" className="mt-6 min-w-0">
+      <h3 className={sectionHeadingClassName} id="compare-year-table-heading">
         Combined year-by-year data
-      </h4>
-      <div className="mt-3 overflow-x-auto rounded-lg border border-slate-200">
-        <table className="min-w-[900px] w-full border-collapse text-sm">
-          <thead className="bg-slate-50 text-slate-600">
+      </h3>
+      <p className={classNames('mt-1', mutedTextClassName)}>
+        A compact year grid for income, total tax plus premiums/credits, and ending balances.
+      </p>
+      <div className={tableShellClassName}>
+        <table className={classNames(tableClassName, 'min-w-[900px]')}>
+          <thead className={tableHeadClassName}>
             <tr>
-              <th className="sticky left-0 z-10 bg-slate-50 px-3 py-2 text-right font-medium">Year</th>
+              <th className={classNames(tableHeaderCellClassName, 'sticky left-0 z-10 bg-slate-100 text-right dark:bg-slate-900')}>
+                Year
+              </th>
               {comparedScenarios.map((entry) => (
-                <th className="px-3 py-2 text-center font-medium" colSpan={3} key={entry.saved.id}>
+                <th className={classNames(tableHeaderCellClassName, 'text-center')} colSpan={3} key={entry.saved.id}>
                   {entry.saved.name}
                 </th>
               ))}
             </tr>
             <tr>
-              <th className="sticky left-0 z-10 bg-slate-50 px-3 py-2 text-right font-medium"> </th>
+              <th className={classNames(tableHeaderCellClassName, 'sticky left-0 z-10 bg-slate-100 text-right dark:bg-slate-900')}>
+                <span className="sr-only">Year metrics</span>
+              </th>
               {comparedScenarios.map((entry) => (
                 <RowHeaders key={entry.saved.id} />
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-200 bg-white">
+          <tbody className={tableBodyClassName}>
             {years.map((year) => (
               <tr key={year}>
-                <th className="sticky left-0 z-10 bg-white px-3 py-2 text-right font-medium tabular-nums" scope="row">
+                <th
+                  className={classNames(
+                    tableCellClassName,
+                    'sticky left-0 z-10 bg-white text-right font-medium tabular-nums text-slate-800 dark:bg-slate-950 dark:text-slate-100',
+                  )}
+                  scope="row"
+                >
                   {year}
                 </th>
                 {comparedScenarios.map((entry) => (
@@ -493,12 +621,14 @@ function MagiOverlay({
   firstMagiVariant,
   onFirstMagiVariantChange,
   onSecondMagiVariantChange,
+  palette,
   secondMagiVariant,
 }: {
   comparedScenarios: readonly ComparedScenario[];
   firstMagiVariant: MagiVariant;
   onFirstMagiVariantChange: (variant: MagiVariant) => void;
   onSecondMagiVariantChange: (variant: MagiVariant) => void;
+  palette: ChartPalette;
   secondMagiVariant: MagiVariant;
 }) {
   const [first, second] = comparedScenarios;
@@ -510,40 +640,49 @@ function MagiOverlay({
   const chartData = buildMagiOverlayData(first, second, firstMagiVariant, secondMagiVariant);
 
   return (
-    <section aria-labelledby="compare-magi-heading" className="mt-6">
+    <section aria-labelledby="compare-magi-heading" className="mt-6 min-w-0">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h4 className="text-base font-semibold" id="compare-magi-heading">
+        <div className="max-w-2xl">
+          <h3 className={sectionHeadingClassName} id="compare-magi-heading">
             MAGI overlay
-          </h4>
-          <p className="text-sm text-slate-600">One MAGI series per scenario keeps the overlay readable.</p>
+          </h3>
+          <p className={classNames('mt-1', mutedTextClassName)}>
+            One selected MAGI series per scenario keeps the overlay readable while preserving ACA versus IRMAA context.
+          </p>
         </div>
         <div className="grid gap-2 sm:grid-cols-2">
           <MagiVariantSelect entry={first} onChange={onFirstMagiVariantChange} value={firstMagiVariant} />
           <MagiVariantSelect entry={second} onChange={onSecondMagiVariantChange} value={secondMagiVariant} />
         </div>
       </div>
-      <div aria-label="Two-scenario MAGI overlay" className="mt-3 rounded-lg border border-slate-200" role="img">
-        <div className="h-72 w-full p-3">
+      <div
+        aria-label="Two-scenario MAGI overlay"
+        className="mt-3 max-w-full overflow-x-auto overscroll-x-contain rounded-xl border border-slate-200 bg-white shadow-sm shadow-slate-900/5 [contain:paint] dark:border-slate-800 dark:bg-slate-950 dark:shadow-none"
+        role="img"
+      >
+        <div className="h-72 min-w-[40rem] p-3">
           <ResponsiveContainer height="100%" width="100%">
             <LineChart data={chartData} margin={{ bottom: 4, left: 4, right: 28, top: 12 }}>
-              <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" />
-              <XAxis axisLine={false} dataKey="year" tick={{ fill: '#475569', fontSize: 12 }} tickLine={false} />
+              <CartesianGrid stroke={palette.grid} strokeDasharray="3 3" />
+              <XAxis axisLine={false} dataKey="year" tick={{ fill: palette.axis, fontSize: 12 }} tickLine={false} />
               <YAxis
                 axisLine={false}
-                tick={{ fill: '#475569', fontSize: 12 }}
+                tick={{ fill: palette.axis, fontSize: 12 }}
                 tickFormatter={formatCompactDollarTick}
                 tickLine={false}
                 width={72}
               />
-              <Tooltip formatter={(value) => DOLLAR_FORMATTER.format(numberValue(value))} />
-              <Legend formatter={(value) => String(value)} wrapperStyle={{ fontSize: 12 }} />
+              <Tooltip content={<CompareMagiTooltip palette={palette} />} />
+              <Legend
+                formatter={(value) => <span style={{ color: palette.legend }}>{String(value)}</span>}
+                wrapperStyle={{ color: palette.legend, fontSize: 12 }}
+              />
               <Line
                 dataKey="firstMagi"
                 dot={false}
                 isAnimationActive={false}
                 name={`${first.saved.name} ${MAGI_LABELS[firstMagiVariant]}`}
-                stroke="#047857"
+                stroke={palette.series.magi.acaMagi.stroke}
                 strokeWidth={2}
                 type="linear"
               />
@@ -552,7 +691,7 @@ function MagiOverlay({
                 dot={false}
                 isAnimationActive={false}
                 name={`${second.saved.name} ${MAGI_LABELS[secondMagiVariant]}`}
-                stroke="#7c3aed"
+                stroke={palette.series.magi.irmaaMagi.stroke}
                 strokeWidth={2}
                 type="linear"
               />
@@ -573,22 +712,76 @@ function MagiVariantSelect({
   onChange: (variant: MagiVariant) => void;
   value: MagiVariant;
 }) {
-  const id = `magi-variant-${entry.saved.id}`;
+  const legendId = `magi-variant-${entry.saved.id}`;
 
   return (
-    <div>
-      <label className="text-xs font-medium text-slate-600" htmlFor={id}>
+    <div aria-labelledby={legendId} className="min-w-0" role="group">
+      <p className="text-xs font-medium text-slate-600 dark:text-slate-400" id={legendId}>
         MAGI series for {entry.saved.name}
-      </label>
-      <select
-        className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1 text-sm"
-        id={id}
-        onChange={(event) => onChange(event.target.value as MagiVariant)}
-        value={value}
-      >
-        <option value="acaMagi">{MAGI_LABELS.acaMagi}</option>
-        <option value="irmaaMagi">{MAGI_LABELS.irmaaMagi}</option>
-      </select>
+      </p>
+      <div className="mt-1 flex rounded-lg border border-slate-200 bg-slate-100 p-1 dark:border-slate-800 dark:bg-slate-900/70">
+        {(['acaMagi', 'irmaaMagi'] as const).map((variant) => {
+          const selected = value === variant;
+
+          return (
+            <button
+              aria-pressed={selected}
+              className={classNames(
+                'flex-1 rounded-md border px-2.5 py-1.5 text-xs font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 motion-reduce:transition-none dark:focus-visible:outline-indigo-400',
+                selected
+                  ? 'border-slate-950 bg-slate-950 text-white shadow-sm shadow-slate-900/10 dark:border-indigo-400 dark:bg-indigo-400 dark:text-slate-950 dark:shadow-none'
+                  : 'border-transparent text-slate-700 hover:border-slate-300 hover:bg-white hover:text-slate-950 dark:text-slate-300 dark:hover:border-slate-700 dark:hover:bg-slate-950 dark:hover:text-slate-50',
+              )}
+              key={variant}
+              onClick={() => onChange(variant)}
+              type="button"
+            >
+              {MAGI_LABELS[variant]}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function CompareMagiTooltip({
+  active,
+  label,
+  palette,
+  payload,
+}: {
+  active?: boolean;
+  label?: number | string;
+  palette: ChartPalette;
+  payload?: readonly TooltipPayloadItem[];
+}) {
+  if (active !== true || payload === undefined || payload.length === 0) {
+    return null;
+  }
+
+  return (
+    <div
+      className="rounded-lg p-3 text-sm shadow-lg shadow-slate-950/10"
+      style={{
+        backgroundColor: palette.tooltip.background,
+        border: `1px solid ${palette.tooltip.border}`,
+        color: palette.tooltip.text,
+      }}
+    >
+      <p className="font-medium">{label}</p>
+      <dl className="mt-2 grid gap-y-1">
+        {payload
+          .filter((item) => typeof item.value === 'number' && Number.isFinite(item.value))
+          .map((item) => (
+            <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4" key={String(item.dataKey)}>
+              <dt className="min-w-0 truncate" style={{ color: palette.tooltip.mutedText }}>
+                {item.name ?? item.dataKey}
+              </dt>
+              <dd className="font-medium tabular-nums">{DOLLAR_FORMATTER.format(numberValue(item.value))}</dd>
+            </div>
+          ))}
+      </dl>
     </div>
   );
 }
@@ -601,30 +794,33 @@ function TaxBreakdownComparison({
   displayUnit: DisplayUnit;
 }) {
   return (
-    <section aria-labelledby="compare-tax-heading" className="mt-6">
-      <h4 className="text-base font-semibold" id="compare-tax-heading">
+    <section aria-labelledby="compare-tax-heading" className="mt-6 min-w-0">
+      <h3 className={sectionHeadingClassName} id="compare-tax-heading">
         Tax breakdown comparison
-      </h4>
-      <div className="mt-3 overflow-x-auto rounded-lg border border-slate-200">
-        <table className="min-w-[680px] w-full border-collapse text-sm">
-          <thead className="bg-slate-50 text-slate-600">
+      </h3>
+      <p className={classNames('mt-1', mutedTextClassName)}>
+        Totals are summed from each saved projection. ACA premium credit is shown as a negative amount.
+      </p>
+      <div className={tableShellClassName}>
+        <table className={classNames(tableClassName, 'min-w-[680px]')}>
+          <thead className={tableHeadClassName}>
             <tr>
-              <th className="px-3 py-2 text-left font-medium">Component</th>
+              <th className={classNames(tableHeaderCellClassName, 'text-left')}>Component</th>
               {comparedScenarios.map((entry) => (
-                <th className="px-3 py-2 text-right font-medium" key={entry.saved.id}>
+                <th className={classNames(tableHeaderCellClassName, 'text-right')} key={entry.saved.id}>
                   {entry.saved.name}
                 </th>
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-200 bg-white">
+          <tbody className={tableBodyClassName}>
             {TAX_COMPONENTS.map((component) => (
               <tr key={component.key}>
-                <th className="px-3 py-2 text-left font-medium text-slate-700" scope="row">
+                <th className={classNames(tableCellClassName, 'text-left font-medium text-slate-700 dark:text-slate-200')} scope="row">
                   {component.label}
                 </th>
                 {comparedScenarios.map((entry) => (
-                  <td className="px-3 py-2 text-right tabular-nums" key={entry.saved.id}>
+                  <td className={classNames(tableCellClassName, 'text-right tabular-nums')} key={entry.saved.id}>
                     {formatMoney(taxComponentTotal(entry, component.key, displayUnit), entry.saved.scenario.startYear, entry, 'nominal')}
                   </td>
                 ))}
@@ -633,7 +829,9 @@ function TaxBreakdownComparison({
           </tbody>
         </table>
       </div>
-      <p className="mt-2 text-xs text-slate-500">ACA premium credit is shown as a negative amount.</p>
+      <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+        Credits reduce the total tax burden; premiums and taxes increase it.
+      </p>
     </section>
   );
 }
@@ -641,9 +839,9 @@ function TaxBreakdownComparison({
 function RowHeaders() {
   return (
     <>
-      <th className="px-3 py-2 text-right font-medium">AGI</th>
-      <th className="px-3 py-2 text-right font-medium">Total tax</th>
-      <th className="px-3 py-2 text-right font-medium">Ending balance</th>
+      <th className={classNames(tableHeaderCellClassName, 'text-right')}>AGI</th>
+      <th className={classNames(tableHeaderCellClassName, 'text-right')}>Total tax</th>
+      <th className={classNames(tableHeaderCellClassName, 'text-right')}>Ending balance</th>
     </>
   );
 }
@@ -654,20 +852,22 @@ function YearCells({ displayUnit, entry, year }: { displayUnit: DisplayUnit; ent
   if (breakdown === undefined) {
     return (
       <>
-        <td className="px-3 py-2 text-right text-slate-400">-</td>
-        <td className="px-3 py-2 text-right text-slate-400">-</td>
-        <td className="px-3 py-2 text-right text-slate-400">-</td>
+        <td className={classNames(tableCellClassName, 'text-right text-slate-400 dark:text-slate-500')}>-</td>
+        <td className={classNames(tableCellClassName, 'text-right text-slate-400 dark:text-slate-500')}>-</td>
+        <td className={classNames(tableCellClassName, 'text-right text-slate-400 dark:text-slate-500')}>-</td>
       </>
     );
   }
 
   return (
     <>
-      <td className="px-3 py-2 text-right tabular-nums">{formatMoney(breakdown.agi, breakdown.year, entry, displayUnit)}</td>
-      <td className="px-3 py-2 text-right tabular-nums">
+      <td className={classNames(tableCellClassName, 'text-right tabular-nums')}>
+        {formatMoney(breakdown.agi, breakdown.year, entry, displayUnit)}
+      </td>
+      <td className={classNames(tableCellClassName, 'text-right tabular-nums')}>
         {formatMoney(taxAndPremiumAmount(breakdown), breakdown.year, entry, displayUnit)}
       </td>
-      <td className="px-3 py-2 text-right tabular-nums">
+      <td className={classNames(tableCellClassName, 'text-right tabular-nums')}>
         {formatMoney(sumBalances(breakdown.closingBalances), breakdown.year, entry, displayUnit)}
       </td>
     </>
@@ -677,27 +877,44 @@ function YearCells({ displayUnit, entry, year }: { displayUnit: DisplayUnit; ent
 function buildComparedScenarios(
   firstScenario: SavedScenario | undefined,
   secondScenario: SavedScenario | undefined,
-): readonly ComparedScenario[] {
-  if (
-    firstScenario === undefined ||
-    secondScenario === undefined ||
-    firstScenario.id === secondScenario.id ||
-    firstScenario.plan === undefined ||
-    secondScenario.plan === undefined
-  ) {
-    return [];
+): CompareBuildResult {
+  if (firstScenario === undefined || secondScenario === undefined || firstScenario.id === secondScenario.id) {
+    return {
+      kind: 'incomplete',
+      message: 'Select two different saved scenarios from the local scenario library.',
+      title: 'Choose two different scenarios',
+    };
   }
 
-  return [
-    {
-      saved: { ...firstScenario, plan: firstScenario.plan },
-      results: runProjection(firstScenario.scenario, firstScenario.plan),
-    },
-    {
-      saved: { ...secondScenario, plan: secondScenario.plan },
-      results: runProjection(secondScenario.scenario, secondScenario.plan),
-    },
-  ];
+  if (firstScenario.plan === undefined || secondScenario.plan === undefined) {
+    return {
+      kind: 'incomplete',
+      message: 'Both selected scenarios need saved withdrawal plans. Update or resave the missing snapshot before comparing.',
+      title: 'Saved plans are required',
+    };
+  }
+
+  try {
+    return {
+      comparedScenarios: [
+        {
+          saved: { ...firstScenario, plan: firstScenario.plan },
+          results: runProjection(firstScenario.scenario, firstScenario.plan),
+        },
+        {
+          saved: { ...secondScenario, plan: secondScenario.plan },
+          results: runProjection(secondScenario.scenario, secondScenario.plan),
+        },
+      ],
+      kind: 'ready',
+    };
+  } catch {
+    return {
+      kind: 'error',
+      message: 'One selected snapshot could not be projected. Review the saved inputs or update the snapshot from the active scenario.',
+      title: 'Comparison could not be projected',
+    };
+  }
 }
 
 function buildSummaryCards(entry: ComparedScenario, displayUnit: DisplayUnit): readonly SummaryCard[] {

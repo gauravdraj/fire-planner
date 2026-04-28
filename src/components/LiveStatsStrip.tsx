@@ -54,8 +54,11 @@ export function LiveStatsStrip() {
     [displayUnit, formValues, projectionResults, scenario],
   );
   return (
-    <section aria-label="Live projection stats" className="sticky top-0 z-10 mt-6 bg-white/90 py-3 backdrop-blur">
-      <ul className="grid gap-2 rounded-lg border border-slate-200 bg-white/80 p-3 sm:grid-cols-2 lg:grid-cols-6">
+    <section
+      aria-label="Live projection stats"
+      className="sticky top-0 z-10 mt-6 bg-white/90 py-3 backdrop-blur dark:bg-slate-950/90"
+    >
+      <ul className="grid gap-2 rounded-2xl border border-slate-200 bg-slate-50/90 p-2 shadow-sm shadow-slate-900/5 dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-none sm:grid-cols-2 lg:grid-cols-6">
         {stats.map((stat) => (
           <LiveStatCell key={stat.id} stat={stat} />
         ))}
@@ -70,16 +73,18 @@ function LiveStatCell({ stat }: { stat: LiveStat }) {
   return (
     <li
       className={[
-        'relative rounded-md border border-slate-100 px-3 py-2 transition-colors duration-700',
-        isPulsing ? 'bg-yellow-100' : 'bg-white',
+        'relative min-w-0 rounded-xl border px-3 py-2.5 transition-colors duration-700 motion-reduce:transition-none',
+        isPulsing
+          ? 'border-yellow-200 bg-yellow-100 dark:border-yellow-500/30 dark:bg-yellow-900/40'
+          : 'border-slate-200/80 bg-white dark:border-slate-800 dark:bg-slate-900/80',
       ].join(' ')}
       data-testid={`live-stat-${stat.id}`}
     >
-      <p className="flex items-center gap-1.5 pr-4 text-[0.7rem] font-medium uppercase tracking-wide text-slate-500">
+      <p className="flex items-center gap-1.5 pr-4 text-[0.7rem] font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
         <span>{stat.label}</span>
         <InfoTooltip ariaLabel={`About ${stat.label}`}>{stat.explanation}</InfoTooltip>
       </p>
-      <p className="mt-1 text-base font-semibold text-slate-950">
+      <p className="mt-1 text-base font-semibold text-slate-950 dark:text-slate-50">
         <MetricCell
           bandType={stat.bandType}
           displayText={stat.value}
@@ -87,7 +92,7 @@ function LiveStatCell({ stat }: { stat: LiveStat }) {
           {...(stat.bandType === 'none' ? {} : { className: 'rounded px-1' })}
         />
       </p>
-      <p className="mt-1 text-[0.7rem] leading-snug text-slate-500">{stat.detail}</p>
+      <p className="mt-1 text-[0.7rem] leading-snug text-slate-500 dark:text-slate-400">{stat.detail}</p>
     </li>
   );
 }

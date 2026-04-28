@@ -1,4 +1,16 @@
 import '@testing-library/jest-dom/vitest';
+import { beforeEach } from 'vitest';
+
+import { installMatchMediaMock, resetMatchMediaMock } from './matchMediaMock';
+
+installMatchMediaMock();
+
+beforeEach(() => {
+  resetMatchMediaMock();
+  installMatchMediaMock();
+  document.documentElement.classList.remove('dark');
+  document.documentElement.style.colorScheme = '';
+});
 
 class ResizeObserverMock implements ResizeObserver {
   private readonly callback: ResizeObserverCallback;

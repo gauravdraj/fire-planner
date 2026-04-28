@@ -113,7 +113,10 @@ describe('BasicPlannerPage', () => {
     expect(screen.queryByRole('button', { name: /run projection/i })).not.toBeInTheDocument();
     expect(screen.queryByText(/Projection results will appear here/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/Run the projection to see/i)).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /projection results/i })).toBeInTheDocument();
+    expect(screen.getByText(/Exports use the same visible column contract as the table/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/live projection stats/i)).toHaveClass('sticky');
+    expect(screen.getByTestId('year-table-scroll')).toHaveClass('max-w-full', 'overflow-x-auto');
     expect(screen.queryByRole('heading', { name: /projection summary/i })).not.toBeInTheDocument();
     expect(screen.getByTestId('live-stat-net-worth-at-retirement')).toHaveTextContent('Net worth at retirement');
     expect(screen.getByTestId('live-stat-plan-end-balance')).toHaveTextContent('Plan-end balance');
@@ -138,6 +141,30 @@ describe('BasicPlannerPage', () => {
 
     expect(useScenarioStore.getState().formValues).toEqual(scenarioFormValues);
     expect(useScenarioStore.getState()).not.toHaveProperty('hasRunProjection');
+  });
+
+  it('keeps invalid basic form edits local until a valid debounced value is entered', async () => {
+    vi.useFakeTimers();
+    const { BasicPlannerPage, useScenarioStore } = await importBasicPlannerPage();
+
+    render(<BasicPlannerPage />);
+
+    const annualSpendingInput = screen.getByLabelText('Annual spending');
+    const initialAnnualSpending = useScenarioStore.getState().formValues.annualSpendingToday;
+
+    fireEvent.change(annualSpendingInput, { target: { value: '-1' } });
+    advanceLiveDebounce();
+
+    expect(annualSpendingInput).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByText('Annual spending must be zero or greater.')).toBeInTheDocument();
+    expect(useScenarioStore.getState().formValues.annualSpendingToday).toBe(initialAnnualSpending);
+
+    fireEvent.change(annualSpendingInput, { target: { value: '91000' } });
+    advanceLiveDebounce();
+
+    expect(annualSpendingInput).not.toHaveAttribute('aria-invalid');
+    expect(screen.queryByText('Annual spending must be zero or greater.')).not.toBeInTheDocument();
+    expect(useScenarioStore.getState().formValues.annualSpendingToday).toBe(91_000);
   });
 
   it('loads starter templates through the scenario store and refreshes visible form values', async () => {

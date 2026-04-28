@@ -14,7 +14,7 @@ describe('MetricCell', () => {
     ['lower ACA range', 1.5, 'bg-amber-50 text-amber-800'],
     ['ACA sweet spot', 2.5, 'bg-emerald-100 text-emerald-900'],
     ['near cliff range', 3.5, 'bg-amber-100 text-amber-900'],
-    ['above cliff range', 4.1, 'bg-rose-300 text-rose-950 font-bold'],
+    ['above cliff range', 4.1, 'bg-rose-200 text-rose-950 font-bold dark:bg-rose-900/70 dark:text-rose-100'],
   ])('applies FPL band classes for %s', (_label, rawNumeric, expectedClassName) => {
     render(<MetricCell bandType="fpl" displayText={`${rawNumeric}x FPL`} rawNumeric={rawNumeric} />);
 
@@ -24,8 +24,8 @@ describe('MetricCell', () => {
   it.each([
     ['safe', 0.039, 'bg-emerald-50 text-emerald-800'],
     ['caution', 0.04, 'bg-amber-100 text-amber-900'],
-    ['danger', 0.05, 'bg-rose-200 text-rose-900'],
-    ['catastrophic', 0.101, 'bg-rose-400 text-rose-950 font-bold'],
+    ['danger', 0.05, 'bg-rose-100 text-rose-800 dark:bg-rose-950/55 dark:text-rose-200'],
+    ['catastrophic', 0.101, 'bg-rose-200 text-rose-950 font-bold dark:bg-rose-900/70 dark:text-rose-100'],
   ])('applies withdrawal-rate classes for %s values', (_label, rawNumeric, expectedClassName) => {
     render(<MetricCell bandType="wdRate" displayText={`${rawNumeric * 100}%`} rawNumeric={rawNumeric} />);
 
@@ -71,14 +71,14 @@ describe('MetricCell', () => {
 
     const pulsingCell = screen.getByText('5.0%');
 
-    expect(pulsingCell).toHaveClass('bg-yellow-100', 'text-rose-900', 'transition-colors', 'duration-700');
-    expect(pulsingCell).not.toHaveClass('bg-rose-200');
+    expect(pulsingCell).toHaveClass('bg-yellow-100', 'dark:bg-yellow-900/40', 'text-rose-800', 'transition-colors', 'duration-700');
+    expect(pulsingCell).not.toHaveClass('bg-rose-100');
 
     act(() => {
       vi.advanceTimersByTime(700);
     });
 
-    expect(screen.getByText('5.0%')).toHaveClass('bg-rose-200', 'text-rose-900');
+    expect(screen.getByText('5.0%')).toHaveClass('bg-rose-100', 'text-rose-800');
     expect(screen.getByText('5.0%')).not.toHaveClass('bg-yellow-100');
   });
 });

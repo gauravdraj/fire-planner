@@ -55,18 +55,22 @@ describe('ShareLinkModal and ShareButton', () => {
     cleanup();
   });
 
-  it('opens the privacy modal on first share and cancel leaves acknowledgement unset', () => {
+  it('opens the privacy modal with keyboard focus and Escape leaves acknowledgement unset', async () => {
     render(<ShareButton />);
+    const shareButton = screen.getByRole('button', { name: /^share$/i });
 
     clickHeaderShare();
 
-    expect(screen.getByRole('dialog', { name: /share-link privacy/i })).toBeInTheDocument();
+    const dialog = screen.getByRole('dialog', { name: /share-link privacy/i });
+    expect(dialog).toBeInTheDocument();
     expect(screen.getByText(SHARE_LINK_PRIVACY_TEXT)).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole('button', { name: /cancel/i })).toHaveFocus());
     expect(clipboardWrites).toHaveLength(0);
 
-    fireEvent.click(screen.getByRole('button', { name: /cancel/i }));
+    fireEvent.keyDown(dialog, { key: 'Escape' });
 
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    await waitFor(() => expect(shareButton).toHaveFocus());
     expect(clipboardWrites).toHaveLength(0);
     expect(window.localStorage.getItem(SHARE_LINK_ACKNOWLEDGED_KEY)).toBeNull();
   });

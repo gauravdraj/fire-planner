@@ -1,9 +1,11 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { App, CUSTOM_LAW_BANNER_TEXT } from '@/App';
 import { DISCLAIMER_TEXT } from '@/components/Disclaimer';
+import { SHARE_LINK_ACKNOWLEDGED_KEY } from '@/components/ShareButton';
 import { mapBasicFormToProjectionInputs, type BasicFormValues } from '@/lib/basicFormMapping';
+import { decodeScenario } from '@/lib/urlHash';
 import { useScenarioStore } from '@/store/scenarioStore';
 import { useScenariosStore } from '@/store/scenariosStore';
 import { UI_STORAGE_KEY, useUiStore } from '@/store/uiStore';
@@ -187,10 +189,127 @@ describe('App', () => {
       mode: 'basic',
     });
   });
+
+  it('keeps the shell control area accessible while sharing, display, and theme controls coexist', () => {
+    render(<App />);
+
+    const controls = screen.getByRole('group', { name: 'Planner controls' });
+
+    expect(controls).toHaveClass('flex-wrap');
+    expect(within(controls).getByRole('group', { name: 'Planner mode' })).toHaveClass('flex-wrap');
+    expect(within(controls).getByRole('group', { name: 'Display dollars' })).toHaveClass('flex-wrap');
+    expect(within(controls).getByLabelText('Theme')).toHaveValue('system');
+    expect(within(controls).getByRole('button', { name: 'Real dollars' })).toHaveAttribute('aria-pressed', 'true');
+    expect(within(controls).getByRole('button', { name: 'Share' })).toBeInTheDocument();
+
+    fireEvent.click(within(controls).getByRole('button', { name: 'Nominal dollars' }));
+    fireEvent.click(within(controls).getByRole('button', { name: 'Share' }));
+
+    expect(useUiStore.getState().displayUnit).toBe('nominal');
+    expect(screen.getByRole('dialog', { name: /share-link privacy/i })).toBeInTheDocument();
+    expect(JSON.parse(window.localStorage.getItem(UI_STORAGE_KEY) ?? '{}')).toMatchObject({
+      displayUnit: 'nominal',
+      mode: 'basic',
+    });
+  });
+
+  it('renders an accessible theme control and applies the selected theme', async () => {
+    render(<App />);
+
+    const themeSelect = screen.getByLabelText('Theme');
+
+    expect(themeSelect).toHaveValue('system');
+
+    fireEvent.change(themeSelect, { target: { value: 'dark' } });
+
+    await waitFor(() => {
+      expect(document.documentElement).toHaveClass('dark');
+    });
+
+    expect(useUiStore.getState().themePreference).toBe('dark');
+    expect(JSON.parse(window.localStorage.getItem(UI_STORAGE_KEY) ?? '{}')).toMatchObject({
+      displayUnit: 'real',
+      mode: 'basic',
+      themePreference: 'dark',
+    });
+  });
+
+  it('switches theme without disturbing planner state, display mode, sharing, or local scenarios', async () => {
+    const clipboardWrites = installClipboardMock();
+    window.history.replaceState(null, '', '/planner');
+    useScenarioStore.getState().replaceFormValues({
+      ...BASE_FORM_VALUES,
+      annualSpendingToday: 88_000,
+      planEndAge: 68,
+      primaryAge: 58,
+      retirementYear: 2028,
+    });
+    saveNamedScenario('Theme QA baseline', useScenarioStore.getState().formValues);
+    saveNamedScenario('Theme QA alternate', {
+      ...BASE_FORM_VALUES,
+      annualSpendingToday: 92_000,
+      brokerageAndCashBalance: 675_000,
+    });
+    useUiStore.getState().setMode('advanced');
+    useUiStore.getState().setDisplayUnit('nominal');
+    window.localStorage.setItem(SHARE_LINK_ACKNOWLEDGED_KEY, 'true');
+
+    const scenarioBeforeThemeSwitch = useScenarioStore.getState().scenario;
+    const planBeforeThemeSwitch = useScenarioStore.getState().plan;
+    const savedScenarioIdsBeforeThemeSwitch = useScenariosStore.getState().scenarios.map((scenario) => scenario.id);
+
+    render(<App />);
+    fireEvent.change(screen.getByLabelText('Theme'), { target: { value: 'dark' } });
+
+    await waitFor(() => {
+      expect(document.documentElement).toHaveClass('dark');
+    });
+
+    expect(useUiStore.getState()).toMatchObject({
+      displayUnit: 'nominal',
+      mode: 'advanced',
+      themePreference: 'dark',
+    });
+    expect(useScenarioStore.getState().formValues.annualSpendingToday).toBe(88_000);
+    expect(useScenarioStore.getState().scenario.startYear).toBe(scenarioBeforeThemeSwitch.startYear);
+    expect(useScenarioStore.getState().plan.endYear).toBe(planBeforeThemeSwitch.endYear);
+    expect(useScenariosStore.getState().scenarios.map((scenario) => scenario.id)).toEqual(
+      savedScenarioIdsBeforeThemeSwitch,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /^share$/i }));
+
+    await waitFor(() => expect(clipboardWrites).toHaveLength(1));
+
+    const decodedSharePayload = decodeScenario(new URL(clipboardWrites[0] ?? '').hash);
+
+    expect(decodedSharePayload?.scenario.startYear).toBe(scenarioBeforeThemeSwitch.startYear);
+    expect(decodedSharePayload?.plan.endYear).toBe(planBeforeThemeSwitch.endYear);
+    expect(useUiStore.getState()).toMatchObject({
+      displayUnit: 'nominal',
+      mode: 'advanced',
+      themePreference: 'dark',
+    });
+  });
 });
 
 function saveNamedScenario(name: string, values: BasicFormValues) {
   const { plan, scenario } = mapBasicFormToProjectionInputs(values);
 
   return useScenariosStore.getState().save({ name, plan, scenario });
+}
+
+function installClipboardMock(): string[] {
+  const clipboardWrites: string[] = [];
+
+  Object.defineProperty(navigator, 'clipboard', {
+    configurable: true,
+    value: {
+      writeText: async (text: string) => {
+        clipboardWrites.push(text);
+      },
+    },
+  });
+
+  return clipboardWrites;
 }

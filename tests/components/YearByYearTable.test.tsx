@@ -232,7 +232,13 @@ describe('YearByYearTable', () => {
     expect(screen.getByRole('heading', { name: 'Year-by-year projection' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Download CSV' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Download JSON' })).toBeInTheDocument();
-    expect(screen.getByTestId('year-table-scroll')).toHaveClass('overflow-x-auto');
+    expect(screen.getByText(/Scroll sideways on smaller screens/i)).toBeInTheDocument();
+    expect(screen.getByTestId('year-table-scroll')).toHaveClass(
+      'max-w-full',
+      'overflow-x-auto',
+      'overscroll-x-contain',
+      'dark:bg-slate-950',
+    );
     expect(container.querySelectorAll('thead tr')).toHaveLength(2);
 
     const bandHeaders = Array.from(container.querySelectorAll('thead tr:first-child th'));
@@ -415,7 +421,7 @@ describe('YearByYearTable', () => {
     const nonAcaFplValue = within(cellFor(2028, 'fplPercentage')).getByText(/\d+(?:\.\d)?%/);
 
     expect(nonAcaFplValue).toHaveTextContent('486.6%');
-    expect(nonAcaFplValue).toHaveClass('bg-rose-300', 'text-rose-950', 'font-bold');
+    expect(nonAcaFplValue).toHaveClass('bg-rose-200', 'text-rose-950', 'font-bold');
     expect(cellFor(2028, 'fplPercentage')).toHaveTextContent('FPL band: above the ACA subsidy cliff risk area.');
   });
 
@@ -444,12 +450,12 @@ describe('YearByYearTable', () => {
     expect(cellFor(2027, 'year')).toHaveClass('border-l-4', 'border-indigo-500');
 
     expect(within(cellFor(2027, 'fplPercentage')).getByText('420%')).toHaveClass(
-      'bg-rose-300',
+      'bg-rose-200',
       'text-rose-950',
       'font-bold',
     );
     expect(cellFor(2027, 'fplPercentage')).toHaveTextContent('FPL band: above the ACA subsidy cliff risk area.');
-    expect(within(cellFor(2027, 'withdrawalRate')).getByText('5%')).toHaveClass('bg-rose-200', 'text-rose-900');
+    expect(within(cellFor(2027, 'withdrawalRate')).getByText('5%')).toHaveClass('bg-rose-100', 'text-rose-800');
     expect(cellFor(2027, 'withdrawalRate')).toHaveTextContent(
       'Withdrawal-rate band: between the 5% danger threshold and 10% catastrophic threshold.',
     );
@@ -498,10 +504,14 @@ describe('YearByYearTable', () => {
     });
     expect(within(cellFor(2028, 'afterTaxCashFlow')).getByText(/→ \+\$\d[\d,]* to balance/)).toBeVisible();
     expect(within(cellFor(2028, 'afterTaxCashFlow')).getByText('→ +$2,500 to balance')).toHaveClass(
-      'text-slate-500',
+      'text-amber-700',
+      'dark:text-amber-300',
     );
     expect(within(cellFor(2029, 'afterTaxCashFlow')).getByText('→ balanced')).toBeVisible();
-    expect(within(cellFor(2029, 'afterTaxCashFlow')).getByText('→ balanced')).toHaveClass('text-slate-500');
+    expect(within(cellFor(2029, 'afterTaxCashFlow')).getByText('→ balanced')).toHaveClass(
+      'text-emerald-700',
+      'dark:text-emerald-300',
+    );
   });
 
   it('recomputes passive balance hints when projection inputs change', () => {

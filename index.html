@@ -4,6 +4,43 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>fire-planner</title>
+    <script>
+      (function () {
+        var themePreference = 'system';
+
+        try {
+          var rawPreference = window.localStorage.getItem('fire-planner.ui.v1');
+          var parsedPreference = rawPreference ? JSON.parse(rawPreference) : null;
+
+          if (
+            parsedPreference &&
+            (parsedPreference.themePreference === 'light' ||
+              parsedPreference.themePreference === 'dark' ||
+              parsedPreference.themePreference === 'system')
+          ) {
+            themePreference = parsedPreference.themePreference;
+          }
+        } catch (error) {
+          themePreference = 'system';
+        }
+
+        var systemPrefersDark = false;
+
+        try {
+          systemPrefersDark =
+            typeof window.matchMedia === 'function' &&
+            window.matchMedia('(prefers-color-scheme: dark)').matches;
+        } catch (error) {
+          systemPrefersDark = false;
+        }
+
+        var resolvedTheme =
+          themePreference === 'dark' || (themePreference === 'system' && systemPrefersDark) ? 'dark' : 'light';
+
+        document.documentElement.classList.toggle('dark', resolvedTheme === 'dark');
+        document.documentElement.style.colorScheme = resolvedTheme;
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

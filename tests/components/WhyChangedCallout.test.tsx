@@ -36,6 +36,7 @@ describe('WhyChangedCallout', () => {
     makeLargeBalanceDrop();
 
     expect(screen.getByText('Why this changed')).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveClass('bg-amber-50/90', 'dark:bg-amber-950/40');
     expect(screen.getByText(/compared with the previous projection for 2027/i)).toBeInTheDocument();
     expect(screen.getByText(/large balance drop/i)).toBeInTheDocument();
   });

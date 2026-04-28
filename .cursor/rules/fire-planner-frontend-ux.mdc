@@ -1,0 +1,38 @@
+---
+description: fire-planner frontend UX, accessibility, responsive behavior, and interaction polish.
+globs:
+  - "src/components/**/*.tsx"
+  - "src/App.tsx"
+  - "src/store/uiStore.ts"
+---
+
+# fire-planner Frontend UX
+
+## Product UX
+
+- Optimize for trust and comprehension over visual novelty. Users should quickly understand what inputs changed, what outputs mean, and which assumptions are active.
+- Keep basic mode approachable and advanced mode powerful without making either feel like a raw internal tool.
+- Preserve existing financial/math behavior unless the task explicitly asks for modeling changes.
+- Educational, methodology, and disclaimer copy should remain sober and clear. Do not make claims that imply tax, legal, investment, or filing advice.
+
+## Accessibility
+
+- Use semantic landmarks and headings. Each major card/region should have an accessible name when it improves navigation.
+- Interactive controls need visible `focus-visible` styling, correct `aria-pressed`/`aria-selected`/`role` usage, disabled states, and keyboard behavior.
+- Do not hide essential information in hover-only affordances. Tooltips may supplement labels, but labels must stand on their own.
+- Maintain WCAG AA contrast in light and dark mode. Status colors need text/background pairs that remain legible.
+- Respect `prefers-reduced-motion` for animation and transitions.
+
+## Responsive Behavior
+
+- Design mobile first, then enhance for larger screens. Verify important flows at roughly 320px, 768px, 1024px, and desktop widths.
+- Tables and charts may scroll horizontally on small screens, but controls and explanatory text should not force page-wide overflow.
+- Header actions, mode navigation, form sections, and advanced tabs should wrap cleanly on mobile.
+- Sticky or dense result surfaces must not obscure form controls or create unreachable content on small screens.
+
+## Interaction Polish
+
+- Include explicit hover, active, focus, disabled, loading, empty, and error states for updated interactive components.
+- Transitions should be subtle and purposeful, usually 150-200ms. Avoid motion that makes financial data feel unstable.
+- Skeletons or empty states should match the shape and hierarchy of the content they replace when loading states exist.
+- For dark-mode controls, make the active state obvious without relying only on color.

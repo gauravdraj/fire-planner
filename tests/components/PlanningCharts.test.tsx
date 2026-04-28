@@ -9,6 +9,7 @@ import {
 } from '@/components/charts/MagiChart';
 import { buildTaxBreakdownChartData, TaxBreakdownChart } from '@/components/charts/TaxBreakdownChart';
 import type { AccountBalances, YearBreakdown } from '@/core/projection';
+import { getChartPalette, getThresholdBandColor } from '@/lib/chartPalette';
 import { useScenarioStore } from '@/store/scenarioStore';
 import { useUiStore } from '@/store/uiStore';
 
@@ -163,12 +164,28 @@ describe('Planning charts', () => {
     const { container } = render(<MagiChart />);
 
     expect(screen.getByRole('heading', { name: 'MAGI thresholds' })).toBeInTheDocument();
-    expect(screen.getByRole('img', { name: /magi compared with aca fpl bands/i })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: /magi compared with aca fpl bands/i })).toHaveClass('overflow-x-auto');
     expect(screen.getByText('ACA MAGI')).toBeInTheDocument();
     expect(screen.getByText('IRMAA MAGI')).toBeInTheDocument();
     expect(screen.getByText(/100-150% FPL/i)).toBeInTheDocument();
     expect(screen.getAllByText(/IRMAA tier 1/i).length).toBeGreaterThan(0);
     expect(container.querySelectorAll('.recharts-line')).toHaveLength(2);
+  });
+
+  it('uses the dark chart palette for MAGI SVG internals and legends', () => {
+    const palette = getChartPalette('dark');
+    useUiStore.getState().setThemePreference('dark');
+
+    const { container } = render(<MagiChart />);
+
+    expect(container.querySelector('.recharts-cartesian-grid line')).toHaveAttribute('stroke', palette.grid);
+    expect(container.querySelector(`[fill="${getThresholdBandColor(palette, 0)}"]`)).toBeInTheDocument();
+    expect(container.querySelector(`[stroke="${palette.referenceLine}"]`)).toBeInTheDocument();
+    expect(container.querySelectorAll('.recharts-line-curve')[0]).toHaveAttribute(
+      'stroke',
+      palette.series.magi.acaMagi.stroke,
+    );
+    expect(screen.getByText('ACA MAGI')).toHaveStyle({ color: palette.legend });
   });
 
   it('builds MAGI threshold data from scenario healthcare and filing status', () => {
@@ -211,5 +228,18 @@ describe('Planning charts', () => {
       stateTax: 2_500,
     });
     expect(container.querySelectorAll('.recharts-bar')).toHaveLength(7);
+  });
+
+  it('uses the dark chart palette for tax SVG internals and legends', () => {
+    const palette = getChartPalette('dark');
+    useUiStore.getState().setThemePreference('dark');
+
+    const { container } = render(<TaxBreakdownChart />);
+
+    expect(screen.getByRole('img', { name: /annual tax breakdown/i })).toHaveClass('overflow-x-auto');
+    expect(container.querySelector('.recharts-cartesian-grid line')).toHaveAttribute('stroke', palette.grid);
+    expect(container.querySelector(`[stroke="${palette.zeroLine}"]`)).toBeInTheDocument();
+    expect(container.querySelector(`[fill="${palette.series.tax.federalTax.fill}"]`)).toBeInTheDocument();
+    expect(screen.getByText('Federal tax')).toHaveStyle({ color: palette.legend });
   });
 });

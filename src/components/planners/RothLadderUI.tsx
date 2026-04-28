@@ -4,12 +4,21 @@ import { effectiveConstants } from '@/core/constants/customLaw';
 import {
   generateRothLadderPlan,
   type RothLadderConstraint,
+  type RothLadderConstraintStatus,
   type RothLadderYearResult,
 } from '@/core/planners/rothLadderTargeter';
 import type { Scenario, WithdrawalPlan } from '@/core/projection';
+import { classNames, formControlClassName } from '@/components/ui/controlStyles';
 import { useScenarioStore } from '@/store/scenarioStore';
 
 type ConstraintKind = RothLadderConstraint['kind'];
+const plannerPanelClassName = 'rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950';
+const eyebrowClassName = 'text-sm font-medium text-indigo-700 dark:text-indigo-300';
+const headingClassName = 'mt-1 text-base font-semibold text-slate-950 dark:text-slate-50';
+const helpTextClassName = 'text-sm leading-6 text-slate-600 dark:text-slate-300';
+const labelClassName = 'text-sm font-medium text-slate-800 dark:text-slate-200';
+const primaryButtonClassName =
+  'rounded-lg bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-slate-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 motion-reduce:transition-none dark:bg-indigo-400 dark:text-slate-950 dark:hover:bg-indigo-300 dark:focus-visible:outline-indigo-400';
 
 export function RothLadderUI() {
   const scenario = useScenarioStore((state) => state.scenario);
@@ -73,28 +82,28 @@ export function RothLadderUI() {
   }
 
   return (
-    <section aria-labelledby="roth-ladder-heading" className="rounded-lg border border-slate-200 p-4">
+    <section aria-labelledby="roth-ladder-heading" className={plannerPanelClassName}>
       <div>
-        <p className="text-sm font-medium text-indigo-700">Roth ladder targeter</p>
-        <h3 className="mt-1 text-base font-semibold text-slate-900" id="roth-ladder-heading">
+        <p className={eyebrowClassName}>Roth ladder targeter</p>
+        <h3 className={headingClassName} id="roth-ladder-heading">
           Generate Roth conversions
         </h3>
-        <p className="mt-1 text-sm text-slate-600">
+        <p className={classNames(helpTextClassName, 'mt-1')}>
           Pick one binding constraint and write annual Roth conversion actions into the manual plan.
         </p>
-        <p className="mt-2 text-xs text-slate-500">
-          <span title="Year T IRMAA MAGI drives the year T+2 Medicare premium bill.">IRMAA T+2:</span> Roth planner
-          results show the later premium year affected by each conversion year.
+        <p className="mt-2 text-xs leading-5 text-slate-500 dark:text-slate-400">
+          <span className="font-medium text-slate-600 dark:text-slate-300">IRMAA T+2:</span> Year T IRMAA MAGI drives
+          the year T+2 Medicare premium bill, so results show the later premium year affected by each conversion year.
         </p>
       </div>
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <NumberField label="Roth start year" onChange={setStartYear} value={startYear} />
         <NumberField label="Roth end year" onChange={setEndYear} value={endYear} />
-        <label className="text-sm font-medium text-slate-800">
+        <label className={labelClassName}>
           Binding constraint
           <select
-            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+            className={formControlClassName({ className: 'mt-1' })}
             onChange={(event) => setConstraintKind(event.target.value as ConstraintKind)}
             value={constraintKind}
           >
@@ -104,10 +113,10 @@ export function RothLadderUI() {
             <option value="ltcgBracket">LTCG bracket</option>
           </select>
         </label>
-        <label className="text-sm font-medium text-slate-800">
+        <label className={labelClassName}>
           Max conversion per year
           <input
-            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+            className={formControlClassName({ className: 'mt-1 tabular-nums' })}
             inputMode="decimal"
             min="0"
             onChange={(event) => setMaxConversion(event.target.value)}
@@ -120,10 +129,10 @@ export function RothLadderUI() {
 
       <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {constraintKind === 'irmaaTier' ? (
-          <label className="text-sm font-medium text-slate-800">
+          <label className={labelClassName}>
             Maximum IRMAA tier
             <select
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+              className={formControlClassName({ className: 'mt-1' })}
               onChange={(event) => setIrmaaTier(Number(event.target.value))}
               value={irmaaTier}
             >
@@ -136,10 +145,10 @@ export function RothLadderUI() {
           </label>
         ) : null}
         {constraintKind === 'acaFplPercentage' ? (
-          <label className="text-sm font-medium text-slate-800">
+          <label className={labelClassName}>
             Maximum ACA FPL multiple
             <input
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+              className={formControlClassName({ className: 'mt-1 tabular-nums' })}
               inputMode="decimal"
               min="0"
               onChange={(event) => setAcaFplPercent(event.target.value)}
@@ -163,10 +172,10 @@ export function RothLadderUI() {
       </div>
 
       <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div aria-live="polite" className="min-h-5 text-sm text-slate-600">
+        <div aria-live="polite" className={messageClassName(message)}>
           {message}
         </div>
-        <button className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white" onClick={generatePlan} type="button">
+        <button className={primaryButtonClassName} onClick={generatePlan} type="button">
           Generate Roth ladder plan
         </button>
       </div>
@@ -178,9 +187,9 @@ export function RothLadderUI() {
 
 function RothOutputTable({ years }: { years: readonly RothLadderYearResult[] }) {
   return (
-    <div className="mt-4 overflow-x-auto rounded-lg border border-slate-200">
-      <table className="min-w-full divide-y divide-slate-200 text-sm">
-        <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">
+    <div className="mt-4 overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
+      <table className="min-w-[48rem] divide-y divide-slate-200 text-sm dark:divide-slate-800">
+        <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:bg-slate-900/60 dark:text-slate-300">
           <tr>
             <th className="px-3 py-2" scope="col">
               Year
@@ -202,19 +211,26 @@ function RothOutputTable({ years }: { years: readonly RothLadderYearResult[] }) 
             </th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-slate-100 bg-white">
+        <tbody className="divide-y divide-slate-100 bg-white dark:divide-slate-800 dark:bg-slate-950">
           {years.map((year) => (
-            <tr key={year.year}>
-              <th className="px-3 py-2 text-left font-medium text-slate-900" scope="row">
+            <tr className="transition-colors hover:bg-slate-50/80 motion-reduce:transition-none dark:hover:bg-slate-900/50" key={year.year}>
+              <th className="px-3 py-2 text-left font-medium tabular-nums text-slate-950 dark:text-slate-50" scope="row">
                 {year.year}
               </th>
-              <td className="px-3 py-2">{formatCurrency(year.conversionAmount)}</td>
-              <td className="px-3 py-2">{formatCurrency(year.measuredValue)}</td>
-              <td className="px-3 py-2">{year.bindingMargin === null ? 'n/a' : formatCurrency(year.bindingMargin)}</td>
-              <td className="px-3 py-2" title={year.irmaaLookback.note}>
-                {year.irmaaLookback.premiumYear}
+              <td className="px-3 py-2 tabular-nums text-slate-700 dark:text-slate-200">{formatCurrency(year.conversionAmount)}</td>
+              <td className="px-3 py-2 tabular-nums text-slate-700 dark:text-slate-200">{formatCurrency(year.measuredValue)}</td>
+              <td className="px-3 py-2 tabular-nums text-slate-700 dark:text-slate-200">
+                {year.bindingMargin === null ? 'n/a' : formatCurrency(year.bindingMargin)}
               </td>
-              <td className="px-3 py-2">{statusLabel(year.status)}</td>
+              <td className="px-3 py-2 tabular-nums text-slate-700 dark:text-slate-200">
+                <span>{year.irmaaLookback.premiumYear}</span>
+                <span className="block text-[0.65rem] leading-tight text-slate-500 dark:text-slate-400">
+                  {year.irmaaLookback.note}
+                </span>
+              </td>
+              <td className="px-3 py-2">
+                <span className={statusBadgeClassName(year.status)}>{statusLabel(year.status)}</span>
+              </td>
             </tr>
           ))}
         </tbody>
@@ -225,10 +241,10 @@ function RothOutputTable({ years }: { years: readonly RothLadderYearResult[] }) 
 
 function NumberField({ label, onChange, value }: { label: string; onChange: (value: number) => void; value: number }) {
   return (
-    <label className="text-sm font-medium text-slate-800">
+    <label className={labelClassName}>
       {label}
       <input
-        className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+        className={formControlClassName({ className: 'mt-1 tabular-nums' })}
         inputMode="numeric"
         onChange={(event) => onChange(Number(event.target.value))}
         type="number"
@@ -250,10 +266,10 @@ function RateSelect({
   value: number;
 }) {
   return (
-    <label className="text-sm font-medium text-slate-800">
+    <label className={labelClassName}>
       {label}
       <select
-        className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+        className={formControlClassName({ className: 'mt-1' })}
         onChange={(event) => onChange(Number(event.target.value))}
         value={value}
       >
@@ -355,4 +371,28 @@ function formatPercent(rate: number): string {
 
 function statusLabel(status: string): string {
   return status.replaceAll('-', ' ');
+}
+
+function messageClassName(message: string): string {
+  return classNames(
+    'min-h-5 text-sm',
+    message.startsWith('Generated')
+      ? 'text-emerald-700 dark:text-emerald-300'
+      : message.length > 0
+        ? 'text-red-700 dark:text-red-300'
+        : 'text-slate-600 dark:text-slate-300',
+  );
+}
+
+function statusBadgeClassName(status: RothLadderConstraintStatus): string {
+  const tone =
+    status === 'constraint-met'
+      ? 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-500/40 dark:bg-emerald-950/30 dark:text-emerald-200'
+      : status === 'already-over-target'
+        ? 'border-red-200 bg-red-50 text-red-800 dark:border-red-500/40 dark:bg-red-950/30 dark:text-red-200'
+        : status.startsWith('limited-by')
+          ? 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-500/40 dark:bg-amber-950/30 dark:text-amber-100'
+          : 'border-slate-200 bg-slate-100 text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300';
+
+  return classNames('inline-flex whitespace-nowrap rounded-full border px-2 py-0.5 text-xs font-medium', tone);
 }

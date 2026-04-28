@@ -85,18 +85,20 @@ export function WhyChangedCallout() {
   return (
     <aside
       aria-labelledby="why-changed-heading"
-      className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950 shadow-sm"
+      className="mt-3 rounded-2xl border border-amber-200 bg-amber-50/90 p-4 text-sm text-amber-950 shadow-sm shadow-amber-950/5 dark:border-amber-500/40 dark:bg-amber-950/40 dark:text-amber-100 dark:shadow-none"
       role="status"
     >
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-sm font-semibold text-amber-950" id="why-changed-heading">
+          <h2 className="text-sm font-semibold text-amber-950 dark:text-amber-100" id="why-changed-heading">
             Why this changed
           </h2>
-          <p className="mt-1 text-amber-900">Compared with the previous projection for {activeCallout.targetYear}.</p>
+          <p className="mt-1 text-amber-900 dark:text-amber-200">
+            Compared with the previous projection for {activeCallout.targetYear}.
+          </p>
         </div>
         <button
-          className="rounded-md border border-amber-300 px-2 py-1 text-xs font-medium text-amber-900 transition-colors hover:bg-amber-100 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2"
+          className="rounded-lg border border-amber-300 bg-white/50 px-2 py-1 text-xs font-medium text-amber-900 transition-colors hover:bg-amber-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-600 motion-reduce:transition-none dark:border-amber-400/40 dark:bg-amber-950/50 dark:text-amber-100 dark:hover:bg-amber-900/60 dark:focus-visible:outline-amber-300"
           onClick={() => setActiveCallout(null)}
           type="button"
         >
@@ -105,8 +107,8 @@ export function WhyChangedCallout() {
       </div>
       <ul className="mt-3 space-y-1.5">
         {activeCallout.changes.map((change) => (
-          <li key={change.kind}>
-            <span className="font-medium">{change.label}:</span> {change.detail}
+          <li className="rounded-lg bg-white/45 px-3 py-2 dark:bg-amber-950/35" key={change.kind}>
+            <span className="font-semibold">{change.label}:</span> <span className="tabular-nums">{change.detail}</span>
           </li>
         ))}
       </ul>

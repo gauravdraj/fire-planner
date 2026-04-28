@@ -8,6 +8,7 @@ import { Footer } from '@/components/Footer';
 import { Header } from '@/components/Header';
 import { MethodologyPage } from '@/components/MethodologyPage';
 import { StalenessGate } from '@/components/StalenessGate';
+import { useResolvedTheme } from '@/lib/theme';
 import { useScenarioStore } from '@/store/scenarioStore';
 import { useUiStore } from '@/store/uiStore';
 
@@ -19,8 +20,10 @@ type ScenarioIdPair = readonly [string, string];
 export function App() {
   const mode = useUiStore((state) => state.mode);
   const setMode = useUiStore((state) => state.setMode);
+  const themePreference = useUiStore((state) => state.themePreference);
   const customLawActive = useScenarioStore((state) => state.customLawActive);
   const [compareScenarioIds, setCompareScenarioIds] = useState<ScenarioIdPair | undefined>(undefined);
+  useResolvedTheme(themePreference);
 
   function launchCompare(scenarioIds: ScenarioIdPair) {
     setCompareScenarioIds(scenarioIds);
@@ -28,12 +31,12 @@ export function App() {
   }
 
   return (
-    <div className="min-h-screen bg-white text-slate-950">
+    <div className="min-h-screen overflow-x-clip bg-slate-50 text-slate-950 antialiased dark:bg-slate-950 dark:text-slate-100">
       <Disclaimer />
       <StalenessGate />
       <Header />
       {customLawActive ? <CustomLawBanner /> : null}
-      <main className="mx-auto w-full max-w-5xl px-4 py-8">
+      <main className="mx-auto w-full max-w-5xl min-w-0 px-3 py-6 sm:px-4 sm:py-8 lg:py-10">
         {mode === 'methodology' ? (
           <MethodologyPage />
         ) : mode === 'compare' ? (
@@ -51,7 +54,10 @@ export function App() {
 
 function CustomLawBanner() {
   return (
-    <div className="border-y border-amber-300 bg-amber-100 px-4 py-3 text-sm font-medium text-amber-950" role="status">
+    <div
+      className="border-y border-amber-300/80 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-950 shadow-sm shadow-amber-900/5 dark:border-amber-500/40 dark:bg-amber-950/50 dark:text-amber-100 dark:shadow-none"
+      role="status"
+    >
       <div className="mx-auto max-w-5xl">{CUSTOM_LAW_BANNER_TEXT}</div>
     </div>
   );

@@ -10,21 +10,35 @@ import { YearByYearTable } from '@/components/YearByYearTable';
 
 export function BasicPlannerPage() {
   return (
-    <section aria-labelledby="basic-planner-heading" className="rounded-lg border border-slate-200 p-5">
-      <h2 className="text-xl font-semibold" id="basic-planner-heading">
-        Basic planner
-      </h2>
-      <p className="mt-2 text-sm text-slate-600">
-        Enter the household facts the current engine supports, and the projection updates as you edit.
-      </p>
+    <section
+      aria-labelledby="basic-planner-heading"
+      className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-900/5 dark:border-slate-800 dark:bg-slate-900/70 dark:shadow-none sm:p-6"
+    >
+      <div className="max-w-3xl">
+        <p className="text-sm font-medium text-indigo-700 dark:text-indigo-300">Live basic scenario</p>
+        <h2 className="mt-1 text-2xl font-semibold tracking-tight text-slate-950 dark:text-slate-50" id="basic-planner-heading">
+          Basic planner
+        </h2>
+        <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-400">
+          Enter the household facts the current engine supports. Valid edits debounce into the projection, so the results
+          below stay tied to the form without a separate run step.
+        </p>
+      </div>
       <StarterTemplateChooser />
       <BasicForm />
       <ProjectionResults />
-      <section aria-labelledby="seventy-two-t-heading" className="mt-6 rounded-lg border border-slate-200 bg-slate-50 p-4">
-        <h3 className="text-lg font-semibold text-slate-950" id="seventy-two-t-heading">
-          72(t) SEPP IRA size calculator
-        </h3>
-        <p className="mt-1 text-sm text-slate-600">Fixed Amortization Method. Independent of your scenario above.</p>
+      <section
+        aria-labelledby="seventy-two-t-heading"
+        className="mt-6 rounded-xl border border-slate-200 bg-slate-50/80 p-4 shadow-sm shadow-slate-900/5 dark:border-slate-800 dark:bg-slate-950/50 dark:shadow-none"
+      >
+        <div className="max-w-3xl">
+          <h3 className="text-lg font-semibold text-slate-950 dark:text-slate-50" id="seventy-two-t-heading">
+            72(t) SEPP IRA size calculator
+          </h3>
+          <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-400">
+            Fixed Amortization Method. Independent of your scenario above.
+          </p>
+        </div>
         <SeventyTwoTCalc />
       </section>
     </section>
@@ -34,9 +48,26 @@ export function BasicPlannerPage() {
 function ProjectionResults() {
   return (
     <>
-      <LiveStatsStrip />
-      <WhyChangedCallout />
-      <YearByYearTable />
+      <section
+        aria-labelledby="basic-results-heading"
+        className="mt-6 min-w-0 rounded-2xl border border-slate-200 bg-slate-50/70 p-4 shadow-sm shadow-slate-900/5 dark:border-slate-800 dark:bg-slate-950/35 dark:shadow-none sm:p-5"
+      >
+        <div className="max-w-3xl">
+          <p className="text-xs font-semibold uppercase tracking-wide text-indigo-700 dark:text-indigo-300">
+            Always-on projection
+          </p>
+          <h3 className="mt-1 text-lg font-semibold text-slate-950 dark:text-slate-50" id="basic-results-heading">
+            Projection results
+          </h3>
+          <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-400">
+            Headline metrics and the year-by-year table update from the current basic inputs. Exports use the same
+            visible column contract as the table.
+          </p>
+        </div>
+        <LiveStatsStrip />
+        <WhyChangedCallout />
+        <YearByYearTable />
+      </section>
       <BalancesChart />
       <MagiChart />
       <TaxBreakdownChart />

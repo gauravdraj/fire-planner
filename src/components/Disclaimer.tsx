@@ -3,8 +3,8 @@ export const DISCLAIMER_TEXT =
 
 export function Disclaimer() {
   return (
-    <section className="border-b border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
-      <p className="mx-auto max-w-5xl">{DISCLAIMER_TEXT}</p>
+    <section className="border-b border-slate-200/80 bg-slate-100 px-4 py-3 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
+      <p className="mx-auto max-w-5xl leading-6">{DISCLAIMER_TEXT}</p>
     </section>
   );
 }

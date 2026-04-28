@@ -2,6 +2,7 @@ import { create } from 'zustand';
 
 import type { ProjectionMetricFormValues } from '@/core/metrics';
 import type { Scenario, YearBreakdown } from '@/core/projection';
+import type { ThemePreference } from '@/lib/theme';
 
 export type PlannerMode = 'basic' | 'advanced' | 'compare' | 'methodology';
 export type DisplayUnit = 'real' | 'nominal';
@@ -17,21 +18,24 @@ export type ProjectionRunSnapshot = Readonly<{
 export type UiStoreState = Readonly<{
   mode: PlannerMode;
   displayUnit: DisplayUnit;
+  themePreference: ThemePreference;
   lastProjectionRunSnapshot: ProjectionRunSnapshot | null;
 }>;
 
 type UiStoreActions = {
   setMode: (mode: PlannerMode) => void;
   setDisplayUnit: (displayUnit: DisplayUnit) => void;
+  setThemePreference: (themePreference: ThemePreference) => void;
   trackProjectionRunSnapshot: (snapshot: ProjectionRunSnapshot) => void;
   resetUiPreferences: () => void;
 };
 
-type PersistedUiState = Partial<Pick<UiStoreState, 'displayUnit' | 'mode'>>;
+type PersistedUiState = Partial<Pick<UiStoreState, 'displayUnit' | 'mode' | 'themePreference'>>;
 
 const DEFAULT_UI_STATE: UiStoreState = {
   mode: 'basic',
   displayUnit: 'real',
+  themePreference: 'system',
   lastProjectionRunSnapshot: null,
 };
 
@@ -42,6 +46,9 @@ export const useUiStore = create<UiStoreState & UiStoreActions>((set) => ({
   },
   setDisplayUnit: (displayUnit) => {
     set((state) => persistUiState({ ...state, displayUnit }));
+  },
+  setThemePreference: (themePreference) => {
+    set((state) => persistUiState({ ...state, themePreference }));
   },
   trackProjectionRunSnapshot: (snapshot) => {
     set({ lastProjectionRunSnapshot: snapshot });
@@ -57,6 +64,9 @@ function readInitialUiState(): UiStoreState {
   return {
     mode: isPlannerMode(persisted.mode) ? persisted.mode : DEFAULT_UI_STATE.mode,
     displayUnit: isDisplayUnit(persisted.displayUnit) ? persisted.displayUnit : DEFAULT_UI_STATE.displayUnit,
+    themePreference: isThemePreference(persisted.themePreference)
+      ? persisted.themePreference
+      : DEFAULT_UI_STATE.themePreference,
     lastProjectionRunSnapshot: null,
   };
 }
@@ -92,6 +102,7 @@ function persistUiState(state: UiStoreState): UiStoreState {
       JSON.stringify({
         mode: state.mode,
         displayUnit: state.displayUnit,
+        themePreference: state.themePreference,
       }),
     );
   }
@@ -105,6 +116,10 @@ function isPlannerMode(value: unknown): value is PlannerMode {
 
 function isDisplayUnit(value: unknown): value is DisplayUnit {
   return value === 'real' || value === 'nominal';
+}
+
+function isThemePreference(value: unknown): value is ThemePreference {
+  return value === 'light' || value === 'dark' || value === 'system';
 }
 
 function getLocalStorage(): Storage | null {

@@ -11,7 +11,9 @@ import {
 } from 'recharts';
 
 import type { Scenario, YearBreakdown } from '@/core/projection';
+import { getChartPalette, type ChartPalette } from '@/lib/chartPalette';
 import { toReal } from '@/lib/realDollars';
+import { useResolvedTheme } from '@/lib/theme';
 import { useScenarioStore } from '@/store/scenarioStore';
 import type { DisplayUnit } from '@/store/uiStore';
 import { useUiStore } from '@/store/uiStore';
@@ -35,15 +37,14 @@ type TooltipPayloadItem = Readonly<{
 const TAX_SERIES: ReadonlyArray<{
   key: TaxBreakdownKey;
   label: string;
-  fill: string;
 }> = [
-  { key: 'federalTax', label: 'Federal tax', fill: '#0f172a' },
-  { key: 'stateTax', label: 'State tax', fill: '#334155' },
-  { key: 'ltcgTax', label: 'LTCG tax', fill: '#475569' },
-  { key: 'niit', label: 'NIIT', fill: '#64748b' },
-  { key: 'seTax', label: 'SE tax', fill: '#94a3b8' },
-  { key: 'irmaaPremium', label: 'IRMAA premiums', fill: '#f97316' },
-  { key: 'acaPremiumCredit', label: 'ACA premium credit', fill: '#16a34a' },
+  { key: 'federalTax', label: 'Federal tax' },
+  { key: 'stateTax', label: 'State tax' },
+  { key: 'ltcgTax', label: 'LTCG tax' },
+  { key: 'niit', label: 'NIIT' },
+  { key: 'seTax', label: 'SE tax' },
+  { key: 'irmaaPremium', label: 'IRMAA premiums' },
+  { key: 'acaPremiumCredit', label: 'ACA premium credit' },
 ];
 
 const DOLLAR_FORMATTER = new Intl.NumberFormat('en-US', {
@@ -56,52 +57,60 @@ export function TaxBreakdownChart() {
   const projectionResults = useScenarioStore((state) => state.projectionResults);
   const scenario = useScenarioStore((state) => state.scenario);
   const displayUnit = useUiStore((state) => state.displayUnit);
+  const themePreference = useUiStore((state) => state.themePreference);
+  const resolvedTheme = useResolvedTheme(themePreference);
+  const palette = getChartPalette(resolvedTheme);
   const unitLabel = displayUnit === 'real' ? "today's dollars" : 'nominal dollars';
   const chartData = buildTaxBreakdownChartData({ displayUnit, projectionResults, scenario });
 
   return (
-    <section aria-labelledby="tax-breakdown-chart-heading" className="mt-6">
+    <section aria-labelledby="tax-breakdown-chart-heading" className="mt-6 min-w-0">
       <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h2 className="text-lg font-semibold" id="tax-breakdown-chart-heading">
+          <h2 className="text-lg font-semibold text-slate-950 dark:text-slate-50" id="tax-breakdown-chart-heading">
             Tax breakdown
           </h2>
-          <p className="text-sm text-slate-600">Annual tax components, with ACA premium credits shown below zero.</p>
+          <p className="text-sm leading-6 text-slate-600 dark:text-slate-400">
+            Annual tax components, with ACA premium credits shown below zero.
+          </p>
         </div>
-        <p className="text-xs text-slate-500">{unitLabel}</p>
+        <p className="text-xs font-medium text-slate-500 dark:text-slate-400">{unitLabel}</p>
       </div>
       <div
         aria-label="Annual tax breakdown with ACA premium credit as a negative value"
-        className="mt-3 rounded-lg border border-slate-200 bg-white"
+        className="mt-3 max-w-full overflow-x-auto overscroll-x-contain rounded-xl border border-slate-200 bg-white shadow-sm shadow-slate-900/5 [contain:paint] dark:border-slate-800 dark:bg-slate-950 dark:shadow-none"
         role="img"
       >
-        <div className="h-72 w-full p-3">
+        <div className="h-72 min-w-[40rem] p-3">
           {chartData.length === 0 ? (
-            <p className="p-4 text-sm text-slate-600">No projection data available.</p>
+            <p className="p-4 text-sm text-slate-600 dark:text-slate-400">No projection data available.</p>
           ) : (
             <ResponsiveContainer height="100%" width="100%">
               <BarChart data={chartData} margin={{ bottom: 4, left: 4, right: 12, top: 12 }}>
-                <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" />
+                <CartesianGrid stroke={palette.grid} strokeDasharray="3 3" />
                 <XAxis
                   axisLine={false}
                   dataKey="year"
-                  tick={{ fill: '#475569', fontSize: 12 }}
+                  tick={{ fill: palette.axis, fontSize: 12 }}
                   tickLine={false}
                 />
                 <YAxis
                   axisLine={false}
-                  tick={{ fill: '#475569', fontSize: 12 }}
+                  tick={{ fill: palette.axis, fontSize: 12 }}
                   tickFormatter={formatCompactDollarTick}
                   tickLine={false}
                   width={72}
                 />
-                <ReferenceLine stroke="#94a3b8" y={0} />
-                <Tooltip content={<TaxBreakdownChartTooltip />} />
-                <Legend formatter={(value) => String(value)} wrapperStyle={{ fontSize: 12 }} />
+                <ReferenceLine stroke={palette.zeroLine} y={0} />
+                <Tooltip content={<TaxBreakdownChartTooltip palette={palette} />} />
+                <Legend
+                  formatter={(value) => <span style={{ color: palette.legend }}>{String(value)}</span>}
+                  wrapperStyle={{ color: palette.legend, fontSize: 12 }}
+                />
                 {TAX_SERIES.map((series) => (
                   <Bar
                     dataKey={series.key}
-                    fill={series.fill}
+                    fill={palette.series.tax[series.key].fill}
                     isAnimationActive={false}
                     key={series.key}
                     name={series.label}
@@ -113,7 +122,7 @@ export function TaxBreakdownChart() {
           )}
         </div>
       </div>
-      <p className="mt-2 text-xs text-slate-500">
+      <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
         ACA premium credit is plotted as a negative value so it remains visually distinct from taxes and premiums.
       </p>
     </section>
@@ -170,10 +179,12 @@ export function formatCompactDollarTick(value: number | string): string {
 export function TaxBreakdownChartTooltip({
   active,
   label,
+  palette = getChartPalette('light'),
   payload,
 }: {
   active?: boolean;
   label?: number | string;
+  palette?: ChartPalette;
   payload?: readonly TooltipPayloadItem[];
 }) {
   if (active !== true || payload === undefined || payload.length === 0) {
@@ -181,13 +192,20 @@ export function TaxBreakdownChartTooltip({
   }
 
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-3 text-sm">
-      <p className="font-medium text-slate-950">{label}</p>
+    <div
+      className="rounded-lg p-3 text-sm shadow-lg shadow-slate-950/10"
+      style={{
+        backgroundColor: palette.tooltip.background,
+        border: `1px solid ${palette.tooltip.border}`,
+        color: palette.tooltip.text,
+      }}
+    >
+      <p className="font-medium">{label}</p>
       <dl className="mt-2 grid grid-cols-[auto_auto] gap-x-4 gap-y-1">
         {TAX_SERIES.map((series) => (
           <div className="contents" key={series.key}>
-            <dt className="text-slate-600">{series.label}</dt>
-            <dd className="text-right font-medium tabular-nums text-slate-950">
+            <dt style={{ color: palette.tooltip.mutedText }}>{series.label}</dt>
+            <dd className="text-right font-medium tabular-nums">
               {DOLLAR_FORMATTER.format(valueForSeries(payload, series.key))}
             </dd>
           </div>

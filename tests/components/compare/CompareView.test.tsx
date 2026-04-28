@@ -94,7 +94,7 @@ describe('CompareView headline metrics', () => {
 
     const riskyCliffCells = within(headlineTable).getAllByLabelText(/ACA cliff years: [1-9]\d* years?/);
     expect(riskyCliffCells.length).toBeGreaterThan(0);
-    expect(riskyCliffCells[0]).toHaveClass('bg-rose-300', 'text-rose-950', 'font-bold');
+    expect(riskyCliffCells[0]).toHaveClass('bg-rose-200', 'text-rose-950', 'font-bold');
 
     for (const savedScenario of [first, second]) {
       const accountMix = screen.getByTestId(`ending-account-mix-${savedScenario.id}`);

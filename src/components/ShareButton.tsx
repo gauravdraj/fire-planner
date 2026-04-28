@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 
 import type { ScenarioHashPayload } from '@/lib/urlHash';
 import { encodeScenario } from '@/lib/urlHash';
@@ -17,6 +17,7 @@ export function ShareButton() {
   const customLawActive = useScenarioStore((state) => state.customLawActive);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [copyStatus, setCopyStatus] = useState<CopyStatus>('idle');
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
   const payload =
     customLaw === undefined ? { scenario, plan, customLawActive } : { scenario, plan, customLaw, customLawActive };
@@ -32,13 +33,18 @@ export function ShareButton() {
     setIsModalOpen(true);
   }
 
+  function closeModal() {
+    setIsModalOpen(false);
+    window.setTimeout(() => triggerRef.current?.focus(), 0);
+  }
+
   async function copyShareLink(currentPayload: ScenarioHashPayload) {
     try {
       const shareUrl = writeShareHash(currentPayload);
 
       await copyTextToClipboard(shareUrl);
       acknowledgeShareLink();
-      setIsModalOpen(false);
+      closeModal();
       setCopyStatus('share-link');
     } catch {
       setCopyStatus('error');
@@ -48,7 +54,7 @@ export function ShareButton() {
   async function exportJson(currentPayload: ScenarioHashPayload) {
     try {
       await copyTextToClipboard(JSON.stringify(currentPayload, null, 2));
-      setIsModalOpen(false);
+      closeModal();
       setCopyStatus('json');
     } catch {
       setCopyStatus('error');
@@ -56,22 +62,23 @@ export function ShareButton() {
   }
 
   return (
-    <div className="relative flex flex-col items-start gap-1">
+    <div className="relative flex min-w-[6rem] flex-col items-start gap-1">
       <button
-        className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
+        className="inline-flex w-full items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm shadow-slate-900/5 transition-colors hover:bg-slate-100 hover:text-slate-950 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 motion-reduce:transition-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:shadow-none dark:hover:bg-slate-800 dark:hover:text-slate-50 dark:focus-visible:outline-indigo-400"
         onClick={handleShareClick}
+        ref={triggerRef}
         type="button"
       >
         Share
       </button>
       {copyStatus !== 'idle' ? (
-        <p className="text-xs text-slate-600" role="status">
+        <p className="text-xs text-slate-600 dark:text-slate-400" role="status">
           {statusMessage(copyStatus)}
         </p>
       ) : null}
       {isModalOpen ? (
         <ShareLinkModal
-          onCancel={() => setIsModalOpen(false)}
+          onCancel={closeModal}
           onCopyShareLink={() => {
             void copyShareLink(payload);
           }}

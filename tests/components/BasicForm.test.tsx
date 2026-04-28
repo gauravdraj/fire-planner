@@ -88,8 +88,23 @@ describe('BasicForm', () => {
       'Healthcare',
     ]);
     for (const fieldset of fieldsets) {
-      expect(fieldset).toHaveClass('rounded-md', 'border', 'border-slate-200', 'p-4');
-      expect(fieldset.querySelector('legend')).toHaveClass('px-2', 'text-sm', 'font-semibold', 'text-slate-700');
+      expect(fieldset).toHaveClass(
+        'rounded-xl',
+        'border',
+        'border-slate-200',
+        'bg-white/90',
+        'p-4',
+        'dark:border-slate-800',
+        'dark:bg-slate-900/60',
+      );
+      expect(fieldset).toHaveAttribute('aria-describedby');
+      expect(fieldset.querySelector('legend')).toHaveClass(
+        'px-2',
+        'text-sm',
+        'font-semibold',
+        'text-slate-800',
+        'dark:text-slate-100',
+      );
     }
 
     const household = screen.getByRole('group', { name: /household/i });
@@ -171,13 +186,23 @@ describe('BasicForm', () => {
 
     fireEvent.focus(screen.getByRole('button', { name: 'About Accounts' }));
 
-    expect(
-      screen
-        .getByText('Starting supported account balances, including HSA, and taxable basis used by the withdrawal display layer.')
-        .closest('[role="tooltip"]'),
-    ).toHaveTextContent(
+    const accountsTrigger = screen.getByRole('button', { name: 'About Accounts' });
+    const tooltipId = accountsTrigger.getAttribute('aria-describedby');
+    const tooltip = tooltipId === null ? null : document.getElementById(tooltipId);
+
+    if (tooltip === null) {
+      throw new Error('Expected Accounts tooltip to be described by an element id.');
+    }
+
+    expect(tooltip).toHaveAttribute('role', 'tooltip');
+    expect(tooltip).toHaveTextContent(
       'Starting supported account balances, including HSA, and taxable basis used by the withdrawal display layer.',
     );
+    expect(
+      screen.getAllByText(
+        'Starting supported account balances, including HSA, and taxable basis used by the withdrawal display layer.',
+      ),
+    ).toHaveLength(2);
   });
 
   it('renders derived chips and updates them after valid debounced edits', () => {

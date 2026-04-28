@@ -57,6 +57,7 @@ type CellModel = Readonly<{
   srText?: string;
   title?: string;
   hint?: string;
+  hintTone?: 'balanced' | 'shortfall';
 }>;
 
 type TableColumn = YearByYearColumnDefinition &
@@ -80,6 +81,8 @@ const NEAR_BRACKET_THRESHOLD = 5_000;
 const BALANCE_HINT_ROW_CAP = 15;
 const BALANCE_HINT_DEBOUNCE_MS = 150;
 const BALANCED_CASHFLOW_THRESHOLD = 100;
+const DOWNLOAD_BUTTON_CLASS =
+  'rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 shadow-sm shadow-slate-900/5 transition-colors hover:border-slate-400 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 motion-reduce:transition-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 dark:shadow-none dark:hover:border-slate-600 dark:hover:bg-slate-900 dark:focus-visible:outline-indigo-400';
 
 type BalanceHintTarget = Readonly<{
   afterTaxCashFlow: number;
@@ -198,21 +201,26 @@ export function YearByYearTable({ now = new Date() }: YearByYearTableProps) {
   }, [balanceHintTargets, computeBalanceHints]);
 
   return (
-    <section aria-labelledby="year-by-year-heading" className="mt-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-lg font-semibold" id="year-by-year-heading">
-          Year-by-year projection
-        </h2>
+    <section aria-labelledby="year-by-year-heading" className="mt-6 min-w-0">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div className="max-w-2xl">
+          <h2 className="text-lg font-semibold text-slate-950 dark:text-slate-50" id="year-by-year-heading">
+            Year-by-year projection
+          </h2>
+          <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-400">
+            Dense nominal/real outputs share the export column metadata. Scroll sideways on smaller screens.
+          </p>
+        </div>
         <div className="flex flex-wrap items-center gap-2">
           <button
-            className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+            className={DOWNLOAD_BUTTON_CLASS}
             onClick={handleDownloadCsv}
             type="button"
           >
             Download CSV
           </button>
           <button
-            className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+            className={DOWNLOAD_BUTTON_CLASS}
             onClick={handleDownloadJson}
             type="button"
           >
@@ -220,9 +228,12 @@ export function YearByYearTable({ now = new Date() }: YearByYearTableProps) {
           </button>
         </div>
       </div>
-      <div className="mt-3 overflow-x-auto rounded-lg border border-slate-200" data-testid="year-table-scroll">
-        <table className="min-w-[2700px] w-full border-separate border-spacing-0 text-xs">
-          <thead className="text-slate-600">
+      <div
+        className="mt-3 max-w-full overflow-x-auto overscroll-x-contain rounded-xl border border-slate-200 bg-white shadow-sm shadow-slate-900/5 [contain:paint] dark:border-slate-800 dark:bg-slate-950 dark:shadow-none"
+        data-testid="year-table-scroll"
+      >
+        <table className="w-full min-w-[2700px] border-separate border-spacing-0 text-xs text-slate-700 dark:text-slate-200">
+          <thead className="text-slate-600 dark:text-slate-300">
             <tr>
               {yearByYearColumnBands.map((band) => (
                 <BandHeader band={band} key={band} />
@@ -234,28 +245,39 @@ export function YearByYearTable({ now = new Date() }: YearByYearTableProps) {
               ))}
             </tr>
           </thead>
-          <tbody className="bg-white">
-            {rows.map((row) => (
-              <tr
-                className={classNames(
-                  'border-b border-slate-200',
-                  row.isRetirementYear && 'border-l-4 border-indigo-500 bg-indigo-50/40',
-                )}
-                data-stale={isStale ? 'true' : undefined}
-                data-testid={`year-table-row-${row.metrics.year}`}
-                key={row.metrics.year}
-              >
-                {TABLE_COLUMNS.map((column) => (
-                  <TableCell
-                    column={column}
-                    context={context}
-                    dataStale={isStale}
-                    key={column.id}
-                    row={row}
-                  />
-                ))}
+          <tbody className="bg-white dark:bg-slate-950">
+            {rows.length === 0 ? (
+              <tr>
+                <td
+                  className="px-4 py-8 text-center text-sm text-slate-500 dark:text-slate-400"
+                  colSpan={TABLE_COLUMNS.length}
+                >
+                  No projection rows available for the current inputs.
+                </td>
               </tr>
-            ))}
+            ) : (
+              rows.map((row) => (
+                <tr
+                  className={classNames(
+                    'border-b border-slate-200 dark:border-slate-800',
+                    row.isRetirementYear && 'border-l-4 border-indigo-500 bg-indigo-50/40 dark:bg-indigo-950/20',
+                  )}
+                  data-stale={isStale ? 'true' : undefined}
+                  data-testid={`year-table-row-${row.metrics.year}`}
+                  key={row.metrics.year}
+                >
+                  {TABLE_COLUMNS.map((column) => (
+                    <TableCell
+                      column={column}
+                      context={context}
+                      dataStale={isStale}
+                      key={column.id}
+                      row={row}
+                    />
+                  ))}
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>
@@ -306,8 +328,8 @@ function BandHeader({ band }: { band: YearByYearColumnBand }) {
   return (
     <th
       className={classNames(
-        'sticky top-0 z-30 border-b border-slate-200 bg-slate-100 px-3 py-2 text-center text-[0.68rem] font-semibold uppercase tracking-wide text-slate-600',
-        band !== 'Identity' && 'border-l border-slate-300',
+        'sticky top-0 z-30 border-b border-slate-200 bg-slate-100 px-3 py-2 text-center text-[0.68rem] font-semibold uppercase tracking-wide text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300',
+        band !== 'Identity' && 'border-l border-slate-300 dark:border-slate-700',
         band === 'Identity' && 'left-0 z-50 text-left',
       )}
       colSpan={columns.length}
@@ -328,11 +350,11 @@ function ColumnHeader({ column }: { column: TableColumn }) {
     <th
       aria-label={explanation.label}
       className={classNames(
-        'sticky top-8 z-20 border-b border-slate-200 bg-slate-50 px-3 py-2 font-medium tabular-nums',
+        'sticky top-8 z-20 border-b border-slate-200 bg-slate-50 px-3 py-2 font-medium tabular-nums text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200',
         column.align === 'left' ? 'text-left' : 'text-right',
-        column.dividerBefore && 'border-l border-slate-300',
+        column.dividerBefore && 'border-l border-slate-300 dark:border-slate-700',
         columnWidthClass(column),
-        stickyColumnClass(column, 'bg-slate-50', true),
+        stickyColumnClass(column, 'bg-slate-50 dark:bg-slate-900', true),
       )}
       scope="col"
     >
@@ -358,12 +380,12 @@ function TableCell({
   const cell = column.getCell(row, context);
   const isPulsing = useChangePulse(cell.pulseValue);
   const describedById = cell.srText === undefined ? undefined : `year-table-${row.metrics.year}-${column.id}-description`;
-  const rowBackground = row.isRetirementYear ? 'bg-indigo-50' : 'bg-white';
-  const backgroundClass = isPulsing ? 'bg-yellow-100' : (cell.className ?? rowBackground);
+  const rowBackground = row.isRetirementYear ? 'bg-indigo-50 dark:bg-indigo-950/40' : 'bg-white dark:bg-slate-950';
+  const backgroundClass = isPulsing ? 'bg-yellow-100 dark:bg-yellow-900/40' : (cell.className ?? rowBackground);
   const className = classNames(
-    'border-b border-slate-200 px-3 py-2 tabular-nums transition-colors duration-700',
+    'border-b border-slate-200 px-3 py-2 tabular-nums transition-colors duration-700 data-[stale=true]:opacity-80 motion-reduce:transition-none dark:border-slate-800',
     column.align === 'left' ? 'text-left' : 'text-right',
-    column.dividerBefore && 'border-l border-slate-300',
+    column.dividerBefore && 'border-l border-slate-300 dark:border-slate-700',
     columnWidthClass(column),
     stickyColumnClass(column, rowBackground, false),
     row.isRetirementYear && column.sticky === 'year' && 'border-l-4 border-indigo-500',
@@ -385,13 +407,13 @@ function TableCell({
       {cell.marker === undefined ? null : (
         <span
           aria-hidden="true"
-          className="ml-1 rounded-full bg-amber-200 px-1.5 py-0.5 text-[0.6rem] font-semibold uppercase tracking-wide text-amber-900"
+          className="ml-1 rounded-full bg-amber-200 px-1.5 py-0.5 text-[0.6rem] font-semibold uppercase tracking-wide text-amber-900 dark:bg-amber-900/70 dark:text-amber-100"
         >
           {cell.marker}
         </span>
       )}
       {cell.hint === undefined ? null : (
-        <div className="mt-0.5 text-[0.65rem] font-medium leading-tight text-slate-500">{cell.hint}</div>
+        <div className={balanceHintClassName(cell.hintTone)}>{cell.hint}</div>
       )}
       {cell.srText === undefined ? null : (
         <span className="sr-only" id={describedById}>
@@ -445,21 +467,21 @@ function optionalMoneyCell(amount: number | null, year: number, context: TableRe
 }
 
 function cashflowCell(amount: number, year: number, context: TableRenderContext): CellModel {
-  const hint = formatBalanceHint(context.balanceHints.get(year), year, context);
+  const balanceHint = context.balanceHints.get(year);
   const cell: CellModel = {
     ...moneyCell(amount, year, context),
     metricBandType: 'cashflow',
     rawNumeric: amount,
   };
 
-  return hint === undefined ? cell : { ...cell, hint };
-}
-
-function formatBalanceHint(hint: BalanceHint | undefined, year: number, context: TableRenderContext): string | undefined {
-  if (hint === undefined) {
-    return undefined;
+  if (balanceHint === undefined) {
+    return cell;
   }
 
+  return { ...cell, hint: formatBalanceHint(balanceHint, year, context), hintTone: balanceHint.kind };
+}
+
+function formatBalanceHint(hint: BalanceHint, year: number, context: TableRenderContext): string {
   if (hint.kind === 'balanced') {
     return '→ balanced';
   }
@@ -480,7 +502,7 @@ function federalTaxCell(row: DisplayRow, context: TableRenderContext): CellModel
 
   return {
     ...baseCell,
-    className: 'bg-amber-50 text-amber-900',
+    className: 'bg-amber-50 text-amber-900 dark:bg-amber-950/45 dark:text-amber-100',
     marker: 'near',
     srText,
     title: srText,
@@ -543,10 +565,23 @@ function stickyColumnClass(column: TableColumn, backgroundClass: string, isHeade
     case 'age':
       return classNames('sticky left-20', zIndexClass, backgroundClass);
     case 'phase':
-      return classNames('sticky left-[9rem] shadow-[2px_0_0_rgba(148,163,184,0.35)]', zIndexClass, backgroundClass);
+      return classNames(
+        'sticky left-[9rem] shadow-[2px_0_0_rgba(148,163,184,0.35)] dark:shadow-[2px_0_0_rgba(51,65,85,0.9)]',
+        zIndexClass,
+        backgroundClass,
+      );
     default:
       return '';
   }
+}
+
+function balanceHintClassName(tone: CellModel['hintTone']): string {
+  return classNames(
+    'mt-0.5 text-[0.65rem] font-medium leading-tight',
+    tone === 'balanced'
+      ? 'text-emerald-700 dark:text-emerald-300'
+      : 'text-amber-700 dark:text-amber-300',
+  );
 }
 
 function columnWidthClass(column: TableColumn): string {

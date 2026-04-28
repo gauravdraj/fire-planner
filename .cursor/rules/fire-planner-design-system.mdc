@@ -1,0 +1,44 @@
+---
+description: fire-planner UI design tokens, visual language, and dark-mode conventions.
+globs:
+  - "src/**/*.tsx"
+  - "src/**/*.ts"
+  - "src/index.css"
+  - "tailwind.config.*"
+---
+
+# fire-planner Design System
+
+`fire-planner` should feel like a calm, trustworthy financial planning tool: precise, legible, privacy-forward, and less like a generic SaaS dashboard. Preserve the browser-only architecture and avoid adding new UI dependencies unless a task explicitly justifies them.
+
+## Visual Direction
+
+- Use an editorial financial-planner aesthetic: quiet surfaces, clear hierarchy, restrained accent color, generous whitespace, and dense-but-readable data views.
+- Indigo remains the only brand accent. Use neutral slate/zinc/stone surfaces for structure and amber/red/emerald only for status semantics.
+- Avoid generic AI UI tropes: gratuitous gradients, glassmorphism, excessive shadows, decorative charts that do not add meaning, fake marketing copy, or random blue/purple accent drift.
+
+## Tokens
+
+- Spacing should follow Tailwind's 4px scale. Prefer `gap-3`, `gap-4`, `gap-6`, `p-4`, `p-5`, `p-6`, `py-8`, and larger section gaps only when they clarify hierarchy.
+- Cards/panels should generally use `rounded-xl` or `rounded-2xl`, `border`, and subtle shadows only when elevation is meaningful.
+- Text hierarchy:
+  - Page title: `text-2xl` to `text-3xl`, `font-semibold`, `tracking-tight`.
+  - Section title: `text-lg` to `text-xl`, `font-semibold`.
+  - Body/help text: `text-sm`, relaxed line-height, muted neutral color.
+  - Numeric outputs should use tabular numerals where helpful (`tabular-nums`).
+- Keep line lengths readable. Financial explanation copy should not stretch across the full viewport on desktop.
+
+## Dark Mode
+
+- Implement dark mode with Tailwind's `dark:` variant and a root `dark` class, not a second component tree.
+- Persist the theme preference in the existing local UI preference layer, with support for a system/default option if practical.
+- Every new light surface/color class should have a deliberate dark equivalent. Avoid unreadable combinations such as dark text on dark surfaces or low-contrast muted copy.
+- Recharts SVG internals should use resolved-theme values from `src/lib/chartPalette.ts`; do not rely on outer `dark:` classes for chart strokes, fills, legends, reference lines, bands, or tooltip contrast.
+- Charts, tables, form controls, banners, tooltips, and status cells must be checked in both light and dark modes.
+
+## Component Surfaces
+
+- Prefer a small set of reusable surface patterns: app shell, page header, panel/card, section header, toolbar, segmented control, table, chart card, callout, and form field group.
+- Do not duplicate component styling across basic, advanced, compare, and methodology views when a simple local abstraction reduces meaningful repetition.
+- Keep shared styling close to React components unless a repeated Tailwind pattern clearly deserves extraction.
+- `src/components/ui/controlStyles.ts` is the local helper for repeated form-control class strings; keep it small and Tailwind-only rather than growing it into a component library.

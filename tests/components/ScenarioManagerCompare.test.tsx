@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { CompareView } from '@/components/compare/CompareView';
@@ -80,6 +80,18 @@ describe('scenario manager and compare view', () => {
 
     const baselineRow = screen.getByLabelText('Select Baseline for comparison').closest('li');
     expect(baselineRow).not.toBeNull();
+
+    act(() => {
+      useScenarioStore.getState().replaceFormValues(ALTERNATE_FORM_VALUES);
+    });
+    fireEvent.click(within(baselineRow as HTMLElement).getByRole('button', { name: 'Update snapshot' }));
+
+    const updatedBaseline = useScenariosStore.getState().list().find((scenario) => scenario.name === 'Baseline');
+    expect(updatedBaseline?.scenario.balances).toMatchObject({
+      taxableBrokerage: ALTERNATE_FORM_VALUES.brokerageAndCashBalance,
+      traditional: ALTERNATE_FORM_VALUES.traditionalBalance,
+    });
+
     fireEvent.change(screen.getByLabelText('Rename Baseline'), { target: { value: 'Optimized' } });
     fireEvent.click(within(baselineRow as HTMLElement).getByRole('button', { name: 'Rename' }));
 
@@ -104,6 +116,7 @@ describe('scenario manager and compare view', () => {
   it('closes on Escape, restores focus, and launches comparison for exactly two selections', async () => {
     const first = saveNamedScenario('Baseline', BASE_FORM_VALUES);
     const second = saveNamedScenario('Harvest plan', ALTERNATE_FORM_VALUES);
+    saveNamedScenario('Conservative', { ...BASE_FORM_VALUES, annualSpendingToday: 70_000 });
     const onCompare = vi.fn();
 
     render(<ScenarioManager onCompare={onCompare} />);
@@ -122,6 +135,11 @@ describe('scenario manager and compare view', () => {
     fireEvent.click(trigger);
     fireEvent.click(screen.getByLabelText('Select Baseline for comparison'));
     fireEvent.click(screen.getByLabelText('Select Harvest plan for comparison'));
+
+    expect(screen.getByText('Ready to compare')).toBeInTheDocument();
+    expect(screen.getByLabelText('Select Conservative for comparison')).toBeDisabled();
+    expect(screen.getByText('Two scenarios are already selected. Clear one before adding this scenario.')).toBeInTheDocument();
+
     fireEvent.click(screen.getByRole('button', { name: 'Compare selected scenarios' }));
 
     expect(onCompare).toHaveBeenCalledWith([first.id, second.id]);
@@ -143,13 +161,19 @@ describe('scenario manager and compare view', () => {
     expect(screen.getAllByText('Baseline').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Harvest plan').length).toBeGreaterThan(0);
     expect(screen.getByText('ACA premium credit')).toBeInTheDocument();
+    expect(screen.getByText('Exactly two scenarios selected')).toBeInTheDocument();
 
-    const firstMagiSelect = screen.getByLabelText('MAGI series for Baseline');
-    expect(firstMagiSelect).toHaveValue('acaMagi');
+    const firstMagiGroup = screen.getByRole('group', { name: 'MAGI series for Baseline' });
+    const acaMagiButton = within(firstMagiGroup).getByRole('button', { name: 'ACA MAGI' });
+    const irmaaMagiButton = within(firstMagiGroup).getByRole('button', { name: 'IRMAA MAGI' });
 
-    fireEvent.change(firstMagiSelect, { target: { value: 'irmaaMagi' } });
+    expect(acaMagiButton).toHaveAttribute('aria-pressed', 'true');
+    expect(irmaaMagiButton).toHaveAttribute('aria-pressed', 'false');
 
-    expect(firstMagiSelect).toHaveValue('irmaaMagi');
+    fireEvent.click(irmaaMagiButton);
+
+    expect(acaMagiButton).toHaveAttribute('aria-pressed', 'false');
+    expect(irmaaMagiButton).toHaveAttribute('aria-pressed', 'true');
   });
 });
 

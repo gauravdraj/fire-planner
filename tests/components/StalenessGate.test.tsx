@@ -46,6 +46,7 @@ describe('StalenessGate', () => {
       'Tax data is stale.',
     );
     expect(screen.getByRole('dialog', { name: /tax data is stale/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /acknowledge and continue/i })).toHaveFocus();
 
     fireEvent.click(screen.getByRole('button', { name: /acknowledge and continue/i }));
 
