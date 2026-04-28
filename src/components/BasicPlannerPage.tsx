@@ -3,6 +3,7 @@ import { BasicForm } from '@/components/BasicForm';
 import { MagiChart } from '@/components/charts/MagiChart';
 import { LiveStatsStrip } from '@/components/LiveStatsStrip';
 import { SeventyTwoTCalc } from '@/components/SeventyTwoTCalc';
+import { StarterTemplateChooser } from '@/components/StarterTemplateChooser';
 import { TaxBreakdownChart } from '@/components/charts/TaxBreakdownChart';
 import { WhyChangedCallout } from '@/components/WhyChangedCallout';
 import { YearByYearTable } from '@/components/YearByYearTable';
@@ -16,6 +17,7 @@ export function BasicPlannerPage() {
       <p className="mt-2 text-sm text-slate-600">
         Enter the household facts the current engine supports, and the projection updates as you edit.
       </p>
+      <StarterTemplateChooser />
       <BasicForm />
       <ProjectionResults />
       <section aria-labelledby="seventy-two-t-heading" className="mt-6 rounded-lg border border-slate-200 bg-slate-50 p-4">

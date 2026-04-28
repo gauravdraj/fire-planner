@@ -2,12 +2,19 @@ import { act, cleanup, fireEvent, render, screen, within } from '@testing-librar
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { YearByYearTable } from '@/components/YearByYearTable';
+import { balanceYearToZero } from '@/core/balanceYearToZero';
 import { CONSTANTS_2026 } from '@/core/constants/2026';
 import type { AccountBalances, YearBreakdown } from '@/core/projection';
 import { useScenarioStore } from '@/store/scenarioStore';
 import { useUiStore } from '@/store/uiStore';
 
 import { installMemoryLocalStorage } from '../store/memoryStorage';
+
+vi.mock('@/core/balanceYearToZero', () => ({
+  balanceYearToZero: vi.fn(),
+}));
+
+const mockBalanceYearToZero = vi.mocked(balanceYearToZero);
 
 const ZERO_BALANCES: AccountBalances = {
   cash: 0,
@@ -203,6 +210,14 @@ describe('YearByYearTable', () => {
     useUiStore.getState().resetUiPreferences();
     useScenarioStore.getState().resetScenario();
     installFixtureState();
+    mockBalanceYearToZero.mockClear();
+    mockBalanceYearToZero.mockImplementation((year) => ({
+      year,
+      brokerageWithdrawal: year === 2028 ? 2_500 : 1_000,
+      resultingCashflow: 0,
+      iterations: 1,
+      converged: true,
+    }));
   });
 
   afterEach(() => {
@@ -361,6 +376,127 @@ describe('YearByYearTable', () => {
     expect(cellFor(2027, 'federalTax')).toHaveTextContent(
       'Federal taxable income is $3,012 below the next ordinary bracket edge.',
     );
+  });
+
+  it('renders passive balance hints after the debounce delay', () => {
+    vi.useFakeTimers();
+    useUiStore.getState().setDisplayUnit('nominal');
+    useScenarioStore.setState({
+      projectionResults: [
+        ...TABLE_FIXTURE,
+        buildYearBreakdown({
+          afterTaxCashFlow: 50,
+          year: 2029,
+        }),
+      ],
+    });
+
+    render(<YearByYearTable now={dateAtTaxDataAge(0)} />);
+
+    expect(mockBalanceYearToZero).not.toHaveBeenCalled();
+    expect(cellFor(2028, 'afterTaxCashFlow')).not.toHaveTextContent('to balance');
+
+    act(() => {
+      vi.advanceTimersByTime(150);
+    });
+
+    expect(mockBalanceYearToZero).toHaveBeenCalledWith(2028, expect.any(Object), expect.any(Object), {
+      tolerance: 100,
+    });
+    expect(mockBalanceYearToZero).toHaveBeenCalledWith(2029, expect.any(Object), expect.any(Object), {
+      tolerance: 100,
+    });
+    expect(mockBalanceYearToZero).not.toHaveBeenCalledWith(2027, expect.any(Object), expect.any(Object), {
+      tolerance: 100,
+    });
+    expect(within(cellFor(2028, 'afterTaxCashFlow')).getByText(/→ \+\$\d[\d,]* to balance/)).toBeVisible();
+    expect(within(cellFor(2028, 'afterTaxCashFlow')).getByText('→ +$2,500 to balance')).toHaveClass(
+      'text-slate-500',
+    );
+    expect(within(cellFor(2029, 'afterTaxCashFlow')).getByText('→ balanced')).toBeVisible();
+    expect(within(cellFor(2029, 'afterTaxCashFlow')).getByText('→ balanced')).toHaveClass('text-slate-500');
+  });
+
+  it('recomputes passive balance hints when projection inputs change', () => {
+    vi.useFakeTimers();
+    useUiStore.getState().setDisplayUnit('nominal');
+    mockBalanceYearToZero.mockImplementation((year, _scenario, plan) => {
+      const spendingForYear = plan.annualSpending.find((entry) => entry.year === year)?.amount ?? 0;
+
+      return {
+        year,
+        brokerageWithdrawal: spendingForYear === 123_456 ? 7_500 : 2_500,
+        resultingCashflow: 0,
+        iterations: 1,
+        converged: true,
+      };
+    });
+
+    render(<YearByYearTable now={dateAtTaxDataAge(0)} />);
+
+    act(() => {
+      vi.advanceTimersByTime(150);
+    });
+
+    expect(within(cellFor(2028, 'afterTaxCashFlow')).getByText('→ +$2,500 to balance')).toBeVisible();
+
+    const currentPlan = useScenarioStore.getState().plan;
+    const updatedPlan = {
+      ...currentPlan,
+      annualSpending: [
+        ...currentPlan.annualSpending.filter((entry) => entry.year !== 2028),
+        { year: 2028, amount: 123_456 },
+      ],
+    };
+
+    act(() => {
+      useScenarioStore.setState({
+        plan: updatedPlan,
+        projectionResults: TABLE_FIXTURE.map((breakdown) =>
+          breakdown.year === 2028 ? { ...breakdown, afterTaxCashFlow: -6_000 } : breakdown,
+        ),
+      });
+    });
+
+    act(() => {
+      vi.advanceTimersByTime(150);
+    });
+
+    expect(within(cellFor(2028, 'afterTaxCashFlow')).getByText('→ +$7,500 to balance')).toBeVisible();
+    expect(cellFor(2028, 'afterTaxCashFlow')).not.toHaveTextContent('→ +$2,500 to balance');
+    expect(mockBalanceYearToZero.mock.calls.at(-1)?.[2]).toMatchObject({
+      annualSpending: expect.arrayContaining([{ year: 2028, amount: 123_456 }]),
+    });
+  });
+
+  it('caps balance hints to the first 15 chronological retirement rows', () => {
+    vi.useFakeTimers();
+    useUiStore.getState().setDisplayUnit('nominal');
+    useScenarioStore.setState({
+      formValues: {
+        ...useScenarioStore.getState().formValues,
+        retirementYear: 2027,
+      },
+      projectionResults: [
+        buildYearBreakdown({ afterTaxCashFlow: -1_000, year: 2026 }),
+        ...Array.from({ length: 16 }, (_unused, index) =>
+          buildYearBreakdown({ afterTaxCashFlow: -1_000, year: 2027 + index }),
+        ),
+      ],
+    });
+
+    render(<YearByYearTable now={dateAtTaxDataAge(0)} />);
+
+    act(() => {
+      vi.advanceTimersByTime(150);
+    });
+
+    expect(mockBalanceYearToZero.mock.calls.map((call) => call[0])).toEqual(
+      Array.from({ length: 15 }, (_unused, index) => 2027 + index),
+    );
+    expect(cellFor(2041, 'afterTaxCashFlow')).toHaveTextContent('→ +$1,000 to balance');
+    expect(cellFor(2042, 'afterTaxCashFlow')).not.toHaveTextContent('to balance');
+    expect(cellFor(2026, 'afterTaxCashFlow')).not.toHaveTextContent('to balance');
   });
 
   it('marks all output rows and cells stale for soft and hard tax-data staleness', () => {

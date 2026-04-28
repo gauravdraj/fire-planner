@@ -1,3 +1,6 @@
+import { useEffect, useMemo, useState } from 'react';
+
+import { balanceYearToZero } from '@/core/balanceYearToZero';
 import { CONSTANTS_2026 } from '@/core/constants/2026';
 import {
   computeYearDisplayMetrics,
@@ -10,6 +13,7 @@ import { columnExplanations, type TableColumnId } from '@/lib/columnExplanations
 import { toReal } from '@/lib/realDollars';
 import { getStalenessLevel } from '@/lib/staleness';
 import { useChangePulse } from '@/lib/useChangePulse';
+import { useDebouncedCallback } from '@/lib/useDebouncedCallback';
 import { useScenarioStore } from '@/store/scenarioStore';
 import type { DisplayUnit } from '@/store/uiStore';
 import { useUiStore } from '@/store/uiStore';
@@ -26,6 +30,7 @@ type TableBand = 'Identity' | 'Balances' | 'Income' | 'Tax' | 'KPIs';
 type StickyColumn = 'year' | 'age' | 'phase';
 
 type TableRenderContext = Readonly<{
+  balanceHints: ReadonlyMap<number, BalanceHint>;
   displayUnit: DisplayUnit;
   scenario: Scenario;
 }>;
@@ -45,6 +50,7 @@ type CellModel = Readonly<{
   marker?: string;
   srText?: string;
   title?: string;
+  hint?: string;
 }>;
 
 type TableColumn = Readonly<{
@@ -71,6 +77,23 @@ const PERCENT_FORMATTER = new Intl.NumberFormat('en-US', {
 const EM_DASH = '—';
 const HEADER_BANDS = ['Identity', 'Balances', 'Income', 'Tax', 'KPIs'] as const satisfies readonly TableBand[];
 const NEAR_BRACKET_THRESHOLD = 5_000;
+const BALANCE_HINT_ROW_CAP = 15;
+const BALANCE_HINT_DEBOUNCE_MS = 150;
+const BALANCED_CASHFLOW_THRESHOLD = 100;
+
+type BalanceHintTarget = Readonly<{
+  afterTaxCashFlow: number;
+  year: number;
+}>;
+
+type BalanceHint =
+  | Readonly<{
+      kind: 'balanced';
+    }>
+  | Readonly<{
+      brokerageWithdrawal: number;
+      kind: 'shortfall';
+    }>;
 
 const TABLE_COLUMNS: readonly TableColumn[] = [
   {
@@ -270,11 +293,43 @@ const TABLE_COLUMNS: readonly TableColumn[] = [
 export function YearByYearTable({ now = new Date() }: YearByYearTableProps) {
   const projectionResults = useScenarioStore((state) => state.projectionResults);
   const scenario = useScenarioStore((state) => state.scenario);
+  const plan = useScenarioStore((state) => state.plan);
   const formValues = useScenarioStore((state) => state.formValues);
   const displayUnit = useUiStore((state) => state.displayUnit);
   const isStale = getStalenessLevel(CONSTANTS_2026.retrievedAt, now) !== 'fresh';
-  const rows = buildDisplayRows({ formValues, projectionResults, scenario });
-  const context = { displayUnit, scenario };
+  const rows = useMemo(
+    () => buildDisplayRows({ formValues, projectionResults, scenario }),
+    [formValues, projectionResults, scenario],
+  );
+  const balanceHintTargets = useMemo(
+    () => buildBalanceHintTargets(rows, formValues.retirementYear),
+    [formValues.retirementYear, rows],
+  );
+  const [balanceHints, setBalanceHints] = useState<ReadonlyMap<number, BalanceHint>>(() => new Map());
+  const computeBalanceHints = useDebouncedCallback((targets: readonly BalanceHintTarget[]) => {
+    const nextHints = new Map<number, BalanceHint>();
+
+    for (const target of targets) {
+      const result = balanceYearToZero(target.year, scenario, plan, { tolerance: BALANCED_CASHFLOW_THRESHOLD });
+
+      if (Math.abs(target.afterTaxCashFlow) <= BALANCED_CASHFLOW_THRESHOLD) {
+        nextHints.set(target.year, { kind: 'balanced' });
+      } else if (target.afterTaxCashFlow < 0) {
+        nextHints.set(target.year, { brokerageWithdrawal: result.brokerageWithdrawal, kind: 'shortfall' });
+      }
+    }
+
+    setBalanceHints(nextHints);
+  }, BALANCE_HINT_DEBOUNCE_MS);
+  const context = { balanceHints, displayUnit, scenario };
+
+  useEffect(() => {
+    setBalanceHints(new Map());
+
+    if (balanceHintTargets.length > 0) {
+      computeBalanceHints(balanceHintTargets);
+    }
+  }, [balanceHintTargets, computeBalanceHints]);
 
   return (
     <section aria-labelledby="year-by-year-heading" className="mt-6">
@@ -342,6 +397,22 @@ function buildDisplayRows({
       scenario,
     }),
   }));
+}
+
+function buildBalanceHintTargets(rows: readonly DisplayRow[], retirementYear: number): readonly BalanceHintTarget[] {
+  /*
+   * Balance hints can probe many projections, so keep them to the first 15
+   * chronological bridge rows and debounce the computation off the keystroke path.
+   */
+  return rows
+    .filter((row) => row.breakdown.year >= retirementYear)
+    .sort((left, right) => left.breakdown.year - right.breakdown.year)
+    .slice(0, BALANCE_HINT_ROW_CAP)
+    .filter((row) => row.breakdown.afterTaxCashFlow < 0 || Math.abs(row.breakdown.afterTaxCashFlow) <= BALANCED_CASHFLOW_THRESHOLD)
+    .map((row) => ({
+      afterTaxCashFlow: row.breakdown.afterTaxCashFlow,
+      year: row.breakdown.year,
+    }));
 }
 
 function BandHeader({ band }: { band: TableBand }) {
@@ -435,6 +506,9 @@ function TableCell({
           {cell.marker}
         </span>
       )}
+      {cell.hint === undefined ? null : (
+        <div className="mt-0.5 text-[0.65rem] font-medium leading-tight text-slate-500">{cell.hint}</div>
+      )}
       {cell.srText === undefined ? null : (
         <span className="sr-only" id={describedById}>
           {cell.srText}
@@ -487,11 +561,26 @@ function optionalMoneyCell(amount: number | null, year: number, context: TableRe
 }
 
 function cashflowCell(amount: number, year: number, context: TableRenderContext): CellModel {
-  return {
+  const hint = formatBalanceHint(context.balanceHints.get(year), year, context);
+  const cell: CellModel = {
     ...moneyCell(amount, year, context),
     metricBandType: 'cashflow',
     rawNumeric: amount,
   };
+
+  return hint === undefined ? cell : { ...cell, hint };
+}
+
+function formatBalanceHint(hint: BalanceHint | undefined, year: number, context: TableRenderContext): string | undefined {
+  if (hint === undefined) {
+    return undefined;
+  }
+
+  if (hint.kind === 'balanced') {
+    return '→ balanced';
+  }
+
+  return `→ +${formatMoney(hint.brokerageWithdrawal, year, context)} to balance`;
 }
 
 function federalTaxCell(row: DisplayRow, context: TableRenderContext): CellModel {

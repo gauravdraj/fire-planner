@@ -75,12 +75,13 @@ const HASH_FORM_VALUES: BasicFormValues = {
 };
 
 async function importBasicPlannerPage() {
-  const [{ BasicPlannerPage }, { useScenarioStore }] = await Promise.all([
+  const [{ BasicPlannerPage }, { STARTER_TEMPLATES }, { DEFAULT_BASIC_FORM_VALUES, useScenarioStore }] = await Promise.all([
     import('@/components/BasicPlannerPage'),
+    import('@/lib/starterTemplates'),
     import('@/store/scenarioStore'),
   ]);
 
-  return { BasicPlannerPage, useScenarioStore };
+  return { BasicPlannerPage, DEFAULT_BASIC_FORM_VALUES, STARTER_TEMPLATES, useScenarioStore };
 }
 
 function advanceLiveDebounce() {
@@ -137,6 +138,76 @@ describe('BasicPlannerPage', () => {
 
     expect(useScenarioStore.getState().formValues).toEqual(scenarioFormValues);
     expect(useScenarioStore.getState()).not.toHaveProperty('hasRunProjection');
+  });
+
+  it('loads starter templates through the scenario store and refreshes visible form values', async () => {
+    vi.useFakeTimers();
+    const { BasicPlannerPage, DEFAULT_BASIC_FORM_VALUES, STARTER_TEMPLATES, useScenarioStore } =
+      await importBasicPlannerPage();
+
+    render(<BasicPlannerPage />);
+
+    expect(screen.getByRole('heading', { name: /try a sample scenario/i })).toBeInTheDocument();
+    const explanation = screen.getByText(/These examples show two common FIRE bridge strategies/i);
+    expect(explanation).toHaveTextContent(/update the projection instantly/i);
+    expect(explanation).toHaveTextContent(/72\(t\) context scenario/i);
+    expect(explanation).toHaveTextContent(/Roth ladder scenario/i);
+    expect(explanation.tagName).toBe('P');
+
+    const initialProjectionResults = useScenarioStore.getState().projectionResults;
+    const brokerageBridgeTemplate = STARTER_TEMPLATES[0];
+    fireEvent.click(screen.getByRole('button', { name: /brokerage bridge with 72\(t\) context/i }));
+
+    expect(useScenarioStore.getState().formValues).toEqual({
+      ...DEFAULT_BASIC_FORM_VALUES,
+      ...brokerageBridgeTemplate.formValues,
+    });
+    expect(useScenarioStore.getState().projectionResults).not.toBe(initialProjectionResults);
+    expect(screen.getByLabelText('State')).toHaveValue(brokerageBridgeTemplate.formValues.stateCode);
+    expect(screen.getByLabelText('Annual spending')).toHaveValue(
+      String(brokerageBridgeTemplate.formValues.annualSpendingToday),
+    );
+    expect(screen.getByLabelText('Auto-deplete brokerage')).toBeChecked();
+    expect(
+      screen.getByText(`Loaded '${brokerageBridgeTemplate.label}' — change any field to customize.`),
+    ).toBeInTheDocument();
+
+    act(() => {
+      vi.advanceTimersByTime(5_000);
+    });
+
+    expect(
+      screen.queryByText(`Loaded '${brokerageBridgeTemplate.label}' — change any field to customize.`),
+    ).not.toBeInTheDocument();
+
+    const rothLadderTemplate = STARTER_TEMPLATES[1];
+    fireEvent.click(screen.getByRole('button', { name: /roth ladder bridge/i }));
+
+    expect(useScenarioStore.getState().formValues).toEqual({
+      ...DEFAULT_BASIC_FORM_VALUES,
+      ...rothLadderTemplate.formValues,
+    });
+    expect(screen.getByLabelText('State')).toHaveValue(rothLadderTemplate.formValues.stateCode);
+    expect(screen.getByLabelText('Annual mortgage P&I')).toHaveValue(
+      String(rothLadderTemplate.formValues.annualMortgagePAndI),
+    );
+    expect(screen.getByText(`Loaded '${rothLadderTemplate.label}' — change any field to customize.`)).toBeInTheDocument();
+  });
+
+  it('cleans up starter template confirmation timers on unmount', async () => {
+    vi.useFakeTimers();
+    const clearTimeoutSpy = vi.spyOn(window, 'clearTimeout');
+    const { BasicPlannerPage } = await importBasicPlannerPage();
+
+    const { unmount } = render(<BasicPlannerPage />);
+    fireEvent.click(screen.getByRole('button', { name: /brokerage bridge with 72\(t\) context/i }));
+
+    expect(screen.getByText(/change any field to customize/i)).toBeInTheDocument();
+
+    unmount();
+
+    expect(clearTimeoutSpy).toHaveBeenCalled();
+    clearTimeoutSpy.mockRestore();
   });
 
   it('hydrates a valid URL hash before localStorage and renders dependent outputs', async () => {

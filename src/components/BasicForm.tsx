@@ -1,4 +1,4 @@
-import { useRef, useState, type ChangeEvent, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ChangeEvent, type ReactNode } from 'react';
 
 import { deriveInputChips } from '@/core/derivedChips';
 import type { FilingStatus } from '@/core/types';
@@ -81,6 +81,7 @@ export function BasicForm() {
   const [draft, setDraft] = useStateFromFormValues(formValues);
   const [touched, setTouched] = useStateFromTouched();
   const pendingPatchRef = useRef<Partial<BasicFormValues>>({});
+  const previousFormValuesRef = useRef(formValues);
   const validation = validateBasicFormDraft(draft);
   const errors = visibleErrors(validation.errors, touched);
   const showPartnerAge = draft.filingStatus === 'mfj';
@@ -94,6 +95,19 @@ export function BasicForm() {
       setFormValues(patch);
     }
   }, LIVE_UPDATE_DELAY_MS);
+
+  useEffect(() => {
+    const previousFormValues = previousFormValuesRef.current;
+    previousFormValuesRef.current = formValues;
+
+    if (!shouldSyncDraftFromStore(draft, previousFormValues, formValues)) {
+      return;
+    }
+
+    pendingPatchRef.current = {};
+    setDraft(createDraft(formValues));
+    setTouched({});
+  }, [formValues]);
 
   function updateField(field: keyof BasicFormDraft, value: string) {
     const nextDraft = { ...draft, [field]: value };
@@ -879,6 +893,32 @@ function createDraft(values: BasicFormValues): BasicFormDraft {
     brokerageQdiPercentage: String(values.brokerageQdiPercentage),
     healthcarePhase: values.healthcarePhase,
   };
+}
+
+function shouldSyncDraftFromStore(
+  draft: BasicFormDraft,
+  previousValues: BasicFormValues,
+  nextValues: BasicFormValues,
+): boolean {
+  const changedFieldCount = countChangedFormFields(previousValues, nextValues);
+
+  if (changedFieldCount === 0) {
+    return false;
+  }
+
+  return draftMatchesFormValues(draft, previousValues) || changedFieldCount > 1;
+}
+
+function countChangedFormFields(previousValues: BasicFormValues, nextValues: BasicFormValues): number {
+  return (Object.keys(nextValues) as Array<keyof BasicFormValues>).filter(
+    (field) => previousValues[field] !== nextValues[field],
+  ).length;
+}
+
+function draftMatchesFormValues(draft: BasicFormDraft, values: BasicFormValues): boolean {
+  const valuesDraft = createDraft(values);
+
+  return (Object.keys(valuesDraft) as Array<keyof BasicFormDraft>).every((field) => draft[field] === valuesDraft[field]);
 }
 
 function isFilingStatus(value: string): value is FilingStatus {
