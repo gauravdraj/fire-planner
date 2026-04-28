@@ -157,11 +157,16 @@ describe('BasicPlannerPage', () => {
 
     expect(layout).toHaveClass('grid', 'gap-6', 'xl:grid-cols-[minmax(0,1fr)_minmax(22rem,28rem)]');
     expect(within(formColumn).getByRole('form', { name: /basic scenario form/i })).toBeInTheDocument();
-    expect(rail).toHaveClass('mt-6', 'min-w-0');
-    expect(rail.className).not.toMatch(/\bsticky\b/);
+    expect(rail).toHaveClass(
+      'mt-6',
+      'min-w-0',
+      'xl:sticky',
+      'xl:top-4',
+      'xl:max-h-[calc(100vh-2rem)]',
+      'xl:overflow-y-auto',
+      'xl:overscroll-contain',
+    );
     expect(rail.className).not.toMatch(/\boverflow-hidden\b/);
-    expect(rail.className).not.toMatch(/\boverflow-(?:auto|scroll|y-auto|y-scroll)\b/);
-    expect(rail.className).not.toMatch(/\bmax-h-/);
     expect(within(rail).getByRole('heading', { name: /projection snapshot/i })).toBeInTheDocument();
     expect(railStats).toHaveClass('mt-4');
     expect(railStats).not.toHaveClass('sticky', 'top-0', 'z-10');

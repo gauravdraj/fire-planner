@@ -57,7 +57,7 @@ function BasicResultsRail() {
   return (
     <aside
       aria-labelledby="basic-results-rail-heading"
-      className="mt-6 min-w-0 rounded-2xl border border-slate-200 bg-slate-50/70 p-4 shadow-sm shadow-slate-900/5 dark:border-slate-800 dark:bg-slate-950/35 dark:shadow-none sm:p-5"
+      className="mt-6 min-w-0 rounded-2xl border border-slate-200 bg-slate-50/70 p-4 shadow-sm shadow-slate-900/5 dark:border-slate-800 dark:bg-slate-950/35 dark:shadow-none sm:p-5 xl:sticky xl:top-4 xl:max-h-[calc(100vh-2rem)] xl:overflow-y-auto xl:overscroll-contain"
       data-testid="basic-results-rail"
     >
       <p className="text-xs font-semibold uppercase tracking-wide text-indigo-700 dark:text-indigo-300">
