@@ -75,13 +75,22 @@ const HASH_FORM_VALUES: BasicFormValues = {
 };
 
 async function importBasicPlannerPage() {
-  const [{ BasicPlannerPage }, { STARTER_TEMPLATES }, { DEFAULT_BASIC_FORM_VALUES, useScenarioStore }] = await Promise.all([
+  const [{ BasicPlannerPage }, { STARTER_TEMPLATES }, { DEFAULT_BASIC_FORM_VALUES, useScenarioStore }, { useUiStore }] = await Promise.all([
     import('@/components/BasicPlannerPage'),
     import('@/lib/starterTemplates'),
     import('@/store/scenarioStore'),
+    import('@/store/uiStore'),
   ]);
 
-  return { BasicPlannerPage, DEFAULT_BASIC_FORM_VALUES, STARTER_TEMPLATES, useScenarioStore };
+  return { BasicPlannerPage, DEFAULT_BASIC_FORM_VALUES, STARTER_TEMPLATES, useScenarioStore, useUiStore };
+}
+
+async function importClassicBasicPlannerPage() {
+  const modules = await importBasicPlannerPage();
+
+  modules.useUiStore.getState().setLayout('classic');
+
+  return modules;
 }
 
 function advanceLiveDebounce() {
@@ -104,7 +113,7 @@ describe('BasicPlannerPage', () => {
 
   it('smokes the live Basic Mode path without a run gate', async () => {
     vi.useFakeTimers();
-    const { BasicPlannerPage, useScenarioStore } = await importBasicPlannerPage();
+    const { BasicPlannerPage, useScenarioStore } = await importClassicBasicPlannerPage();
 
     render(<BasicPlannerPage />);
 
@@ -126,6 +135,7 @@ describe('BasicPlannerPage', () => {
     expect(screen.getByLabelText(/72\(t\) calculator inputs/i)).toBeInTheDocument();
     expect(screen.getByText('Fixed Amortization Method. Independent of your scenario above.')).toBeInTheDocument();
     expect(screen.getByText('$803,990.37')).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: /can you harvest taxable gains at 0%/i })).not.toBeInTheDocument();
 
     const averageMagiStat = screen.getByTestId('live-stat-average-bridge-magi');
     const initialAverageMagi = liveStatValue(averageMagiStat);
@@ -144,7 +154,7 @@ describe('BasicPlannerPage', () => {
   });
 
   it('renders the xl workstation structure with a populated results rail', async () => {
-    const { BasicPlannerPage } = await importBasicPlannerPage();
+    const { BasicPlannerPage } = await importClassicBasicPlannerPage();
 
     render(<BasicPlannerPage />);
 
@@ -177,9 +187,54 @@ describe('BasicPlannerPage', () => {
     expect(tableScroll).toHaveClass('max-w-full', 'overflow-x-auto');
   });
 
+  it('renders the verdict layout in answer-first order with collapsed details and tools', async () => {
+    const { BasicPlannerPage, useUiStore } = await importBasicPlannerPage();
+    useUiStore.getState().setLayout('verdict');
+
+    const { container } = render(<BasicPlannerPage />);
+    const answer = container.querySelector('[aria-label="Plan answer"]');
+    const whatIfCards = screen.getByRole('heading', { name: 'What can you change?' }).closest('section');
+    const formArea = container.querySelector('#adjust-your-plan');
+    const projectionDetails = screen.getByText('Show the detailed math').closest('details');
+    const secondaryTools = screen.getByText('Show starter tools').closest('details');
+
+    expect(screen.getByRole('heading', { name: /plan dashboard/i })).toBeInTheDocument();
+    expect(screen.getByText('Plan verdict')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /account balances/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /could a roth ladder reduce future ira taxes/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /can you harvest taxable gains at 0%/i })).toBeInTheDocument();
+    expect(screen.getByRole('form', { name: /basic scenario form/i })).toBeInTheDocument();
+    expect(answer).not.toBeNull();
+    expect(whatIfCards).not.toBeNull();
+    expect(formArea).not.toBeNull();
+    expect(projectionDetails).not.toBeNull();
+    expect(secondaryTools).not.toBeNull();
+    expect(answer?.compareDocumentPosition(whatIfCards as Element)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(whatIfCards?.compareDocumentPosition(formArea as Element)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(formArea?.compareDocumentPosition(projectionDetails as Element)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(projectionDetails).not.toHaveAttribute('open');
+    expect(secondaryTools).not.toHaveAttribute('open');
+
+    (projectionDetails as HTMLDetailsElement).open = true;
+    fireEvent(projectionDetails as HTMLDetailsElement, new Event('toggle'));
+
+    expect(useUiStore.getState().advancedDisclosed).toBe(true);
+    expect(screen.getByLabelText(/live projection stats/i)).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /year-by-year projection/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /magi thresholds/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /tax breakdown/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /advanced planner/i })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Planner controls' })).toBeInTheDocument();
+
+    (secondaryTools as HTMLDetailsElement).open = true;
+
+    expect(screen.getByRole('heading', { name: /sample scenarios/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /72\(t\) SEPP IRA size calculator/i })).toBeInTheDocument();
+  });
+
   it('keeps invalid basic form edits local until a valid debounced value is entered', async () => {
     vi.useFakeTimers();
-    const { BasicPlannerPage, useScenarioStore } = await importBasicPlannerPage();
+    const { BasicPlannerPage, useScenarioStore } = await importClassicBasicPlannerPage();
 
     render(<BasicPlannerPage />);
 
@@ -204,7 +259,7 @@ describe('BasicPlannerPage', () => {
   it('loads starter templates through the scenario store and refreshes visible form values', async () => {
     vi.useFakeTimers();
     const { BasicPlannerPage, DEFAULT_BASIC_FORM_VALUES, STARTER_TEMPLATES, useScenarioStore } =
-      await importBasicPlannerPage();
+      await importClassicBasicPlannerPage();
 
     render(<BasicPlannerPage />);
 
@@ -256,7 +311,7 @@ describe('BasicPlannerPage', () => {
   it('cleans up starter template confirmation timers on unmount', async () => {
     vi.useFakeTimers();
     const clearTimeoutSpy = vi.spyOn(window, 'clearTimeout');
-    const { BasicPlannerPage } = await importBasicPlannerPage();
+    const { BasicPlannerPage } = await importClassicBasicPlannerPage();
 
     const { unmount } = render(<BasicPlannerPage />);
     fireEvent.click(screen.getByRole('button', { name: /brokerage bridge with 72\(t\) context/i }));
@@ -278,7 +333,7 @@ describe('BasicPlannerPage', () => {
     );
     window.location.hash = encodeScenario(mapBasicFormToProjectionInputs(HASH_FORM_VALUES));
 
-    const { BasicPlannerPage, useScenarioStore } = await importBasicPlannerPage();
+    const { BasicPlannerPage, useScenarioStore } = await importClassicBasicPlannerPage();
 
     render(<BasicPlannerPage />);
 
@@ -302,7 +357,7 @@ describe('BasicPlannerPage', () => {
     );
     window.location.hash = '#v1:not-valid-compressed-data';
 
-    const { BasicPlannerPage, useScenarioStore } = await importBasicPlannerPage();
+    const { BasicPlannerPage, useScenarioStore } = await importClassicBasicPlannerPage();
 
     render(<BasicPlannerPage />);
 

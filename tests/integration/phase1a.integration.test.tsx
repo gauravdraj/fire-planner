@@ -131,6 +131,7 @@ describe('Phase 1A basic-form integration smoke', () => {
     installMemoryLocalStorage();
     useUiStore.getState().resetUiPreferences();
     useUiStore.getState().setDisplayUnit('nominal');
+    useUiStore.getState().setLayout('classic');
     useScenarioStore.getState().resetScenario();
     window.history.replaceState(null, '', '/planner?case=phase1a');
   });

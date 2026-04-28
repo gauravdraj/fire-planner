@@ -13,8 +13,11 @@ import { classNames } from '@/components/ui/controlStyles';
 import { useUiStore } from '@/store/uiStore';
 
 type ScenarioIdPair = readonly [string, string];
-type AdvancedTab = 'custom-law' | 'manual-plan' | 'planner-controls' | 'planning-charts' | 'scenarios';
+export type AdvancedTab = 'custom-law' | 'manual-plan' | 'planner-controls' | 'planning-charts' | 'scenarios';
 type AdvancedViewProps = {
+  activeTab?: AdvancedTab;
+  embedded?: boolean;
+  onActiveTabChange?: (tab: AdvancedTab) => void;
   onCompare?: (scenarioIds: ScenarioIdPair) => void;
 };
 
@@ -26,12 +29,20 @@ const TABS: ReadonlyArray<{ id: AdvancedTab; label: string }> = [
   { id: 'scenarios', label: 'Scenarios' },
 ];
 
-export function AdvancedView({ onCompare }: AdvancedViewProps = {}) {
+export function AdvancedView({ activeTab: controlledActiveTab, embedded = false, onActiveTabChange, onCompare }: AdvancedViewProps = {}) {
   const mode = useUiStore((state) => state.mode);
-  const [activeTab, setActiveTab] = useState<AdvancedTab>('custom-law');
+  const [uncontrolledActiveTab, setUncontrolledActiveTab] = useState<AdvancedTab>('custom-law');
+  const activeTab = controlledActiveTab ?? uncontrolledActiveTab;
 
-  if (mode !== 'advanced') {
+  if (!embedded && mode !== 'advanced') {
     return null;
+  }
+
+  function setActiveTab(tabId: AdvancedTab) {
+    if (controlledActiveTab === undefined) {
+      setUncontrolledActiveTab(tabId);
+    }
+    onActiveTabChange?.(tabId);
   }
 
   function focusTab(tabId: AdvancedTab) {

@@ -5,6 +5,7 @@ import { BasicPlannerPage } from '@/components/BasicPlannerPage';
 import { StarterTemplateChooser } from '@/components/StarterTemplateChooser';
 import { STARTER_TEMPLATES } from '@/lib/starterTemplates';
 import { DEFAULT_BASIC_FORM_VALUES, useScenarioStore } from '@/store/scenarioStore';
+import { useUiStore } from '@/store/uiStore';
 
 import { installMemoryLocalStorage } from '../store/memoryStorage';
 
@@ -17,6 +18,8 @@ describe('StarterTemplateChooser', () => {
     vi.useFakeTimers();
     installMemoryLocalStorage();
     window.history.replaceState(null, '', '/');
+    useUiStore.getState().resetUiPreferences();
+    useUiStore.getState().setLayout('classic');
     useScenarioStore.getState().resetScenario();
   });
 

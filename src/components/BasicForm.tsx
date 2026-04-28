@@ -75,7 +75,9 @@ const PERCENT_FIELDS = [
 const LIVE_UPDATE_DELAY_MS = 150;
 const PLAN_END_AFTER_PRIMARY_AGE_ERROR = 'Plan-end age must be greater than primary age.';
 
-export function BasicForm() {
+type BasicFormLayout = 'classic' | 'verdict';
+
+export function BasicForm({ layout = 'classic' }: { layout?: BasicFormLayout } = {}) {
   const formValues = useScenarioStore((state) => state.formValues);
   const scenario = useScenarioStore((state) => state.scenario);
   const projectionResults = useScenarioStore((state) => state.projectionResults);
@@ -140,166 +142,276 @@ export function BasicForm() {
     return (event: ChangeEvent<HTMLInputElement>) => updateField(field, String(event.target.checked));
   }
 
-  return (
-    <div aria-label="Basic scenario form" className="mt-6 grid items-start gap-4 sm:grid-cols-2" role="form">
-      <SectionFieldset sectionId="household">
-        <Field error={errors.filingStatus} id="filingStatus">
-          <select
-            aria-describedby={errors.filingStatus ? 'filingStatus-error' : undefined}
-            aria-invalid={errors.filingStatus ? 'true' : undefined}
-            className={inputClassName(errors.filingStatus)}
-            id="filingStatus"
-            onChange={handleSelectChange('filingStatus')}
-            value={draft.filingStatus}
-          >
-            {FILING_STATUS_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </Field>
+  if (layout === 'verdict') {
+    return renderVerdictForm();
+  }
 
-        <Field error={errors.stateCode} id="stateCode">
-          <select
-            aria-describedby={errors.stateCode ? 'stateCode-error' : undefined}
-            aria-invalid={errors.stateCode ? 'true' : undefined}
-            className={inputClassName(errors.stateCode)}
-            id="stateCode"
-            onChange={handleSelectChange('stateCode')}
-            value={draft.stateCode}
-          >
-            {STATE_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </Field>
+  return renderClassicForm();
 
-        {renderNumberField('primaryAge', draft, errors, handleInputChange)}
-        {showPartnerAge ? renderNumberField('partnerAge', draft, errors, handleInputChange) : null}
-      </SectionFieldset>
+  function renderClassicForm() {
+    return (
+      <div aria-label="Basic scenario form" className="mt-6 grid items-start gap-4 sm:grid-cols-2" role="form">
+        <SectionFieldset sectionId="household">
+          {renderFilingStatusField()}
+          {renderStateField()}
+          {renderNumberField('primaryAge', draft, errors, handleInputChange)}
+          {showPartnerAge ? renderNumberField('partnerAge', draft, errors, handleInputChange) : null}
+        </SectionFieldset>
 
-      <SectionFieldset sectionId="timeline">
-        {renderNumberField('currentYear', draft, errors, handleInputChange)}
-        {renderNumberField(
-          'retirementYear',
-          draft,
-          errors,
-          handleInputChange,
-          chips.retirementTarget,
-        )}
-        {renderNumberField('planEndAge', draft, errors, handleInputChange)}
-        {renderNumberField('socialSecurityClaimAge', draft, errors, handleInputChange)}
-      </SectionFieldset>
+        <SectionFieldset sectionId="timeline">
+          {renderNumberField('currentYear', draft, errors, handleInputChange)}
+          {renderNumberField(
+            'retirementYear',
+            draft,
+            errors,
+            handleInputChange,
+            chips.retirementTarget,
+          )}
+          {renderNumberField('planEndAge', draft, errors, handleInputChange)}
+          {renderNumberField('socialSecurityClaimAge', draft, errors, handleInputChange)}
+        </SectionFieldset>
 
-      <SectionFieldset sectionId="spending">
-        {renderNumberField(
-          'annualSpendingToday',
-          draft,
-          errors,
-          handleInputChange,
-          chips.annualSpending,
-        )}
-        {renderNumberField(
-          'annualMortgagePAndI',
-          draft,
-          errors,
-          handleInputChange,
-          chips.mortgagePAndI,
-        )}
-        {renderNumberField('mortgagePayoffYear', draft, errors, handleInputChange)}
-      </SectionFieldset>
+        <SectionFieldset sectionId="spending">
+          {renderNumberField(
+            'annualSpendingToday',
+            draft,
+            errors,
+            handleInputChange,
+            chips.annualSpending,
+          )}
+          {renderNumberField(
+            'annualMortgagePAndI',
+            draft,
+            errors,
+            handleInputChange,
+            chips.mortgagePAndI,
+          )}
+          {renderNumberField('mortgagePayoffYear', draft, errors, handleInputChange)}
+        </SectionFieldset>
 
-      <SectionFieldset sectionId="balances">
-        {renderNumberField('traditionalBalance', draft, errors, handleInputChange)}
-        {renderNumberField('rothBalance', draft, errors, handleInputChange)}
-        {renderNumberField(
-          'brokerageAndCashBalance',
-          draft,
-          errors,
-          handleInputChange,
-          chips.brokeragePlusCash,
-        )}
-        {renderNumberField(
-          'taxableBrokerageBasis',
-          draft,
-          errors,
-          handleInputChange,
-        )}
-        {renderNumberField('hsaBalance', draft, errors, handleInputChange)}
-      </SectionFieldset>
+        <SectionFieldset sectionId="balances">
+          {renderNumberField('traditionalBalance', draft, errors, handleInputChange)}
+          {renderNumberField('rothBalance', draft, errors, handleInputChange)}
+          {renderNumberField(
+            'brokerageAndCashBalance',
+            draft,
+            errors,
+            handleInputChange,
+            chips.brokeragePlusCash,
+          )}
+          {renderNumberField(
+            'taxableBrokerageBasis',
+            draft,
+            errors,
+            handleInputChange,
+          )}
+          {renderNumberField('hsaBalance', draft, errors, handleInputChange)}
+        </SectionFieldset>
 
-      <SectionFieldset sectionId="growthDividends">
-        {renderNumberField('expectedReturnTraditional', draft, errors, handleInputChange)}
-        {renderNumberField('expectedReturnRoth', draft, errors, handleInputChange)}
-        {renderNumberField('expectedReturnBrokerage', draft, errors, handleInputChange)}
-        {renderNumberField('expectedReturnHsa', draft, errors, handleInputChange)}
-        {renderNumberField('brokerageDividendYield', draft, errors, handleInputChange)}
-        {renderNumberField('brokerageQdiPercentage', draft, errors, handleInputChange)}
-      </SectionFieldset>
+        <SectionFieldset sectionId="growthDividends">
+          {renderNumberField('expectedReturnTraditional', draft, errors, handleInputChange)}
+          {renderNumberField('expectedReturnRoth', draft, errors, handleInputChange)}
+          {renderNumberField('expectedReturnBrokerage', draft, errors, handleInputChange)}
+          {renderNumberField('expectedReturnHsa', draft, errors, handleInputChange)}
+          {renderNumberField('brokerageDividendYield', draft, errors, handleInputChange)}
+          {renderNumberField('brokerageQdiPercentage', draft, errors, handleInputChange)}
+        </SectionFieldset>
 
-      <SectionFieldset sectionId="withdrawalStrategy">
-        {renderCheckboxField(
-          'autoDepleteBrokerageEnabled',
-          draft,
-          errors,
-          handleCheckboxChange,
-        )}
-        {renderNumberField(
-          'autoDepleteBrokerageYears',
-          draft,
-          errors,
-          handleInputChange,
-        )}
-        {renderNumberField(
-          'autoDepleteBrokerageAnnualScaleUpFactor',
-          draft,
-          errors,
-          handleInputChange,
-        )}
-      </SectionFieldset>
+        <SectionFieldset sectionId="withdrawalStrategy">
+          {renderCheckboxField(
+            'autoDepleteBrokerageEnabled',
+            draft,
+            errors,
+            handleCheckboxChange,
+          )}
+          {renderNumberField(
+            'autoDepleteBrokerageYears',
+            draft,
+            errors,
+            handleInputChange,
+          )}
+          {renderNumberField(
+            'autoDepleteBrokerageAnnualScaleUpFactor',
+            draft,
+            errors,
+            handleInputChange,
+          )}
+        </SectionFieldset>
 
-      <SectionFieldset sectionId="income">
-        {renderNumberField('annualW2Income', draft, errors, handleInputChange, chips.w2Income)}
-        {renderNumberField('annualConsultingIncome', draft, errors, handleInputChange)}
-        {renderNumberField('annualRentalIncome', draft, errors, handleInputChange)}
-        {renderNumberField(
-          'annualSocialSecurityBenefit',
-          draft,
-          errors,
-          handleInputChange,
-          chips.socialSecurity,
-        )}
-        {renderNumberField(
-          'annualPensionOrAnnuityIncome',
-          draft,
-          errors,
-          handleInputChange,
-        )}
-      </SectionFieldset>
+        <SectionFieldset sectionId="income">
+          {renderNumberField('annualW2Income', draft, errors, handleInputChange, chips.w2Income)}
+          {renderNumberField('annualConsultingIncome', draft, errors, handleInputChange)}
+          {renderNumberField('annualRentalIncome', draft, errors, handleInputChange)}
+          {renderNumberField(
+            'annualSocialSecurityBenefit',
+            draft,
+            errors,
+            handleInputChange,
+            chips.socialSecurity,
+          )}
+          {renderNumberField(
+            'annualPensionOrAnnuityIncome',
+            draft,
+            errors,
+            handleInputChange,
+          )}
+        </SectionFieldset>
 
-      <SectionFieldset sectionId="healthcare">
-        <Field error={errors.healthcarePhase} id="healthcarePhase" chip={chips.healthcare}>
-          <select
-            aria-describedby={errors.healthcarePhase ? 'healthcarePhase-error' : undefined}
-            aria-invalid={errors.healthcarePhase ? 'true' : undefined}
-            className={inputClassName(errors.healthcarePhase)}
-            id="healthcarePhase"
-            onChange={handleSelectChange('healthcarePhase')}
-            value={draft.healthcarePhase}
-          >
-            {HEALTHCARE_PHASE_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </Field>
-      </SectionFieldset>
-    </div>
-  );
+        <SectionFieldset sectionId="healthcare">
+          {renderHealthcarePhaseField()}
+        </SectionFieldset>
+      </div>
+    );
+  }
+
+  function renderVerdictForm() {
+    return (
+      <div aria-label="Basic scenario form" className="mt-5 grid items-start gap-4" role="form">
+        <fieldset className={verdictPanelClassName()}>
+          <legend className="px-2 text-sm font-semibold text-slate-800 dark:text-slate-100">Plan basics</legend>
+          <p className="mb-4 text-sm leading-6 text-slate-600 dark:text-slate-400">
+            Start with the few facts most likely to change the answer. Everything else stays grouped below.
+          </p>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {renderFilingStatusField()}
+            {renderStateField()}
+            {renderNumberField('primaryAge', draft, errors, handleInputChange)}
+            {showPartnerAge ? renderNumberField('partnerAge', draft, errors, handleInputChange) : null}
+            {renderNumberField('retirementYear', draft, errors, handleInputChange, chips.retirementTarget)}
+            {renderNumberField('annualSpendingToday', draft, errors, handleInputChange, chips.annualSpending)}
+            {renderTotalPortfolioField(draft)}
+            {renderNumberField('annualW2Income', draft, errors, handleInputChange, chips.w2Income)}
+            {renderNumberField(
+              'annualSocialSecurityBenefit',
+              draft,
+              errors,
+              handleInputChange,
+              chips.socialSecurity,
+            )}
+            {renderNumberField('socialSecurityClaimAge', draft, errors, handleInputChange)}
+            {renderHealthcarePhaseField()}
+          </div>
+        </fieldset>
+
+        <VerdictDisclosureGroup
+          description="Edit account buckets, taxable basis, expected returns, and taxable brokerage dividend assumptions."
+          id="portfolio-mix"
+          title="Portfolio mix"
+        >
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {renderNumberField('traditionalBalance', draft, errors, handleInputChange)}
+            {renderNumberField('rothBalance', draft, errors, handleInputChange)}
+            {renderNumberField(
+              'brokerageAndCashBalance',
+              draft,
+              errors,
+              handleInputChange,
+              chips.brokeragePlusCash,
+            )}
+            {renderNumberField('taxableBrokerageBasis', draft, errors, handleInputChange)}
+            {renderNumberField('hsaBalance', draft, errors, handleInputChange)}
+            {renderNumberField('expectedReturnTraditional', draft, errors, handleInputChange)}
+            {renderNumberField('expectedReturnRoth', draft, errors, handleInputChange)}
+            {renderNumberField('expectedReturnBrokerage', draft, errors, handleInputChange)}
+            {renderNumberField('expectedReturnHsa', draft, errors, handleInputChange)}
+            {renderNumberField('brokerageDividendYield', draft, errors, handleInputChange)}
+            {renderNumberField('brokerageQdiPercentage', draft, errors, handleInputChange)}
+          </div>
+        </VerdictDisclosureGroup>
+
+        <VerdictDisclosureGroup
+          description="Add income streams and mortgage payments that affect cash flow beyond wages and Social Security."
+          id="other-income"
+          title="Other income"
+        >
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {renderNumberField('annualConsultingIncome', draft, errors, handleInputChange)}
+            {renderNumberField('annualRentalIncome', draft, errors, handleInputChange)}
+            {renderNumberField('annualPensionOrAnnuityIncome', draft, errors, handleInputChange)}
+            {renderNumberField('annualMortgagePAndI', draft, errors, handleInputChange, chips.mortgagePAndI)}
+            {renderNumberField('mortgagePayoffYear', draft, errors, handleInputChange)}
+          </div>
+        </VerdictDisclosureGroup>
+
+        <VerdictDisclosureGroup
+          description="Adjust the projection window and optional taxable-brokerage draw schedule."
+          id="withdrawal-control"
+          title="Withdrawal settings"
+        >
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {renderNumberField('currentYear', draft, errors, handleInputChange)}
+            {renderNumberField('planEndAge', draft, errors, handleInputChange)}
+            {renderCheckboxField('autoDepleteBrokerageEnabled', draft, errors, handleCheckboxChange)}
+            {renderNumberField('autoDepleteBrokerageYears', draft, errors, handleInputChange)}
+            {renderNumberField('autoDepleteBrokerageAnnualScaleUpFactor', draft, errors, handleInputChange)}
+          </div>
+        </VerdictDisclosureGroup>
+      </div>
+    );
+  }
+
+  function renderFilingStatusField() {
+    return (
+      <Field error={errors.filingStatus} id="filingStatus">
+        <select
+          aria-describedby={errors.filingStatus ? 'filingStatus-error' : undefined}
+          aria-invalid={errors.filingStatus ? 'true' : undefined}
+          className={inputClassName(errors.filingStatus)}
+          id="filingStatus"
+          onChange={handleSelectChange('filingStatus')}
+          value={draft.filingStatus}
+        >
+          {FILING_STATUS_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </Field>
+    );
+  }
+
+  function renderStateField() {
+    return (
+      <Field error={errors.stateCode} id="stateCode">
+        <select
+          aria-describedby={errors.stateCode ? 'stateCode-error' : undefined}
+          aria-invalid={errors.stateCode ? 'true' : undefined}
+          className={inputClassName(errors.stateCode)}
+          id="stateCode"
+          onChange={handleSelectChange('stateCode')}
+          value={draft.stateCode}
+        >
+          {STATE_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </Field>
+    );
+  }
+
+  function renderHealthcarePhaseField() {
+    return (
+      <Field error={errors.healthcarePhase} id="healthcarePhase" chip={chips.healthcare}>
+        <select
+          aria-describedby={errors.healthcarePhase ? 'healthcarePhase-error' : undefined}
+          aria-invalid={errors.healthcarePhase ? 'true' : undefined}
+          className={inputClassName(errors.healthcarePhase)}
+          id="healthcarePhase"
+          onChange={handleSelectChange('healthcarePhase')}
+          value={draft.healthcarePhase}
+        >
+          {HEALTHCARE_PHASE_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </Field>
+    );
+  }
 
   function clearPendingField(field: keyof BasicFormDraft, errors: BasicFormErrors) {
     const { [field]: _ignoredField, ...withoutField } = pendingPatchRef.current;
@@ -462,6 +574,50 @@ function SectionFieldset({
   );
 }
 
+function VerdictDisclosureGroup({
+  children,
+  description,
+  id,
+  title,
+}: {
+  children: ReactNode;
+  description: string;
+  id: 'portfolio-mix' | 'other-income' | 'withdrawal-control';
+  title: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const buttonId = `${id}-disclosure-button`;
+  const descriptionId = `${id}-disclosure-description`;
+  const regionId = `${id}-disclosure-region`;
+
+  return (
+    <section className={verdictPanelClassName()}>
+      <button
+        aria-controls={regionId}
+        aria-describedby={descriptionId}
+        aria-expanded={open}
+        className="flex w-full items-center justify-between gap-3 rounded-lg text-left text-base font-semibold text-slate-950 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-indigo-600 dark:text-slate-50 dark:focus-visible:outline-indigo-400"
+        id={buttonId}
+        onClick={() => setOpen((current) => !current)}
+        type="button"
+      >
+        <span>{title}</span>
+        <span className="text-sm font-medium text-indigo-700 dark:text-indigo-300" aria-hidden="true">
+          {open ? 'Hide' : 'Show'}
+        </span>
+      </button>
+      <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-400" id={descriptionId}>
+        {description}
+      </p>
+      {open ? (
+        <div aria-labelledby={buttonId} className="mt-4" id={regionId} role="region">
+          {children}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
 function Field({
   children,
   chip,
@@ -494,12 +650,62 @@ function Field({
   );
 }
 
+function renderTotalPortfolioField(draft: BasicFormDraft) {
+  const helpId = 'totalPortfolio-help';
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label className="text-sm font-medium text-slate-800 dark:text-slate-200" htmlFor="totalPortfolio">
+        Total portfolio
+      </label>
+      <input
+        aria-describedby={helpId}
+        className={inputClassName(undefined)}
+        id="totalPortfolio"
+        readOnly
+        type="text"
+        value={formatReadonlyMoney(sumPortfolioBuckets(draft))}
+      />
+      <p className="text-xs leading-5 text-slate-500 dark:text-slate-400" id={helpId}>
+        Read-only sum of the portfolio buckets. Open Portfolio mix to edit balances.
+      </p>
+    </div>
+  );
+}
+
 function DerivedChip({ children }: { children: string }) {
   return (
     <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
       → {children}
     </p>
   );
+}
+
+function verdictPanelClassName(): string {
+  return 'rounded-xl border border-slate-200 bg-white/90 p-4 shadow-sm shadow-slate-900/5 dark:border-slate-800 dark:bg-slate-900/60 dark:shadow-none';
+}
+
+function sumPortfolioBuckets(draft: BasicFormDraft): number {
+  return (
+    draftMoneyValue(draft.traditionalBalance) +
+    draftMoneyValue(draft.rothBalance) +
+    draftMoneyValue(draft.brokerageAndCashBalance) +
+    draftMoneyValue(draft.hsaBalance)
+  );
+}
+
+function draftMoneyValue(rawValue: string): number {
+  const value = Number(rawValue);
+
+  return Number.isFinite(value) && value >= 0 ? value : 0;
+}
+
+function formatReadonlyMoney(value: number): string {
+  return new Intl.NumberFormat('en-US', {
+    currency: 'USD',
+    maximumFractionDigits: 0,
+    style: 'currency',
+  }).format(value);
 }
 
 function visibleErrors(errors: BasicFormErrors, touched: BasicFormTouched): BasicFormErrors {

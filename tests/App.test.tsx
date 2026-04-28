@@ -62,6 +62,7 @@ describe('App', () => {
     const { container } = render(<App />);
     const shell = container.firstElementChild;
     const headerShell = container.querySelector('header > div');
+    const footerShell = container.querySelector('footer > div');
     const main = container.querySelector('main');
 
     expect(shell?.children).toHaveLength(4);
@@ -71,14 +72,19 @@ describe('App', () => {
     expect(shell?.children[3]?.tagName).toBe('FOOTER');
     expect(screen.getByText(DISCLAIMER_TEXT)).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Fire Planner' })).toBeInTheDocument();
+    expect(
+      screen.getByText('Free, open-source, client-only, fixture-validated, transparent FIRE planning.'),
+    ).toBeInTheDocument();
     expect(screen.getByText('All inputs stay on your device.')).toBeInTheDocument();
     expect(screen.getByText(DISCLAIMER_TEXT)).toHaveClass('lg:max-w-6xl', 'xl:max-w-7xl');
     expect(headerShell).toHaveClass('lg:max-w-6xl', 'xl:max-w-7xl');
     expect(main).toHaveClass('lg:max-w-6xl', 'xl:max-w-7xl');
-    expect(screen.getByText('All inputs stay on your device.')).toHaveClass('lg:max-w-6xl', 'xl:max-w-7xl');
+    expect(footerShell).toHaveClass('lg:max-w-6xl', 'xl:max-w-7xl');
   });
 
   it('persists mode changes and renders only the advanced Gate 4 shell', () => {
+    useClassicLayout();
+
     render(<App />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Advanced' }));
@@ -90,7 +96,12 @@ describe('App', () => {
     expect(screen.getByRole('tab', { name: 'Planning charts' })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Scenarios' })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Basic planner' })).not.toBeInTheDocument();
-    expect(JSON.parse(window.localStorage.getItem(UI_STORAGE_KEY) ?? '{}')).toMatchObject({ mode: 'advanced' });
+    expect(useUiStore.getState()).toMatchObject({ advancedDisclosed: true, mode: 'advanced', view: 'plan' });
+    expect(JSON.parse(window.localStorage.getItem(UI_STORAGE_KEY) ?? '{}')).toMatchObject({
+      advancedDisclosed: true,
+      mode: 'advanced',
+      view: 'plan',
+    });
   });
 
   it('routes to compare as a top-level view without a router dependency', () => {
@@ -108,21 +119,28 @@ describe('App', () => {
     expect(screen.getByRole('heading', { name: 'Scenario summaries' })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Basic planner' })).not.toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Advanced planner' })).not.toBeInTheDocument();
-    expect(JSON.parse(window.localStorage.getItem(UI_STORAGE_KEY) ?? '{}')).toMatchObject({ mode: 'compare' });
+    expect(useUiStore.getState()).toMatchObject({ mode: 'compare', view: 'compare' });
+    expect(JSON.parse(window.localStorage.getItem(UI_STORAGE_KEY) ?? '{}')).toMatchObject({
+      mode: 'compare',
+      view: 'compare',
+    });
   });
 
   it('routes to methodology as a top-level view without rendering planner content', () => {
     render(<App />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Methodology' }));
+    fireEvent.click(screen.getByRole('link', { name: 'Methodology' }));
 
-    expect(useUiStore.getState().mode).toBe('methodology');
+    expect(useUiStore.getState()).toMatchObject({ mode: 'methodology', view: 'methodology' });
     expect(screen.getByRole('heading', { name: 'Methodology' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'What Fire Planner Is' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: "What this tool is and isn't" })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Basic planner' })).not.toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Advanced planner' })).not.toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Compare two scenarios' })).not.toBeInTheDocument();
-    expect(JSON.parse(window.localStorage.getItem(UI_STORAGE_KEY) ?? '{}')).toMatchObject({ mode: 'methodology' });
+    expect(JSON.parse(window.localStorage.getItem(UI_STORAGE_KEY) ?? '{}')).toMatchObject({
+      mode: 'methodology',
+      view: 'methodology',
+    });
   });
 
   it('launches compare from the advanced scenario manager', () => {
@@ -132,6 +150,7 @@ describe('App', () => {
       annualSpendingToday: 95_000,
       brokerageAndCashBalance: 650_000,
     });
+    useClassicLayout();
 
     render(<App />);
     fireEvent.click(screen.getByRole('button', { name: 'Advanced' }));
@@ -141,20 +160,52 @@ describe('App', () => {
     fireEvent.click(screen.getByLabelText('Select Harvest plan for comparison'));
     fireEvent.click(screen.getByRole('button', { name: 'Compare selected scenarios' }));
 
-    expect(useUiStore.getState().mode).toBe('compare');
+    expect(useUiStore.getState()).toMatchObject({ mode: 'compare', view: 'compare' });
     expect(screen.getByRole('heading', { name: 'Compare two scenarios' })).toBeInTheDocument();
     expect(screen.getByLabelText('First saved scenario')).toHaveValue(first.id);
     expect(screen.getByLabelText('Second saved scenario')).toHaveValue(second.id);
     expect(screen.queryByRole('heading', { name: 'Advanced planner' })).not.toBeInTheDocument();
   });
 
-  it('keeps basic mode unchanged by default', () => {
+  it('launches compare from the verdict advanced disclosure scenario manager', () => {
+    const first = saveNamedScenario('Baseline', BASE_FORM_VALUES);
+    const second = saveNamedScenario('Harvest plan', {
+      ...BASE_FORM_VALUES,
+      annualSpendingToday: 95_000,
+      brokerageAndCashBalance: 650_000,
+    });
+
     render(<App />);
 
-    expect(screen.getByRole('heading', { name: 'Basic planner' })).toBeInTheDocument();
+    const advancedDetails = screen.getByText('Show the detailed math').closest('details');
+    expect(advancedDetails).not.toBeNull();
+    (advancedDetails as HTMLDetailsElement).open = true;
+    fireEvent(advancedDetails as HTMLDetailsElement, new Event('toggle'));
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Scenarios' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Manage scenarios' }));
+    fireEvent.click(screen.getByLabelText('Select Baseline for comparison'));
+    fireEvent.click(screen.getByLabelText('Select Harvest plan for comparison'));
+    fireEvent.click(screen.getByRole('button', { name: 'Compare selected scenarios' }));
+
+    expect(useUiStore.getState()).toMatchObject({ mode: 'compare', view: 'compare' });
+    expect(screen.getByRole('heading', { name: 'Compare two scenarios' })).toBeInTheDocument();
+    expect(screen.getByLabelText('First saved scenario')).toHaveValue(first.id);
+    expect(screen.getByLabelText('Second saved scenario')).toHaveValue(second.id);
+    expect(screen.queryByRole('heading', { name: 'Plan dashboard' })).not.toBeInTheDocument();
+  });
+
+  it('defaults to the verdict Plan dashboard while keeping Basic compatibility state', () => {
+    render(<App />);
+
+    expect(useUiStore.getState()).toMatchObject({ layout: 'verdict', mode: 'basic', view: 'plan' });
+    expect(screen.getByRole('heading', { name: 'Plan dashboard' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Basic planner' })).not.toBeInTheDocument();
     expect(screen.getByRole('form', { name: /basic scenario form/i })).toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: 'Planner mode' })).not.toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Plan navigation' })).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Planner layout' })).toBeInTheDocument();
     expect(screen.queryByText(CUSTOM_LAW_BANNER_TEXT)).not.toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: 'Advanced planner' })).not.toBeInTheDocument();
   });
 
   it('shows the custom-law banner across mode switches and hides it after reset all', () => {
@@ -165,6 +216,7 @@ describe('App', () => {
         },
       },
     });
+    useClassicLayout();
 
     render(<App />);
 
@@ -189,11 +241,54 @@ describe('App', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Nominal dollars' }));
 
-    expect(useUiStore.getState().mode).toBe('basic');
+    expect(useUiStore.getState()).toMatchObject({ mode: 'basic', view: 'plan' });
     expect(useUiStore.getState().displayUnit).toBe('nominal');
     expect(JSON.parse(window.localStorage.getItem(UI_STORAGE_KEY) ?? '{}')).toMatchObject({
       displayUnit: 'nominal',
       mode: 'basic',
+      view: 'plan',
+    });
+  });
+
+  it('defaults to verdict, persists layout changes, and keeps Classic available', () => {
+    render(<App />);
+
+    expect(useUiStore.getState()).toMatchObject({ mode: 'basic', view: 'plan' });
+    expect(useUiStore.getState().layout).toBe('verdict');
+    expect(screen.getByRole('heading', { name: 'Plan dashboard' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Basic planner' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: 'Planner mode' })).not.toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Plan navigation' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Verdict' })).toHaveAttribute('aria-pressed', 'true');
+    expect(JSON.parse(window.localStorage.getItem(UI_STORAGE_KEY) ?? '{}')).toMatchObject({
+      layout: 'verdict',
+      mode: 'basic',
+      view: 'plan',
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Compare' }));
+
+    expect(useUiStore.getState()).toMatchObject({ mode: 'compare', view: 'compare' });
+    expect(screen.getByRole('heading', { name: 'Compare two scenarios' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Plan' }));
+
+    expect(useUiStore.getState()).toMatchObject({ mode: 'basic', view: 'plan' });
+    expect(screen.getByRole('heading', { name: 'Plan dashboard' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('link', { name: 'Methodology' }));
+
+    expect(useUiStore.getState()).toMatchObject({ mode: 'methodology', view: 'methodology' });
+    expect(screen.getByRole('heading', { name: 'Methodology' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Classic' }));
+
+    expect(useUiStore.getState().layout).toBe('classic');
+    expect(screen.getByRole('group', { name: 'Planner mode' })).toBeInTheDocument();
+    expect(JSON.parse(window.localStorage.getItem(UI_STORAGE_KEY) ?? '{}')).toMatchObject({
+      layout: 'classic',
+      mode: 'methodology',
+      view: 'methodology',
     });
   });
 
@@ -205,13 +300,17 @@ describe('App', () => {
     const shareButton = within(controls).getByRole('button', { name: 'Share' });
 
     expect(controls).toHaveClass('flex-wrap', 'items-center');
-    expect(within(controls).getByRole('group', { name: 'Planner mode' })).toHaveClass('flex-wrap');
+    expect(within(controls).getByRole('group', { name: 'Plan navigation' })).toHaveClass('flex-wrap');
+    expect(within(controls).queryByRole('group', { name: 'Planner mode' })).not.toBeInTheDocument();
     expect(within(controls).getByRole('group', { name: 'Display dollars' })).toHaveClass('flex-wrap');
+    expect(within(controls).getByRole('group', { name: 'Planner layout' })).toHaveClass('flex-wrap');
     expect(themeSelect).toHaveAttribute('aria-label', 'Theme');
     expect(themeSelect).toHaveClass('h-10');
     expect(themeSelect.closest('label')).toBeNull();
     expect(themeSelect).toHaveValue('system');
     expect(within(controls).getByRole('button', { name: 'Real dollars' })).toHaveAttribute('aria-pressed', 'true');
+    expect(within(controls).getByRole('button', { name: 'Classic' })).toHaveAttribute('aria-pressed', 'false');
+    expect(within(controls).getByRole('button', { name: 'Verdict' })).toHaveAttribute('aria-pressed', 'true');
     expect(shareButton).toHaveClass('h-10');
 
     fireEvent.click(within(controls).getByRole('button', { name: 'Nominal dollars' }));
@@ -221,7 +320,9 @@ describe('App', () => {
     expect(screen.getByRole('dialog', { name: /share-link privacy/i })).toBeInTheDocument();
     expect(JSON.parse(window.localStorage.getItem(UI_STORAGE_KEY) ?? '{}')).toMatchObject({
       displayUnit: 'nominal',
+      layout: 'verdict',
       mode: 'basic',
+      view: 'plan',
     });
   });
 
@@ -242,6 +343,7 @@ describe('App', () => {
     expect(JSON.parse(window.localStorage.getItem(UI_STORAGE_KEY) ?? '{}')).toMatchObject({
       displayUnit: 'real',
       mode: 'basic',
+      view: 'plan',
       themePreference: 'dark',
     });
   });
@@ -264,6 +366,7 @@ describe('App', () => {
     });
     useUiStore.getState().setMode('advanced');
     useUiStore.getState().setDisplayUnit('nominal');
+    useUiStore.getState().setLayout('verdict');
     window.localStorage.setItem(SHARE_LINK_ACKNOWLEDGED_KEY, 'true');
 
     const scenarioBeforeThemeSwitch = useScenarioStore.getState().scenario;
@@ -278,8 +381,11 @@ describe('App', () => {
     });
 
     expect(useUiStore.getState()).toMatchObject({
+      advancedDisclosed: true,
       displayUnit: 'nominal',
       mode: 'advanced',
+      view: 'plan',
+      layout: 'verdict',
       themePreference: 'dark',
     });
     expect(useScenarioStore.getState().formValues.annualSpendingToday).toBe(88_000);
@@ -297,9 +403,13 @@ describe('App', () => {
 
     expect(decodedSharePayload?.scenario.startYear).toBe(scenarioBeforeThemeSwitch.startYear);
     expect(decodedSharePayload?.plan.endYear).toBe(planBeforeThemeSwitch.endYear);
+    expect(decodedSharePayload).not.toHaveProperty('layout');
     expect(useUiStore.getState()).toMatchObject({
+      advancedDisclosed: true,
       displayUnit: 'nominal',
       mode: 'advanced',
+      view: 'plan',
+      layout: 'verdict',
       themePreference: 'dark',
     });
   });
@@ -309,6 +419,10 @@ function saveNamedScenario(name: string, values: BasicFormValues) {
   const { plan, scenario } = mapBasicFormToProjectionInputs(values);
 
   return useScenariosStore.getState().save({ name, plan, scenario });
+}
+
+function useClassicLayout() {
+  useUiStore.getState().setLayout('classic');
 }
 
 function installClipboardMock(): string[] {

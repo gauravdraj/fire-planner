@@ -4,6 +4,7 @@ import { CONSTANTS_2026 } from '@/core/constants/2026';
 import { columnExplanations, liveStatExplanations } from '@/lib/columnExplanations';
 import {
   constantSourceRows,
+  glossaryItems,
   methodologySections,
   methodologySectionIds,
   metricMethodologyEntries,
@@ -12,9 +13,10 @@ import {
 import methodologyContentSource from '@/lib/methodologyContent?raw';
 
 describe('methodologyContent', () => {
-  it('exports all eight Methodology sections in the required order', () => {
+  it('exports all nine Methodology sections in the required order', () => {
     expect(methodologySectionIds).toEqual([
       'overview',
+      'glossary',
       'modeled',
       'not-modeled',
       'constants-source',
@@ -28,6 +30,18 @@ describe('methodologyContent', () => {
     for (const section of methodologySections) {
       expect(section.title.trim()).not.toBe('');
       expect(section.summary.trim()).not.toBe('');
+    }
+  });
+
+  it('keeps the intro wedge and required glossary terms visible in app content', () => {
+    const overview = methodologySections.find((section) => section.id === 'overview');
+    const wedgeText = overview?.paragraphs?.join(' ') ?? '';
+    const glossaryText = glossaryItems.map((item) => `${item.label} ${item.description}`).join('\n').toLowerCase();
+
+    expect(overview?.title).toBe("What this tool is and isn't");
+    expect(wedgeText).toContain('free, open-source, client-only, fixture-validated, transparent');
+    for (const term of ['magi', 'irmaa', 'aca', 'ptc', 'fpl', 'ltcg', 'qbi', 'sstb', 'niit', 'sepp', '72(t)', 'roth conversion ladder', 'customlaw scenario']) {
+      expect(glossaryText).toContain(term);
     }
   });
 

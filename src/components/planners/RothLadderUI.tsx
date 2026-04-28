@@ -8,10 +8,15 @@ import {
   type RothLadderYearResult,
 } from '@/core/planners/rothLadderTargeter';
 import type { Scenario, WithdrawalPlan } from '@/core/projection';
+import { toReal } from '@/lib/realDollars';
 import { classNames, formControlClassName } from '@/components/ui/controlStyles';
 import { useScenarioStore } from '@/store/scenarioStore';
+import type { DisplayUnit } from '@/store/uiStore';
+import { useUiStore } from '@/store/uiStore';
 
 type ConstraintKind = RothLadderConstraint['kind'];
+export const ROTH_LADDER_TARGET_ID = 'roth-ladder-targeter';
+
 const plannerPanelClassName = 'rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950';
 const eyebrowClassName = 'text-sm font-medium text-indigo-700 dark:text-indigo-300';
 const headingClassName = 'mt-1 text-base font-semibold text-slate-950 dark:text-slate-50';
@@ -24,8 +29,9 @@ export function RothLadderUI() {
   const scenario = useScenarioStore((state) => state.scenario);
   const plan = useScenarioStore((state) => state.plan);
   const setPlan = useScenarioStore((state) => state.setPlan);
+  const displayUnit = useUiStore((state) => state.displayUnit);
   const defaultRange = useMemo(
-    () => defaultPlannerRange(scenario, plan),
+    () => defaultRothLadderPlannerRange(scenario, plan),
     [plan.endYear, scenario.socialSecurity?.claimYear, scenario.startYear],
   );
   const constants = effectiveConstants(scenario);
@@ -41,7 +47,7 @@ export function RothLadderUI() {
   const [constraintKind, setConstraintKind] = useState<ConstraintKind>('federalBracket');
   const [irmaaTier, setIrmaaTier] = useState(irmaaTierOptions[0]?.index ?? 0);
   const [acaFplPercent, setAcaFplPercent] = useState('4');
-  const [federalBracketRate, setFederalBracketRate] = useState(federalBracketRates[1] ?? federalBracketRates[0] ?? 0);
+  const [federalBracketRate, setFederalBracketRate] = useState(defaultFederalBracketRate(federalBracketRates));
   const [ltcgBracketRate, setLtcgBracketRate] = useState(ltcgBracketRates[0] ?? 0);
   const [maxConversion, setMaxConversion] = useState('');
   const [years, setYears] = useState<readonly RothLadderYearResult[]>([]);
@@ -60,7 +66,7 @@ export function RothLadderUI() {
         basePlan: plan,
         startYear: clampYear(startYear, scenario.startYear, plan.endYear),
         endYear: clampYear(Math.max(startYear, endYear), scenario.startYear, plan.endYear),
-        constraint: buildConstraint({
+        constraint: buildRothLadderConstraint({
           acaFplPercent,
           constraintKind,
           federalBracketRate,
@@ -82,7 +88,7 @@ export function RothLadderUI() {
   }
 
   return (
-    <section aria-labelledby="roth-ladder-heading" className={plannerPanelClassName}>
+    <section aria-labelledby="roth-ladder-heading" className={plannerPanelClassName} id={ROTH_LADDER_TARGET_ID}>
       <div>
         <p className={eyebrowClassName}>Roth ladder targeter</p>
         <h3 className={headingClassName} id="roth-ladder-heading">
@@ -180,12 +186,22 @@ export function RothLadderUI() {
         </button>
       </div>
 
-      {years.length > 0 ? <RothOutputTable years={years} /> : null}
+      {years.length > 0 ? <RothOutputTable displayUnit={displayUnit} scenario={scenario} years={years} /> : null}
     </section>
   );
 }
 
-function RothOutputTable({ years }: { years: readonly RothLadderYearResult[] }) {
+function RothOutputTable({
+  displayUnit,
+  scenario,
+  years,
+}: {
+  displayUnit: DisplayUnit;
+  scenario: Scenario;
+  years: readonly RothLadderYearResult[];
+}) {
+  const conversionUnitLabel = displayUnit === 'real' ? "today's $" : 'nominal $';
+
   return (
     <div className="mt-4 overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
       <table className="min-w-[48rem] divide-y divide-slate-200 text-sm dark:divide-slate-800">
@@ -195,7 +211,7 @@ function RothOutputTable({ years }: { years: readonly RothLadderYearResult[] }) 
               Year
             </th>
             <th className="px-3 py-2" scope="col">
-              Conversion
+              Conversion ({conversionUnitLabel})
             </th>
             <th className="px-3 py-2" scope="col">
               Measured
@@ -217,7 +233,9 @@ function RothOutputTable({ years }: { years: readonly RothLadderYearResult[] }) 
               <th className="px-3 py-2 text-left font-medium tabular-nums text-slate-950 dark:text-slate-50" scope="row">
                 {year.year}
               </th>
-              <td className="px-3 py-2 tabular-nums text-slate-700 dark:text-slate-200">{formatCurrency(year.conversionAmount)}</td>
+              <td className="px-3 py-2 tabular-nums text-slate-700 dark:text-slate-200">
+                {formatDisplayCurrency(year.conversionAmount, year.year, scenario, displayUnit)}
+              </td>
               <td className="px-3 py-2 tabular-nums text-slate-700 dark:text-slate-200">{formatCurrency(year.measuredValue)}</td>
               <td className="px-3 py-2 tabular-nums text-slate-700 dark:text-slate-200">
                 {year.bindingMargin === null ? 'n/a' : formatCurrency(year.bindingMargin)}
@@ -283,7 +301,7 @@ function RateSelect({
   );
 }
 
-function buildConstraint({
+function buildRothLadderConstraint({
   acaFplPercent,
   constraintKind,
   federalBracketRate,
@@ -314,7 +332,16 @@ function buildConstraint({
   }
 }
 
-function defaultPlannerRange(scenario: Scenario, plan: WithdrawalPlan): { startYear: number; endYear: number } {
+export function buildDefaultRothLadderConstraint(scenario: Scenario): RothLadderConstraint {
+  const constants = effectiveConstants(scenario);
+  const federalBracketRates = constants.federal.ordinaryBrackets[scenario.filingStatus]
+    .slice(0, -1)
+    .map((bracket) => bracket.rate);
+
+  return { kind: 'federalBracket', bracketRate: defaultFederalBracketRate(federalBracketRates) };
+}
+
+export function defaultRothLadderPlannerRange(scenario: Scenario, plan: WithdrawalPlan): { startYear: number; endYear: number } {
   const startYear = scenario.startYear;
   const socialSecurityClaimYear = scenario.socialSecurity?.claimYear;
   const fallbackEndYear = Math.min(startYear + 10, plan.endYear);
@@ -324,6 +351,10 @@ function defaultPlannerRange(scenario: Scenario, plan: WithdrawalPlan): { startY
       : fallbackEndYear;
 
   return { startYear, endYear };
+}
+
+function defaultFederalBracketRate(federalBracketRates: readonly number[]): number {
+  return federalBracketRates[1] ?? federalBracketRates[0] ?? 0;
 }
 
 function tierUpperBound(tier: object): number | null {
@@ -363,6 +394,12 @@ function clampYear(year: number, startYear: number, endYear: number): number {
 
 function formatCurrency(value: number): string {
   return `$${Math.round(value).toLocaleString('en-US')}`;
+}
+
+function formatDisplayCurrency(value: number, year: number, scenario: Scenario, displayUnit: DisplayUnit): string {
+  const displayValue = displayUnit === 'real' ? toReal(value, year, scenario.startYear, scenario.inflationRate) : value;
+
+  return formatCurrency(displayValue);
 }
 
 function formatPercent(rate: number): string {

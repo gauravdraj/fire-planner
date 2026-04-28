@@ -43,8 +43,7 @@ export function MethodologyPage() {
           Methodology
         </h2>
         <p className={classNames('mt-2', mutedTextClassName)}>
-          A plain-English reference for what Fire Planner models, what it leaves out, and where key law constants come
-          from.
+          A plain-English reference for this free, open-source, client-only, fixture-validated, transparent planner.
         </p>
       </header>
 

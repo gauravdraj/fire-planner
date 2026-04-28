@@ -167,6 +167,7 @@ describe('basic Gate 3 app flow', () => {
   beforeEach(() => {
     vi.resetModules();
     installMemoryLocalStorage();
+    window.localStorage.setItem('fire-planner.ui.v1', JSON.stringify({ layout: 'classic' }));
     installClipboardMock();
     consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     window.history.replaceState(null, '', '/planner?case=gate3');

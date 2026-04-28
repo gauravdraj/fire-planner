@@ -3,8 +3,13 @@ import { useEffect, useMemo, useState } from 'react';
 import { effectiveConstants } from '@/core/constants/customLaw';
 import { generateLtcgHarvestPlan, type LtcgHarvestStatus, type LtcgHarvestYearResult } from '@/core/planners/ltcgHarvester';
 import type { Scenario, WithdrawalPlan } from '@/core/projection';
+import { toReal } from '@/lib/realDollars';
 import { checkboxControlClassName, classNames, formControlClassName } from '@/components/ui/controlStyles';
 import { useScenarioStore } from '@/store/scenarioStore';
+import type { DisplayUnit } from '@/store/uiStore';
+import { useUiStore } from '@/store/uiStore';
+
+export const LTCG_HARVESTER_TARGET_ID = 'ltcg-harvester-targeter';
 
 const plannerPanelClassName = 'rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950';
 const eyebrowClassName = 'text-sm font-medium text-indigo-700 dark:text-indigo-300';
@@ -18,8 +23,9 @@ export function LtcgHarvesterUI() {
   const scenario = useScenarioStore((state) => state.scenario);
   const plan = useScenarioStore((state) => state.plan);
   const setPlan = useScenarioStore((state) => state.setPlan);
+  const displayUnit = useUiStore((state) => state.displayUnit);
   const defaultRange = useMemo(
-    () => defaultPlannerRange(scenario, plan),
+    () => defaultLtcgHarvesterPlannerRange(scenario, plan),
     [plan.endYear, scenario.socialSecurity?.claimYear, scenario.startYear],
   );
   const irmaaTierOptions = effectiveConstants(scenario).irmaa.partBTiers[scenario.filingStatus]
@@ -67,7 +73,7 @@ export function LtcgHarvesterUI() {
   }
 
   return (
-    <section aria-labelledby="ltcg-harvester-heading" className={plannerPanelClassName}>
+    <section aria-labelledby="ltcg-harvester-heading" className={plannerPanelClassName} id={LTCG_HARVESTER_TARGET_ID}>
       <div>
         <p className={eyebrowClassName}>0% LTCG harvester</p>
         <h3 className={headingClassName} id="ltcg-harvester-heading">
@@ -167,12 +173,22 @@ export function LtcgHarvesterUI() {
         </button>
       </div>
 
-      {years.length > 0 ? <LtcgOutputTable years={years} /> : null}
+      {years.length > 0 ? <LtcgOutputTable displayUnit={displayUnit} scenario={scenario} years={years} /> : null}
     </section>
   );
 }
 
-function LtcgOutputTable({ years }: { years: readonly LtcgHarvestYearResult[] }) {
+function LtcgOutputTable({
+  displayUnit,
+  scenario,
+  years,
+}: {
+  displayUnit: DisplayUnit;
+  scenario: Scenario;
+  years: readonly LtcgHarvestYearResult[];
+}) {
+  const harvestUnitLabel = displayUnit === 'real' ? "today's $" : 'nominal $';
+
   return (
     <div className="mt-4 overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
       <table className="min-w-[48rem] divide-y divide-slate-200 text-sm dark:divide-slate-800">
@@ -182,7 +198,7 @@ function LtcgOutputTable({ years }: { years: readonly LtcgHarvestYearResult[] })
               Year
             </th>
             <th className="px-3 py-2" scope="col">
-              Harvest
+              Harvest ({harvestUnitLabel})
             </th>
             <th className="px-3 py-2" scope="col">
               0% headroom
@@ -204,7 +220,9 @@ function LtcgOutputTable({ years }: { years: readonly LtcgHarvestYearResult[] })
               <th className="px-3 py-2 text-left font-medium tabular-nums text-slate-950 dark:text-slate-50" scope="row">
                 {year.year}
               </th>
-              <td className="px-3 py-2 tabular-nums text-slate-700 dark:text-slate-200">{formatCurrency(year.harvestAmount)}</td>
+              <td className="px-3 py-2 tabular-nums text-slate-700 dark:text-slate-200">
+                {formatDisplayCurrency(year.harvestAmount, year.year, scenario, displayUnit)}
+              </td>
               <td className="px-3 py-2 tabular-nums text-slate-700 dark:text-slate-200">{formatCurrency(year.ltcg0PctHeadroom)}</td>
               <td className="px-3 py-2 tabular-nums text-slate-700 dark:text-slate-200">
                 {year.acaGuardMargin === null ? 'n/a' : formatCurrency(year.acaGuardMargin)}
@@ -238,7 +256,7 @@ function NumberField({ label, onChange, value }: { label: string; onChange: (val
   );
 }
 
-function defaultPlannerRange(scenario: Scenario, plan: WithdrawalPlan): { startYear: number; endYear: number } {
+export function defaultLtcgHarvesterPlannerRange(scenario: Scenario, plan: WithdrawalPlan): { startYear: number; endYear: number } {
   const startYear = scenario.startYear;
   const socialSecurityClaimYear = scenario.socialSecurity?.claimYear;
   const fallbackEndYear = Math.min(startYear + 10, plan.endYear);
@@ -287,6 +305,12 @@ function clampYear(year: number, startYear: number, endYear: number): number {
 
 function formatCurrency(value: number): string {
   return `$${Math.round(value).toLocaleString('en-US')}`;
+}
+
+function formatDisplayCurrency(value: number, year: number, scenario: Scenario, displayUnit: DisplayUnit): string {
+  const displayValue = displayUnit === 'real' ? toReal(value, year, scenario.startYear, scenario.inflationRate) : value;
+
+  return formatCurrency(displayValue);
 }
 
 function statusLabel(status: string): string {

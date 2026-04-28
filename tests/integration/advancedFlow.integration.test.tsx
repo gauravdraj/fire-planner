@@ -39,6 +39,7 @@ describe('advanced Gate 4 app flow', () => {
   beforeEach(() => {
     installMemoryLocalStorage();
     useUiStore.getState().resetUiPreferences();
+    useUiStore.getState().setLayout('classic');
     useScenarioStore.getState().resetScenario();
     useScenariosStore.setState({ scenarios: [] });
     window.history.replaceState(null, '', '/planner?case=gate4');

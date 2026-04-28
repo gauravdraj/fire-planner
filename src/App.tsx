@@ -18,8 +18,10 @@ export const CUSTOM_LAW_BANNER_TEXT =
 type ScenarioIdPair = readonly [string, string];
 
 export function App() {
-  const mode = useUiStore((state) => state.mode);
-  const setMode = useUiStore((state) => state.setMode);
+  const advancedDisclosed = useUiStore((state) => state.advancedDisclosed);
+  const layout = useUiStore((state) => state.layout);
+  const view = useUiStore((state) => state.view);
+  const setView = useUiStore((state) => state.setView);
   const themePreference = useUiStore((state) => state.themePreference);
   const customLawActive = useScenarioStore((state) => state.customLawActive);
   const [compareScenarioIds, setCompareScenarioIds] = useState<ScenarioIdPair | undefined>(undefined);
@@ -27,7 +29,7 @@ export function App() {
 
   function launchCompare(scenarioIds: ScenarioIdPair) {
     setCompareScenarioIds(scenarioIds);
-    setMode('compare');
+    setView('compare');
   }
 
   return (
@@ -37,14 +39,14 @@ export function App() {
       <Header />
       {customLawActive ? <CustomLawBanner /> : null}
       <main className="mx-auto w-full max-w-5xl min-w-0 px-3 py-6 sm:px-4 sm:py-8 lg:max-w-6xl lg:py-10 xl:max-w-7xl">
-        {mode === 'methodology' ? (
+        {view === 'methodology' ? (
           <MethodologyPage />
-        ) : mode === 'compare' ? (
+        ) : view === 'compare' ? (
           <CompareView {...(compareScenarioIds === undefined ? {} : { initialScenarioIds: compareScenarioIds })} />
-        ) : mode === 'advanced' ? (
+        ) : layout === 'classic' && advancedDisclosed ? (
           <AdvancedView onCompare={launchCompare} />
         ) : (
-          <BasicPlannerPage />
+          <BasicPlannerPage onCompare={launchCompare} />
         )}
       </main>
       <Footer />

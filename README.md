@@ -31,6 +31,10 @@ npm test         # run all tests
 npm run build    # production build (tsc --noEmit + vite build)
 ```
 
+## Default layout
+
+New browsers now open to the answer-first Verdict layout. The Classic/Verdict toggle remains in the header, so anyone who prefers the older detailed workstation can switch back to Classic; explicit saved layout preferences are preserved.
+
 ## Deployment
 
 Pushes to `main` trigger `.github/workflows/deploy.yml`, which runs the test suite, builds the site, and deploys `dist/` to GitHub Pages. The site is served from a custom domain via the `public/CNAME` file.

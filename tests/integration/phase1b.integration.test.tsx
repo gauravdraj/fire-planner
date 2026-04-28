@@ -66,6 +66,7 @@ describe('Phase 1B starter-template integration smoke', () => {
     installMemoryLocalStorage();
     useUiStore.getState().resetUiPreferences();
     useUiStore.getState().setDisplayUnit('nominal');
+    useUiStore.getState().setLayout('classic');
     useScenarioStore.getState().resetScenario();
     window.history.replaceState(null, '', '/planner?case=phase1b');
   });

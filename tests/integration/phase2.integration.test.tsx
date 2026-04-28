@@ -34,6 +34,7 @@ describe('Phase 2 integration smoke', () => {
   beforeEach(() => {
     installMemoryLocalStorage();
     useUiStore.getState().resetUiPreferences();
+    useUiStore.getState().setLayout('classic');
     useScenarioStore.getState().resetScenario();
     useScenariosStore.setState({ scenarios: [] });
     window.history.replaceState(null, '', '/planner?case=phase2');

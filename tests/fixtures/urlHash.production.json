@@ -1,0 +1,54 @@
+{
+  "fixtureSet": "urlHash.production.v1",
+  "capturedAt": "2026-04-28T08:46:00.000Z",
+  "source": "Canonical production-v1 URL-hash payloads compressed with lz-string.",
+  "note": "Production v1 hashes encode scenario, plan, optional customLaw, and customLawActive only; they never encoded mode/view/layout navigation state.",
+  "fixtures": [
+    {
+      "name": "basic-scenario-plan",
+      "description": "Canonical production-v1 share hash with scenario, plan, and inactive custom-law flag.",
+      "capture": {
+        "kind": "canonical",
+        "capturedAt": "2026-04-28T08:46:00.000Z",
+        "source": "production-v1-url-hash-contract"
+      },
+      "payloadKeys": [
+        "scenario",
+        "plan",
+        "customLawActive"
+      ],
+      "hash": "v1:N4IgzgxgpgdghgJwJYHsQC5RgC6OwTSkQwCYAGEgNgBoQAzJAGyRgHMBlXbAVzAxAC2dAFYhaAdxIBJGBBQCoGANqgAnkQSkKNEHAEpuMbBgCMADjKWyAX2pqNWkgHZaeg0dMWrt+8XTkSM1d9Q2N0GzsQdT8AgE5g9zCbAF1aORgwbkZsFlYZOQVlX01-bQTQ0wBWK1owHAAjDDo4RjAoCRIAdThWKDAAQVZWBChWOGwoABMMMlpueqQ4QeHR8amZnyiHUudyj3DahqaWto7u3oGhkbGJ6YOQecXl67W7iOLHIN0Q-dnwI-QzVa7RAknOfWeq1uMzmCyWVyh63Cm2iJTieySh2wjUBJxBYJ6EIRNyRf0e8JWJLe1lSIAAFkRsnSIIhFOgVFsYmUQABrFh3EAwFAwRQo7YBFy8-n8IUikBirmBWh8mAC2WiyKoxzxKWqmXC0W0gAOsDAqBg+XkbI5Wp2OjcFWRmvFFElDt+CrRFC+7rCJnIlk92oxpgDKVcMBg3CQ2FUlsK7I+dpDTqTEpT705XqV30SG2dip1vo2tJGRha8etae5xfuAjWyBajFUAAU8EgIEgjWs+OhsAhuFAgzs3T9MYIG4tGM22wgcp3uxNe-3B8OAj6xzCJxNG9PW+2Fz2MCuhwXs0XN3XJ0393OO12j32B0PaTg1hhQCwClAACpwAAeAAycDiB+4BcFAADCKCTGyIAAGKAWI4FrAAcnocHwYwKDIJMcDIbg-6EIqOhgAYCDQPwkFwLKHYtAABAAqgASoBAC0dJwGAdL0UaCAwdwEA5MKbEAG4mPRDD-jwIwANz0UK9H8kgolIJM3AMV+Vr0YRAB0yEjP2SBQKJUz9GEIABJQbFkAALGxgTISqaoGvKtggPULQ0dAvagCy3FbnSYD4f41SWLQhFwPUjBQAAQvxPJQAghIYJQYXhSA-ZwJMMbmi0GCxFYGX8dgdKkCQ6XuZ5Zq+ZlAFRTF8UoIlyW9BgtlhhEIAsHQjDjOazHvuEulkAAzLQUD-iaQlTMxUAyRkYH+WV9xBSFZAjZUEX1dFcUJUlKXDWQW2ZclOXCfAjAzJttAlStG3He59asEgAASSA4DhqjKLShJpS2jC8McwK0N2c4igggxQP9gO9kCpzgCgnYtOwUAQNwyCxktfVIAIxFeqN426JGGmMLFsBQAwYS2V4NjuUafUwGBsCTPjwbE1GKMmqquRFFmjj2peJgmEVa6uimwuE4GZ6fBLJiUJQsSxGLJAXnm6D+mQJhK7psRODS7no59AjAeI-RCSpbLw0OQA"
+    },
+    {
+      "name": "custom-law-active",
+      "description": "Canonical production-v1 share hash with sparse customLaw and active custom-law flag.",
+      "capture": {
+        "kind": "canonical",
+        "capturedAt": "2026-04-28T08:46:00.000Z",
+        "source": "production-v1-url-hash-contract"
+      },
+      "payloadKeys": [
+        "scenario",
+        "plan",
+        "customLaw",
+        "customLawActive"
+      ],
+      "hash": "v1:N4IgzgxgpgdghgJwJYHsQC5RgC6OwTSkQwCYAGEgNgBoQAzJAGyRgHMBlXbAVzAxAC2dAFYhaAdxIBJGBBQCoGANqgAnkQSkKNEHAEpuMbBgCMADjKWyAX2pqNWkgHZaeg0dMWrt+8XTkSM1d9Q2N0GzsQdT8AgE5g9zCbAF1aORgwbkZsFlYZOQVlX01-bQTQ0wBWK1owHAAjDDo4RjAoCRIAdThWKDAAQVZWBChWOGwoABMMMlpueqQ4QeHR8amZnyiHUudyj3DahqaWto7u3oGhkbGJ6YOQecXl67W7iOLHIN0Q-dnwI-QzVa7RAknOfWeq1uMzmCyWVyh63Cm2iJTieySh2wjUBJxBYJ6EIRNyRf0e8JWJLe1lSIAAFkRsnSIIhFOgVFsYmUQABrFh3EAwFAwRQo7YBFy8-n8IUikBirmBWh8mAC2WiyKoxzxKWqmXC0W0gAOsDAqBg+XkbI5Wp2OjcFWRmvFFElDt+CrRFC+7rCJnIlk92oxpgDKVcMBg3CQ2FUlsK7I+dpDTqTEpT705XqV30SG2dip1vo2tJGRha8etae5xfuAjWyBajFUAAU8EgIEgjWs+OhsAhuFAgzs3T9MYIG4tGM22wgcp3uxNe-3B8OAj6xzCJxNG9PW+2Fz2MCuhwXs0XN3XJ0393OO12j32B0PaTg1hhQCwClAACpwAAeAAycDiB+4BcFAADCKCTGyIAAGKAWI4FrAAcnocHwYwKDIJMcDIbg-6EIqOhgAYCDQPwkFwLKHYtAABAAqgASoBAC0dJwGAdL0UaCAwdwEA5MKbEAG4mPRDD-jwIwANz0UK9H8kgolIJM3AMV+Vr0YRAB0yEjP2SBQKJUz9GEIABJQbFkAALGxgTISqaoGvKtggPULQ0dAvagCy3FbnSYD4f41SWLQhFwPUjBQAAQvxPJQAghIYJQYXhSA-ZwJMMbmi0GCxFYGX8dgdKkCQ6XuZ5Zq+ZlAFRTF8UoIlyW9BgtlhhEIAsHQjDjOazHvuEulkAAzLQUD-iaQlTMxUAyRkYH+WV9xBSFZAjZUEX1dFcUJUlKXDWQW2ZclOXCfAjAzJttAlStG3He59asEgAASSA4DhqjKLShJpS2jC8McwK0N2c4igggxQP9gO9kCpzgCgnYtOwUAQNwyCxktfVIAIxFeqN426JGGmMLFsBQAwYS2V4XXo59AjAaBmD0FMB1XSzb6qogkwACJTIJF1gWabAxVoNSCCI7VFbQdIoCto0y5LvaddYavuUafUwGBsCTPjwbE1GKMmqquRFFmjj2peJgmEVa6uimNuE4GZ6fI7JiUJQsSxPbJAXnm6D+mQJje7psRODS7n09g8hM2BdBs8lHNYLg3MIHzAtCeawu5GLpQS0IojoLZStywrStCCrdtq2kvAx4zIH9FnpnHs+1hAA"
+    },
+    {
+      "name": "manual-plan-data",
+      "description": "Canonical production-v1 share hash with plan-level Roth conversion and LTCG harvest data.",
+      "capture": {
+        "kind": "canonical",
+        "capturedAt": "2026-04-28T08:46:00.000Z",
+        "source": "production-v1-url-hash-contract"
+      },
+      "payloadKeys": [
+        "scenario",
+        "plan",
+        "customLawActive"
+      ],
+      "hash": "v1:N4IgzgxgpgdghgJwJYHsQC5RgC6OwTSkQwCYAGEgNgBoQAzJAGyRgHMBlXbAVzAxAC2dAFYhaAdxIBJGBBQCoGANqgAnkQSkKNEHAEpuMbBgCMADjKWyAX2pqNWkgHZaeg0dMWrt+8XTkSM1d9Q2N0GzsQdT8AgE5g9zCI301-MgBmMgTQjBsAXVo5GDBuRmwWVhk5BWUUxx03HPQTAFYrWjAcACMMOjhGMCgJEgB1OFYoMABBVlYEKFY4bCgAE1zabi6kOBm5haXV3J8ohzTnbI9wju7e-sHhsYnp2fnF5bWrkE3t3deDj+SJxiFCCuhClyy4Bu6D6AyGIEkj0mv3273WXy2OxeqMO4WO0VScQuSWu2B6MLu8MR42R2LeuMh3yxe3pAPxp3ImWJ6M6ZNucIeNOeLP+6KZKNZRwKIAAFkQyjKIIhFOgVEDCdpaABrFgfEAwFAwRTs4HnEA6mB6g1GkAmjWBbW6-jW42RAmOeLmp3ofWG111NJcr2W51+23SgAOsDAqBgVXkKrV7rODXBSTtjhcYMSRzdHJB3Oa5EsGbOnsalxMxcByc5kIrYSr3mlcBgMG4SGwqnjNVVAYCqZzeLzpqzDdz-YL2aaNfzJHLaYn6q0QfHeOl8yM-R7icnVELkIEB2Q-UYqgACngkBAkBGDnx0NgENwoKWAmPF58j8sT4wz5eEHKG872WB8nxfN8pzXQ9j22P8LyvYD7wwcDXxHe0FyHGCfzg-9ENvZDH2fNDJ1XT9sKgX88MA68CNAlDiOsaUcAODBQBYaooAAFTgAAPAAZOBxDY8AuCgABhFAVhVEAADF+LEUSDgAOT0GTZMYFBkBWOBFNwXjCFNHQwAMBBoH4cTW0Na9+gAAgAVQAJX4gBaGU4DAGVbIjBApO4CBykNFyADcTFshheJ4eYAG5bINWzdSQYKkBWbg7I4hNbP0gA6RT5ifJAoGC1YpjCEABxcsgABYXMCRSLStMNrFsEAun6VtoAfUAlU89EZTAXT-DaSxaH0uAukYKAACFfK1SiaQwShhpGkAnzgFZO1jfoMFiKwVt87AZVIEhlpatqYy61a+PGyaZpQOaEAW9AqurCIQBYOhGCWWNHNY8JsoyWgoF4qMAtWRyoCi4oRJ6o7Pn6wayABlpRuuibptm+aJlyZHRsejbAvgRgcbIFGQAOuGkdJlqj1YJAAAkkBwLTVGUFsJiW89GF4fl7hAO9AKNBAZigTnuYfWE+ZMm9+nYKAIG4ZAuxhr6kAEQyNXSdJXDbNLGCm2AoAYMIqq8GwWojL6YBE2AVg1ld6112Wo0tCpamXFNCxMEw9sgs0129rWS3QxxQQDkxKEoWJYj9zCmibExo+y2InEgsihyrdILBaZPU43FBDskmBioQGNDQfJM5zDz90lO6Uukxx6JnpxBipwCu9zjyszaYlqFeZgRBPEKYAqSlVJdfIA"
+    }
+  ]
+}

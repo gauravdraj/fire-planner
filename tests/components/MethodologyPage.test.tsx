@@ -14,7 +14,7 @@ describe('MethodologyPage', () => {
     cleanup();
   });
 
-  it('renders all eight methodology section headings in order', () => {
+  it('renders all nine methodology section headings in order', () => {
     render(<MethodologyPage />);
 
     expect(screen.getByRole('heading', { name: 'Methodology' })).toBeInTheDocument();

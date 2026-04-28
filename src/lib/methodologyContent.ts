@@ -39,6 +39,7 @@ const CURATED_SOURCE_URLS = {
 
 export const methodologySectionIds = [
   'overview',
+  'glossary',
   'modeled',
   'not-modeled',
   'constants-source',
@@ -108,10 +109,68 @@ export type MethodologySection = Readonly<{
 }>;
 
 export const overviewParagraphs = [
-  'Fire Planner is a browser-local retirement bridge planning tool for year-by-year FIRE withdrawal analysis. It estimates whether supported account buckets can fund a plan and highlights tax, healthcare, MAGI, ACA, IRMAA, and withdrawal-strategy tradeoffs.',
-  'The app is an educational estimator. It is designed to make assumptions visible and testable, not to replace official worksheets, professional advice, or tax filing software.',
+  'Fire Planner is a free, open-source, client-only, fixture-validated, transparent retirement withdrawal planner.',
+  'It estimates whether supported account buckets can fund a plan and highlights tax, healthcare, MAGI, ACA, IRMAA, and withdrawal-strategy tradeoffs.',
+  'It is an educational estimator. It makes assumptions visible and testable, but it does not replace official worksheets, professional advice, or tax filing software.',
   'All inputs and projections stay in the browser. There is no backend account, cloud sync, analytics, or server persistence in the current architecture.',
 ] as const;
+
+export const glossaryItems = [
+  {
+    id: 'magi',
+    label: 'MAGI',
+    description:
+      'Modified adjusted gross income: AGI with program-specific addbacks. The app tracks ACA MAGI and IRMAA MAGI separately where rules differ.',
+  },
+  {
+    id: 'irmaa',
+    label: 'IRMAA',
+    description:
+      'Income-Related Monthly Adjustment Amount: a Medicare premium surcharge based on prior-year or prior-prior-year MAGI.',
+  },
+  {
+    id: 'aca-ptc-fpl',
+    label: 'ACA/PTC/FPL%',
+    description:
+      'ACA marketplace premium tax credits compare household MAGI to the Federal Poverty Level, expressed as an FPL percentage.',
+  },
+  {
+    id: 'ltcg',
+    label: 'LTCG',
+    description:
+      'Long-term capital gains: gains on assets held more than one year, stacked with qualified dividends into separate federal tax brackets.',
+  },
+  {
+    id: 'qbi-sstb',
+    label: 'QBI/SSTB',
+    description:
+      'Qualified business income deduction rules, including phaseouts that can limit specified service trade or business income.',
+  },
+  {
+    id: 'niit',
+    label: 'NIIT',
+    description:
+      'Net Investment Income Tax: a 3.8% federal tax on certain investment income when MAGI exceeds statutory thresholds.',
+  },
+  {
+    id: 'sepp-72t',
+    label: 'SEPP/72(t)',
+    description:
+      'Substantially Equal Periodic Payments under Internal Revenue Code section 72(t), used to avoid early-distribution penalties.',
+  },
+  {
+    id: 'roth-conversion-ladder',
+    label: 'Roth conversion ladder',
+    description:
+      'A sequence of traditional-to-Roth conversions that can create later Roth principal access while managing tax brackets.',
+  },
+  {
+    id: 'custom-law-scenario',
+    label: 'customLaw scenario',
+    description:
+      'A scenario-specific set of sparse law overrides layered over sealed default constants without changing the baseline constants.',
+  },
+] as const satisfies readonly MethodologyListItem[];
 
 export const modeledItems = [
   {
@@ -480,9 +539,15 @@ export const sourceReferences = [
 export const methodologySections = [
   {
     id: 'overview',
-    title: 'What Fire Planner Is',
-    summary: 'A browser-local retirement bridge planner focused on transparent year-by-year tax and cashflow estimates.',
+    title: "What this tool is and isn't",
+    summary: 'A short statement of the product boundary before the detailed methodology.',
     paragraphs: overviewParagraphs,
+  },
+  {
+    id: 'glossary',
+    title: 'Glossary',
+    summary: 'Plain-English definitions for the tax and planning terms used throughout the planner.',
+    items: glossaryItems,
   },
   {
     id: 'modeled',

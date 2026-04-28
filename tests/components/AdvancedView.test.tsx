@@ -26,6 +26,14 @@ describe('AdvancedView', () => {
     expect(screen.queryByRole('tab', { name: 'Custom law' })).not.toBeInTheDocument();
   });
 
+  it('can render embedded inside the verdict Plan disclosure without switching compatibility mode', () => {
+    render(<AdvancedView embedded />);
+
+    expect(useUiStore.getState().mode).toBe('basic');
+    expect(screen.getByRole('heading', { name: 'Advanced planner' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Custom law' })).toHaveAttribute('aria-selected', 'true');
+  });
+
   it('renders the required advanced tabs in advanced mode', () => {
     useUiStore.getState().setMode('advanced');
 

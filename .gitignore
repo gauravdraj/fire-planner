@@ -13,6 +13,7 @@ COUNCIL_*.md
 ADR_*.md
 AIZEN_SPEC_*.md
 UAT_*.md
+!UAT_VERDICT_LAYOUT.md
 .aizen/
 
 # IDE-specific
