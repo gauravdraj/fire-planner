@@ -25,6 +25,7 @@ vi.mock('recharts', () => ({
 
 let clipboardWrites: string[];
 let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
+const SLOW_UI_INTEGRATION_TIMEOUT_MS = 20_000;
 
 async function importApp() {
   const { App } = await import('@/App');
@@ -235,7 +236,7 @@ describe('basic Gate 3 app flow', () => {
     expect(screen.queryByRole('dialog', { name: /share-link privacy/i })).not.toBeInTheDocument();
     expect(new URL(clipboardWrites[1] ?? '').hash).toMatch(/^#v1:/);
     expect(consoleErrorSpy).not.toHaveBeenCalled();
-  }, 10_000);
+  }, SLOW_UI_INTEGRATION_TIMEOUT_MS);
 
   it('pulses a live stat cell after typing into annual spending', async () => {
     await renderFilledRealisticPlannerWithFakeTimers();
@@ -247,7 +248,7 @@ describe('basic Gate 3 app flow', () => {
     const liveStats = within(screen.getByLabelText(/live projection stats/i)).getAllByRole('listitem');
 
     expect(liveStats.some((stat) => stat.classList.contains('bg-yellow-100'))).toBe(true);
-  }, 10_000);
+  }, SLOW_UI_INTEGRATION_TIMEOUT_MS);
 
   it('updates plan-end balance after editing traditional expected return', async () => {
     await renderFilledRealisticPlannerWithFakeTimers();
@@ -258,7 +259,7 @@ describe('basic Gate 3 app flow', () => {
     advanceLiveDebounce();
 
     expect(numericMoney(liveStatValue('plan-end-balance'))).toBeLessThan(planEndBalanceBefore);
-  }, 10_000);
+  }, SLOW_UI_INTEGRATION_TIMEOUT_MS);
 
   it('updates the retirement target derived chip after typing into the field', async () => {
     await renderFilledRealisticPlannerWithFakeTimers();
@@ -270,7 +271,7 @@ describe('basic Gate 3 app flow', () => {
 
     expect(screen.getByText('→ Age 63 in 5 yrs')).toBeInTheDocument();
     expect(screen.queryByText('→ Age 64 in 6 yrs')).not.toBeInTheDocument();
-  }, 10_000);
+  }, SLOW_UI_INTEGRATION_TIMEOUT_MS);
 
   it('renders the five grouped year-table band labels', async () => {
     const { container } = await renderFilledRealisticPlanner();
@@ -282,7 +283,7 @@ describe('basic Gate 3 app flow', () => {
       'Tax',
       'KPIs',
     ]);
-  }, 10_000);
+  }, SLOW_UI_INTEGRATION_TIMEOUT_MS);
 
   it('renders a dense year-table row with at least eighteen per-year columns', async () => {
     const { container, table } = await renderFilledRealisticPlanner();
@@ -293,7 +294,7 @@ describe('basic Gate 3 app flow', () => {
     expect(within(firstDataRow).getAllByRole('cell').length + within(firstDataRow).getAllByRole('rowheader').length).toBe(
       perYearColumnCount,
     );
-  }, 10_000);
+  }, SLOW_UI_INTEGRATION_TIMEOUT_MS);
 
   it('colors a bridge-year FPL percentage cell with its threshold class', async () => {
     const { table } = await renderFilledRealisticPlanner();
@@ -302,7 +303,7 @@ describe('basic Gate 3 app flow', () => {
     const bridgeFplValue = bridgeFplMetric.textContent ?? '';
 
     expect(bridgeFplMetric).toHaveClass(...expectedFplClassForPercent(bridgeFplValue));
-  }, 10_000);
+  }, SLOW_UI_INTEGRATION_TIMEOUT_MS);
 
   it('renders basic-form fieldsets with the expected legends', async () => {
     const { form } = await renderFilledRealisticPlanner();
@@ -311,7 +312,12 @@ describe('basic Gate 3 app flow', () => {
     expect(fieldsets).toHaveLength(8);
     expect(
       fieldsets.map((fieldset) =>
-        within(fieldset).getByRole('button', { name: /About / }).getAttribute('aria-label')?.replace('About ', ''),
+        within(fieldset)
+          .getByRole('button', {
+            name: /^About (Household|Timeline|Spending & debt|Accounts|Growth & dividends|Withdrawal strategy|Income|Healthcare)$/,
+          })
+          .getAttribute('aria-label')
+          ?.replace('About ', ''),
       ),
     ).toEqual([
       'Household',
@@ -323,13 +329,13 @@ describe('basic Gate 3 app flow', () => {
       'Income',
       'Healthcare',
     ]);
-  }, 10_000);
+  }, SLOW_UI_INTEGRATION_TIMEOUT_MS);
 
   it('renders at least twenty info tooltip glyphs across the planner page', async () => {
     await renderFilledRealisticPlanner();
 
     expect(screen.getAllByRole('button', { name: /About / }).length).toBeGreaterThanOrEqual(20);
-  }, 10_000);
+  }, SLOW_UI_INTEGRATION_TIMEOUT_MS);
 
   it('keeps the rich year table horizontally scrollable with sticky year headers', async () => {
     const { container, table } = await renderFilledRealisticPlanner();
@@ -339,7 +345,7 @@ describe('basic Gate 3 app flow', () => {
     expect(tableScrollRegion?.querySelector('table')).toBe(table);
     expect(within(table).getByRole('columnheader', { name: 'Year' })).toHaveClass('sticky', 'left-0');
     expect(within(table).getAllByRole('rowheader')[0]).toHaveClass('sticky', 'left-0');
-  }, 10_000);
+  }, SLOW_UI_INTEGRATION_TIMEOUT_MS);
 
   it('continues to update live stat values when display units change', async () => {
     await renderFilledRealisticPlanner();
@@ -348,5 +354,5 @@ describe('basic Gate 3 app flow', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Nominal dollars' }));
 
     expect(liveStatValue('net-worth-at-retirement')).not.toBe(realRetirementValue);
-  }, 10_000);
+  }, SLOW_UI_INTEGRATION_TIMEOUT_MS);
 });

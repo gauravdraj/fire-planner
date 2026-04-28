@@ -64,7 +64,7 @@ export function ShareButton() {
   return (
     <div className="relative flex min-w-[6rem] flex-col items-start gap-1">
       <button
-        className="inline-flex w-full items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm shadow-slate-900/5 transition-colors hover:bg-slate-100 hover:text-slate-950 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 motion-reduce:transition-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:shadow-none dark:hover:bg-slate-800 dark:hover:text-slate-50 dark:focus-visible:outline-indigo-400"
+        className="inline-flex h-10 w-full items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-0 text-sm font-medium text-slate-700 shadow-sm shadow-slate-900/5 transition-colors hover:bg-slate-100 hover:text-slate-950 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 motion-reduce:transition-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:shadow-none dark:hover:bg-slate-800 dark:hover:text-slate-50 dark:focus-visible:outline-indigo-400"
         onClick={handleShareClick}
         ref={triggerRef}
         type="button"

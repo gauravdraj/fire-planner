@@ -86,7 +86,7 @@ export function AdvancedView({ onCompare }: AdvancedViewProps = {}) {
   return (
     <section
       aria-labelledby="advanced-view-heading"
-      className="rounded-2xl border border-slate-200 bg-white/95 p-5 shadow-sm shadow-slate-900/5 dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-none"
+      className="min-w-0 rounded-2xl border border-slate-200 bg-white/95 p-5 shadow-sm shadow-slate-900/5 dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-none"
     >
       <div>
         <p className="text-sm font-medium text-indigo-700 dark:text-indigo-300">Gate 4 advanced controls</p>
@@ -174,4 +174,4 @@ export function AdvancedView({ onCompare }: AdvancedViewProps = {}) {
 }
 
 const tabPanelClassName =
-  'rounded-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-indigo-600 dark:focus-visible:outline-indigo-400';
+  'min-w-0 rounded-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-indigo-600 dark:focus-visible:outline-indigo-400';

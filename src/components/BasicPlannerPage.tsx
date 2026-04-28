@@ -25,7 +25,15 @@ export function BasicPlannerPage() {
         </p>
       </div>
       <StarterTemplateChooser />
-      <BasicForm />
+      <div
+        className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(22rem,28rem)] xl:items-start"
+        data-testid="basic-workstation-layout"
+      >
+        <div className="min-w-0" data-testid="basic-form-column">
+          <BasicForm />
+        </div>
+        <BasicResultsRail />
+      </div>
       <ProjectionResults />
       <section
         aria-labelledby="seventy-two-t-heading"
@@ -42,6 +50,28 @@ export function BasicPlannerPage() {
         <SeventyTwoTCalc />
       </section>
     </section>
+  );
+}
+
+function BasicResultsRail() {
+  return (
+    <aside
+      aria-labelledby="basic-results-rail-heading"
+      className="mt-6 min-w-0 rounded-2xl border border-slate-200 bg-slate-50/70 p-4 shadow-sm shadow-slate-900/5 dark:border-slate-800 dark:bg-slate-950/35 dark:shadow-none sm:p-5"
+      data-testid="basic-results-rail"
+    >
+      <p className="text-xs font-semibold uppercase tracking-wide text-indigo-700 dark:text-indigo-300">
+        Live summary
+      </p>
+      <h3 className="mt-1 text-lg font-semibold text-slate-950 dark:text-slate-50" id="basic-results-rail-heading">
+        Projection snapshot
+      </h3>
+      <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-400">
+        Headline outcomes and balance shape stay visible beside the form on wide desktop screens.
+      </p>
+      <LiveStatsStrip variant="rail" />
+      <BalancesChart variant="compact" />
+    </aside>
   );
 }
 
@@ -64,11 +94,9 @@ function ProjectionResults() {
             visible column contract as the table.
           </p>
         </div>
-        <LiveStatsStrip />
         <WhyChangedCallout />
         <YearByYearTable />
       </section>
-      <BalancesChart />
       <MagiChart />
       <TaxBreakdownChart />
     </>

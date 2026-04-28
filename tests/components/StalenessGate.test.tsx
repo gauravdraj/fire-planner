@@ -31,10 +31,12 @@ describe('StalenessGate', () => {
 
   it('shows the soft warning banner at 540 days', () => {
     render(<StalenessGate now={dateAtAge(540)} />);
+    const bannerShell = screen.getByText('Tax data may be getting stale.').closest('div');
 
     expect(screen.getByRole('status', { name: /tax data staleness warning/i })).toHaveTextContent(
       'Tax data may be getting stale.',
     );
+    expect(bannerShell).toHaveClass('lg:max-w-6xl', 'xl:max-w-7xl');
     expect(screen.getByText(/is 540 days old/i)).toBeInTheDocument();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });

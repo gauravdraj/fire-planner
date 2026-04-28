@@ -21,6 +21,7 @@ import { useUiStore } from '@/store/uiStore';
 
 type BalancesChartProps = {
   now?: Date | string;
+  variant?: 'compact' | 'default';
 };
 
 type BalanceSeriesKey = 'traditional' | 'roth' | 'hsa' | 'taxableBrokerage' | 'cash';
@@ -57,22 +58,26 @@ const DOLLAR_FORMATTER = new Intl.NumberFormat('en-US', {
   style: 'currency',
 });
 
-export function BalancesChart({ now = new Date() }: BalancesChartProps) {
+export function BalancesChart({ now = new Date(), variant = 'default' }: BalancesChartProps) {
   const projectionResults = useScenarioStore((state) => state.projectionResults);
   const scenario = useScenarioStore((state) => state.scenario);
   const displayUnit = useUiStore((state) => state.displayUnit);
   const themePreference = useUiStore((state) => state.themePreference);
   const resolvedTheme = useResolvedTheme(themePreference);
   const palette = getChartPalette(resolvedTheme);
+  const isCompact = variant === 'compact';
   const isStale = getStalenessLevel(CONSTANTS_2026.retrievedAt, now) !== 'fresh';
   const unitLabel = displayUnit === 'real' ? "today's dollars" : 'nominal dollars';
   const chartData = buildBalancesChartData({ displayUnit, projectionResults, scenario });
 
   return (
-    <section aria-labelledby="balances-chart-heading" className="mt-6 min-w-0">
+    <section aria-labelledby="balances-chart-heading" className={isCompact ? 'mt-4 min-w-0' : 'mt-6 min-w-0'}>
       <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h2 className="text-lg font-semibold text-slate-950 dark:text-slate-50" id="balances-chart-heading">
+          <h2
+            className={isCompact ? 'text-base font-semibold text-slate-950 dark:text-slate-50' : 'text-lg font-semibold text-slate-950 dark:text-slate-50'}
+            id="balances-chart-heading"
+          >
             Account balances
           </h2>
           <p className="text-sm leading-6 text-slate-600 dark:text-slate-400">
@@ -87,30 +92,33 @@ export function BalancesChart({ now = new Date() }: BalancesChartProps) {
         data-stale={isStale ? 'true' : undefined}
         role="img"
       >
-        <div className="h-72 min-w-[40rem] p-3">
+        <div className={isCompact ? 'h-64 min-w-[22rem] p-2 xl:min-w-0' : 'h-72 min-w-[40rem] p-3'}>
           {chartData.length === 0 ? (
             <p className="p-4 text-sm text-slate-600 dark:text-slate-400">No projection data available.</p>
           ) : (
             <ResponsiveContainer height="100%" width="100%">
-              <AreaChart data={chartData} margin={{ bottom: 4, left: 4, right: 12, top: 12 }}>
+              <AreaChart
+                data={chartData}
+                margin={isCompact ? { bottom: 0, left: 0, right: 4, top: 8 } : { bottom: 4, left: 4, right: 12, top: 12 }}
+              >
                 <CartesianGrid stroke={palette.grid} strokeDasharray="3 3" />
                 <XAxis
                   axisLine={false}
                   dataKey="year"
-                  tick={{ fill: palette.axis, fontSize: 12 }}
+                  tick={{ fill: palette.axis, fontSize: isCompact ? 11 : 12 }}
                   tickLine={false}
                 />
                 <YAxis
                   axisLine={false}
-                  tick={{ fill: palette.axis, fontSize: 12 }}
+                  tick={{ fill: palette.axis, fontSize: isCompact ? 11 : 12 }}
                   tickFormatter={formatCompactDollarTick}
                   tickLine={false}
-                  width={72}
+                  width={isCompact ? 56 : 72}
                 />
                 <Tooltip content={<BalancesChartTooltip palette={palette} />} />
                 <Legend
                   formatter={(value) => <span style={{ color: palette.legend }}>{String(value)}</span>}
-                  wrapperStyle={{ color: palette.legend, fontSize: 12 }}
+                  wrapperStyle={{ color: palette.legend, fontSize: isCompact ? 11 : 12 }}
                 />
                 {BALANCE_SERIES.map((series) => (
                   <Area

@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { mapBasicFormToProjectionInputs, type BasicFormValues } from '@/lib/basicFormMapping';
@@ -115,7 +115,7 @@ describe('BasicPlannerPage', () => {
     expect(screen.queryByText(/Run the projection to see/i)).not.toBeInTheDocument();
     expect(screen.getByRole('heading', { name: /projection results/i })).toBeInTheDocument();
     expect(screen.getByText(/Exports use the same visible column contract as the table/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/live projection stats/i)).toHaveClass('sticky');
+    expect(screen.getByLabelText(/live projection stats/i)).not.toHaveClass('sticky');
     expect(screen.getByTestId('year-table-scroll')).toHaveClass('max-w-full', 'overflow-x-auto');
     expect(screen.queryByRole('heading', { name: /projection summary/i })).not.toBeInTheDocument();
     expect(screen.getByTestId('live-stat-net-worth-at-retirement')).toHaveTextContent('Net worth at retirement');
@@ -141,6 +141,35 @@ describe('BasicPlannerPage', () => {
 
     expect(useScenarioStore.getState().formValues).toEqual(scenarioFormValues);
     expect(useScenarioStore.getState()).not.toHaveProperty('hasRunProjection');
+  });
+
+  it('renders the xl workstation structure with a populated results rail', async () => {
+    const { BasicPlannerPage } = await importBasicPlannerPage();
+
+    render(<BasicPlannerPage />);
+
+    const layout = screen.getByTestId('basic-workstation-layout');
+    const formColumn = screen.getByTestId('basic-form-column');
+    const rail = screen.getByTestId('basic-results-rail');
+    const railStats = within(rail).getByLabelText(/live projection stats/i);
+    const railChart = within(rail).getByRole('img', { name: /stacked account balances/i });
+    const tableScroll = screen.getByTestId('year-table-scroll');
+
+    expect(layout).toHaveClass('grid', 'gap-6', 'xl:grid-cols-[minmax(0,1fr)_minmax(22rem,28rem)]');
+    expect(within(formColumn).getByRole('form', { name: /basic scenario form/i })).toBeInTheDocument();
+    expect(rail).toHaveClass('mt-6', 'min-w-0');
+    expect(rail.className).not.toMatch(/\bsticky\b/);
+    expect(rail.className).not.toMatch(/\boverflow-hidden\b/);
+    expect(rail.className).not.toMatch(/\boverflow-(?:auto|scroll|y-auto|y-scroll)\b/);
+    expect(rail.className).not.toMatch(/\bmax-h-/);
+    expect(within(rail).getByRole('heading', { name: /projection snapshot/i })).toBeInTheDocument();
+    expect(railStats).toHaveClass('mt-4');
+    expect(railStats).not.toHaveClass('sticky', 'top-0', 'z-10');
+    expect(within(rail).getByRole('heading', { name: /account balances/i })).toBeInTheDocument();
+    expect(railChart).toHaveClass('max-w-full', 'overflow-x-auto');
+    expect(within(rail).queryByText(/no projection data available/i)).not.toBeInTheDocument();
+    expect(rail).not.toContainElement(tableScroll);
+    expect(tableScroll).toHaveClass('max-w-full', 'overflow-x-auto');
   });
 
   it('keeps invalid basic form edits local until a valid debounced value is entered', async () => {

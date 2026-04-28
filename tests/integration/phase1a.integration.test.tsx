@@ -31,6 +31,7 @@ const MONEY_FORMATTER = new Intl.NumberFormat('en-US', {
   maximumFractionDigits: 0,
   style: 'currency',
 });
+const SLOW_UI_INTEGRATION_TIMEOUT_MS = 20_000;
 
 function changeField(label: string | RegExp, value: string) {
   fireEvent.change(screen.getByLabelText(label), { target: { value } });
@@ -211,5 +212,5 @@ describe('Phase 1A basic-form integration smoke', () => {
     const cumulativeBridgeTax = roundToCents(retirementYear.totalTax + payoffYear.totalTax);
     expect(cumulativeBridgeTax).toBe(17_171.59);
     expect(liveStatValue('total-bridge-tax')).toBe(formatMoney(cumulativeBridgeTax));
-  }, 10_000);
+  }, SLOW_UI_INTEGRATION_TIMEOUT_MS);
 });

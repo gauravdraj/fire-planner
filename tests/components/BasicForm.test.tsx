@@ -2,6 +2,7 @@ import { act, cleanup, fireEvent, render, screen, within } from '@testing-librar
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { BasicForm } from '@/components/BasicForm';
+import { basicControlHelp } from '@/lib/basicControlHelp';
 import { useScenarioStore } from '@/store/scenarioStore';
 
 import { installMemoryLocalStorage } from '../store/memoryStorage';
@@ -14,6 +15,18 @@ function advanceLiveDebounce() {
   act(() => {
     vi.advanceTimersByTime(151);
   });
+}
+
+function expectTooltip(trigger: HTMLElement, text: string) {
+  const tooltipId = trigger.getAttribute('aria-describedby');
+  const tooltip = tooltipId === null ? null : document.getElementById(tooltipId);
+
+  if (tooltip === null) {
+    throw new Error(`Expected ${trigger.getAttribute('aria-label') ?? 'tooltip trigger'} to describe a tooltip.`);
+  }
+
+  expect(tooltip).toHaveAttribute('role', 'tooltip');
+  expect(tooltip).toHaveTextContent(text);
 }
 
 describe('BasicForm', () => {
@@ -63,7 +76,13 @@ describe('BasicForm', () => {
     expect(screen.getByLabelText('HSA expected return')).toHaveValue('0.05');
     expect(screen.getByLabelText('Brokerage dividend yield')).toHaveValue('0');
     expect(screen.getByLabelText('Qualified dividend percentage')).toHaveValue('0.95');
-    expect(screen.getByText(/Expected returns are annual decimals/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Expected account returns plus taxable brokerage dividend yield and qualified-dividend share assumptions.',
+        { selector: 'p' },
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/price return plus after-tax reinvested dividends/i)).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Cash expected return')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /run projection/i })).not.toBeInTheDocument();
   });
@@ -174,7 +193,11 @@ describe('BasicForm', () => {
   it('adds accessible section tooltips to every fieldset legend', () => {
     render(<BasicForm />);
 
-    expect(screen.getAllByRole('button', { name: /About / })).toHaveLength(8);
+    expect(
+      screen.getAllByRole('button', {
+        name: /^About (Household|Timeline|Spending & debt|Withdrawal strategy|Accounts|Income|Healthcare|Growth & dividends)$/,
+      }),
+    ).toHaveLength(8);
     expect(screen.getByRole('button', { name: 'About Household' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'About Timeline' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'About Spending & debt' })).toBeInTheDocument();
@@ -186,16 +209,8 @@ describe('BasicForm', () => {
 
     fireEvent.focus(screen.getByRole('button', { name: 'About Accounts' }));
 
-    const accountsTrigger = screen.getByRole('button', { name: 'About Accounts' });
-    const tooltipId = accountsTrigger.getAttribute('aria-describedby');
-    const tooltip = tooltipId === null ? null : document.getElementById(tooltipId);
-
-    if (tooltip === null) {
-      throw new Error('Expected Accounts tooltip to be described by an element id.');
-    }
-
-    expect(tooltip).toHaveAttribute('role', 'tooltip');
-    expect(tooltip).toHaveTextContent(
+    expectTooltip(
+      screen.getByRole('button', { name: 'About Accounts' }),
       'Starting supported account balances, including HSA, and taxable basis used by the withdrawal display layer.',
     );
     expect(
@@ -203,6 +218,27 @@ describe('BasicForm', () => {
         'Starting supported account balances, including HSA, and taxable basis used by the withdrawal display layer.',
       ),
     ).toHaveLength(2);
+  });
+
+  it('adds metadata-backed tooltips to input, select, and checkbox labels', () => {
+    render(<BasicForm />);
+
+    expect(screen.getByLabelText('Annual spending')).toBeInTheDocument();
+    expect(screen.getByLabelText('Filing status')).toHaveValue('mfj');
+    expect(screen.getByLabelText('Auto-deplete brokerage')).not.toBeChecked();
+
+    expectTooltip(
+      screen.getByRole('button', { name: 'About Annual spending' }),
+      basicControlHelp.annualSpendingToday.description,
+    );
+    expectTooltip(
+      screen.getByRole('button', { name: 'About Filing status' }),
+      basicControlHelp.filingStatus.description,
+    );
+    expectTooltip(
+      screen.getByRole('button', { name: 'About Auto-deplete brokerage' }),
+      basicControlHelp.autoDepleteBrokerageEnabled.description,
+    );
   });
 
   it('renders derived chips and updates them after valid debounced edits', () => {

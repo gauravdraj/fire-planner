@@ -36,7 +36,7 @@ export function App() {
       <StalenessGate />
       <Header />
       {customLawActive ? <CustomLawBanner /> : null}
-      <main className="mx-auto w-full max-w-5xl min-w-0 px-3 py-6 sm:px-4 sm:py-8 lg:py-10">
+      <main className="mx-auto w-full max-w-5xl min-w-0 px-3 py-6 sm:px-4 sm:py-8 lg:max-w-6xl lg:py-10 xl:max-w-7xl">
         {mode === 'methodology' ? (
           <MethodologyPage />
         ) : mode === 'compare' ? (
@@ -58,7 +58,7 @@ function CustomLawBanner() {
       className="border-y border-amber-300/80 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-950 shadow-sm shadow-amber-900/5 dark:border-amber-500/40 dark:bg-amber-950/50 dark:text-amber-100 dark:shadow-none"
       role="status"
     >
-      <div className="mx-auto max-w-5xl">{CUSTOM_LAW_BANNER_TEXT}</div>
+      <div className="mx-auto max-w-5xl lg:max-w-6xl xl:max-w-7xl">{CUSTOM_LAW_BANNER_TEXT}</div>
     </div>
   );
 }

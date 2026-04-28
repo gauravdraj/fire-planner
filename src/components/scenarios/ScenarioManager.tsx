@@ -189,7 +189,7 @@ export function ScenarioManager({ onCompare }: ScenarioManagerProps) {
           }}
           role="dialog"
         >
-          <div className="w-full max-w-5xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-slate-950/20 dark:border-slate-800 dark:bg-slate-950 dark:shadow-black/50">
+          <div className="w-full max-w-5xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-slate-950/20 dark:border-slate-800 dark:bg-slate-950 dark:shadow-black/50 lg:max-w-6xl xl:max-w-7xl">
             <div className="max-h-[86vh] overflow-y-auto p-4 sm:p-6">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div className="max-w-2xl">

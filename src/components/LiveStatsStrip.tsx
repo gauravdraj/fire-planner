@@ -21,6 +21,7 @@ import { useUiStore } from '@/store/uiStore';
 
 import { InfoTooltip } from './InfoTooltip';
 import { MetricCell, type MetricCellBandType } from './MetricCell';
+import { classNames } from './ui/controlStyles';
 
 type LiveStat = Readonly<{
   id: LiveStatMetricId;
@@ -33,6 +34,10 @@ type LiveStat = Readonly<{
   detail: string;
 }>;
 
+type LiveStatsStripProps = {
+  variant?: 'rail' | 'strip';
+};
+
 const DOLLAR_FORMATTER = new Intl.NumberFormat('en-US', {
   currency: 'USD',
   maximumFractionDigits: 0,
@@ -44,11 +49,12 @@ const PERCENT_FORMATTER = new Intl.NumberFormat('en-US', {
   style: 'percent',
 });
 
-export function LiveStatsStrip() {
+export function LiveStatsStrip({ variant = 'strip' }: LiveStatsStripProps) {
   const formValues = useScenarioStore((state) => state.formValues);
   const projectionResults = useScenarioStore((state) => state.projectionResults);
   const scenario = useScenarioStore((state) => state.scenario);
   const displayUnit = useUiStore((state) => state.displayUnit);
+  const isRail = variant === 'rail';
   const stats = useMemo(
     () => buildLiveStats({ displayUnit, formValues, projectionResults, scenario }),
     [displayUnit, formValues, projectionResults, scenario],
@@ -56,9 +62,16 @@ export function LiveStatsStrip() {
   return (
     <section
       aria-label="Live projection stats"
-      className="sticky top-0 z-10 mt-6 bg-white/90 py-3 backdrop-blur dark:bg-slate-950/90"
+      className={classNames(
+        isRail ? 'mt-4' : 'sticky top-0 z-10 mt-6 bg-white/90 py-3 backdrop-blur dark:bg-slate-950/90',
+      )}
     >
-      <ul className="grid gap-2 rounded-2xl border border-slate-200 bg-slate-50/90 p-2 shadow-sm shadow-slate-900/5 dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-none sm:grid-cols-2 lg:grid-cols-6">
+      <ul
+        className={classNames(
+          'grid gap-2 border border-slate-200 bg-slate-50/90 p-2 shadow-sm shadow-slate-900/5 dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-none',
+          isRail ? 'rounded-xl sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2' : 'rounded-2xl sm:grid-cols-2 lg:grid-cols-6',
+        )}
+      >
         {stats.map((stat) => (
           <LiveStatCell key={stat.id} stat={stat} />
         ))}

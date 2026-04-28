@@ -31,7 +31,9 @@ describe('AdvancedView', () => {
 
     render(<AdvancedView />);
 
-    expect(screen.getByRole('heading', { name: 'Advanced planner' })).toBeInTheDocument();
+    const advancedHeading = screen.getByRole('heading', { name: 'Advanced planner' });
+    expect(advancedHeading).toBeInTheDocument();
+    expect(advancedHeading.closest('section')).toHaveClass('min-w-0');
     expect(screen.getByRole('tab', { name: 'Custom law' })).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByRole('tab', { name: 'Manual plan' })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Planner controls' })).toBeInTheDocument();
@@ -47,6 +49,7 @@ describe('AdvancedView', () => {
 
     fireEvent.click(screen.getByRole('tab', { name: 'Planning charts' }));
     expect(screen.queryByRole('heading', { name: 'Projection summary' })).not.toBeInTheDocument();
+    expect(screen.getByRole('tabpanel', { name: 'Planning charts' })).toHaveClass('min-w-0');
     expect(screen.getByRole('heading', { name: 'Year-by-year projection' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Account balances' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'MAGI thresholds' })).toBeInTheDocument();

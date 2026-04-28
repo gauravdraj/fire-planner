@@ -110,6 +110,18 @@ describe('LiveStatsStrip', () => {
     expect(within(cellAt(cells, 5)).getByText('$0')).toHaveClass('tabular-nums');
   });
 
+  it('renders the rail variant without sticky positioning', () => {
+    render(<LiveStatsStrip variant="rail" />);
+
+    const strip = screen.getByLabelText('Live projection stats');
+    const list = within(strip).getByRole('list');
+
+    expect(strip).toHaveClass('mt-4');
+    expect(strip).not.toHaveClass('sticky', 'top-0', 'z-10', 'bg-white/90', 'backdrop-blur');
+    expect(list).toHaveClass('rounded-xl', 'sm:grid-cols-2', 'xl:grid-cols-1', '2xl:grid-cols-2');
+    expect(list).not.toHaveClass('lg:grid-cols-6');
+  });
+
   it('updates values after setFormValues and pulses changed stats without deltas', () => {
     vi.useFakeTimers();
     useUiStore.getState().setDisplayUnit('nominal');

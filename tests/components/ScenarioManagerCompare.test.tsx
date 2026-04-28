@@ -126,6 +126,7 @@ describe('scenario manager and compare view', () => {
 
     const dialog = screen.getByRole('dialog', { name: 'Manage saved scenarios' });
     expect(screen.getByLabelText('Save active scenario as')).toHaveFocus();
+    expect(dialog.firstElementChild).toHaveClass('lg:max-w-6xl', 'xl:max-w-7xl');
 
     fireEvent.keyDown(dialog, { key: 'Escape' });
 

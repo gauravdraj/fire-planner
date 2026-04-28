@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ChangeEvent, type ReactNode } from 'r
 
 import { deriveInputChips } from '@/core/derivedChips';
 import type { FilingStatus } from '@/core/types';
+import { basicControlHelp, type BasicControlId } from '@/lib/basicControlHelp';
 import type { BasicFormValues, BasicHealthcarePhase, BasicStarterStateCode } from '@/lib/basicFormMapping';
 import { basicFormSectionExplanations, type BasicFormSectionId } from '@/lib/columnExplanations';
 import { useDebouncedCallback } from '@/lib/useDebouncedCallback';
@@ -142,7 +143,7 @@ export function BasicForm() {
   return (
     <div aria-label="Basic scenario form" className="mt-6 grid items-start gap-4 sm:grid-cols-2" role="form">
       <SectionFieldset sectionId="household">
-        <Field error={errors.filingStatus} id="filingStatus" label="Filing status">
+        <Field error={errors.filingStatus} id="filingStatus">
           <select
             aria-describedby={errors.filingStatus ? 'filingStatus-error' : undefined}
             aria-invalid={errors.filingStatus ? 'true' : undefined}
@@ -159,7 +160,7 @@ export function BasicForm() {
           </select>
         </Field>
 
-        <Field error={errors.stateCode} id="stateCode" label="State">
+        <Field error={errors.stateCode} id="stateCode">
           <select
             aria-describedby={errors.stateCode ? 'stateCode-error' : undefined}
             aria-invalid={errors.stateCode ? 'true' : undefined}
@@ -176,28 +177,26 @@ export function BasicForm() {
           </select>
         </Field>
 
-        {renderNumberField('primaryAge', 'Primary age', draft, errors, handleInputChange)}
-        {showPartnerAge ? renderNumberField('partnerAge', 'Partner age', draft, errors, handleInputChange) : null}
+        {renderNumberField('primaryAge', draft, errors, handleInputChange)}
+        {showPartnerAge ? renderNumberField('partnerAge', draft, errors, handleInputChange) : null}
       </SectionFieldset>
 
       <SectionFieldset sectionId="timeline">
-        {renderNumberField('currentYear', 'Current year', draft, errors, handleInputChange)}
+        {renderNumberField('currentYear', draft, errors, handleInputChange)}
         {renderNumberField(
           'retirementYear',
-          'Retirement target year',
           draft,
           errors,
           handleInputChange,
           chips.retirementTarget,
         )}
-        {renderNumberField('planEndAge', 'Plan-end age', draft, errors, handleInputChange)}
-        {renderNumberField('socialSecurityClaimAge', 'Social Security claim age', draft, errors, handleInputChange)}
+        {renderNumberField('planEndAge', draft, errors, handleInputChange)}
+        {renderNumberField('socialSecurityClaimAge', draft, errors, handleInputChange)}
       </SectionFieldset>
 
       <SectionFieldset sectionId="spending">
         {renderNumberField(
           'annualSpendingToday',
-          'Annual spending',
           draft,
           errors,
           handleInputChange,
@@ -205,21 +204,19 @@ export function BasicForm() {
         )}
         {renderNumberField(
           'annualMortgagePAndI',
-          'Annual mortgage P&I',
           draft,
           errors,
           handleInputChange,
           chips.mortgagePAndI,
         )}
-        {renderNumberField('mortgagePayoffYear', 'Mortgage payoff year', draft, errors, handleInputChange)}
+        {renderNumberField('mortgagePayoffYear', draft, errors, handleInputChange)}
       </SectionFieldset>
 
       <SectionFieldset sectionId="balances">
-        {renderNumberField('traditionalBalance', 'Traditional balance', draft, errors, handleInputChange)}
-        {renderNumberField('rothBalance', 'Roth balance', draft, errors, handleInputChange)}
+        {renderNumberField('traditionalBalance', draft, errors, handleInputChange)}
+        {renderNumberField('rothBalance', draft, errors, handleInputChange)}
         {renderNumberField(
           'brokerageAndCashBalance',
-          'Brokerage plus cash balance',
           draft,
           errors,
           handleInputChange,
@@ -227,46 +224,37 @@ export function BasicForm() {
         )}
         {renderNumberField(
           'taxableBrokerageBasis',
-          'Weighted-average taxable basis',
           draft,
           errors,
           handleInputChange,
         )}
-        {renderNumberField('hsaBalance', 'HSA balance', draft, errors, handleInputChange)}
+        {renderNumberField('hsaBalance', draft, errors, handleInputChange)}
       </SectionFieldset>
 
       <SectionFieldset sectionId="growthDividends">
-        <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm leading-6 text-slate-600 dark:border-slate-800 dark:bg-slate-950/60 dark:text-slate-400 sm:col-span-2">
-          Expected returns are annual decimals for each modeled account bucket. Brokerage expected return is price
-          appreciation when dividend yield is modeled; price return plus after-tax reinvested dividends make up modeled
-          brokerage growth.
-        </p>
-        {renderNumberField('expectedReturnTraditional', 'Traditional expected return', draft, errors, handleInputChange)}
-        {renderNumberField('expectedReturnRoth', 'Roth expected return', draft, errors, handleInputChange)}
-        {renderNumberField('expectedReturnBrokerage', 'Brokerage expected return', draft, errors, handleInputChange)}
-        {renderNumberField('expectedReturnHsa', 'HSA expected return', draft, errors, handleInputChange)}
-        {renderNumberField('brokerageDividendYield', 'Brokerage dividend yield', draft, errors, handleInputChange)}
-        {renderNumberField('brokerageQdiPercentage', 'Qualified dividend percentage', draft, errors, handleInputChange)}
+        {renderNumberField('expectedReturnTraditional', draft, errors, handleInputChange)}
+        {renderNumberField('expectedReturnRoth', draft, errors, handleInputChange)}
+        {renderNumberField('expectedReturnBrokerage', draft, errors, handleInputChange)}
+        {renderNumberField('expectedReturnHsa', draft, errors, handleInputChange)}
+        {renderNumberField('brokerageDividendYield', draft, errors, handleInputChange)}
+        {renderNumberField('brokerageQdiPercentage', draft, errors, handleInputChange)}
       </SectionFieldset>
 
       <SectionFieldset sectionId="withdrawalStrategy">
         {renderCheckboxField(
           'autoDepleteBrokerageEnabled',
-          'Auto-deplete brokerage',
           draft,
           errors,
           handleCheckboxChange,
         )}
         {renderNumberField(
           'autoDepleteBrokerageYears',
-          'Brokerage depletion years',
           draft,
           errors,
           handleInputChange,
         )}
         {renderNumberField(
           'autoDepleteBrokerageAnnualScaleUpFactor',
-          'Brokerage annual scale-up factor',
           draft,
           errors,
           handleInputChange,
@@ -274,12 +262,11 @@ export function BasicForm() {
       </SectionFieldset>
 
       <SectionFieldset sectionId="income">
-        {renderNumberField('annualW2Income', 'W-2 income', draft, errors, handleInputChange, chips.w2Income)}
-        {renderNumberField('annualConsultingIncome', 'Net consulting income', draft, errors, handleInputChange)}
-        {renderNumberField('annualRentalIncome', 'Net rental income', draft, errors, handleInputChange)}
+        {renderNumberField('annualW2Income', draft, errors, handleInputChange, chips.w2Income)}
+        {renderNumberField('annualConsultingIncome', draft, errors, handleInputChange)}
+        {renderNumberField('annualRentalIncome', draft, errors, handleInputChange)}
         {renderNumberField(
           'annualSocialSecurityBenefit',
-          'Social Security annual benefit',
           draft,
           errors,
           handleInputChange,
@@ -287,7 +274,6 @@ export function BasicForm() {
         )}
         {renderNumberField(
           'annualPensionOrAnnuityIncome',
-          'Pension/annuity annual amount',
           draft,
           errors,
           handleInputChange,
@@ -295,7 +281,7 @@ export function BasicForm() {
       </SectionFieldset>
 
       <SectionFieldset sectionId="healthcare">
-        <Field error={errors.healthcarePhase} id="healthcarePhase" label="Healthcare phase" chip={chips.healthcare}>
+        <Field error={errors.healthcarePhase} id="healthcarePhase" chip={chips.healthcare}>
           <select
             aria-describedby={errors.healthcarePhase ? 'healthcarePhase-error' : undefined}
             aria-invalid={errors.healthcarePhase ? 'true' : undefined}
@@ -481,19 +467,22 @@ function Field({
   chip,
   error,
   id,
-  label,
 }: {
   children: ReactNode;
   chip?: string | undefined;
   error: string | undefined;
-  id: string;
-  label: string;
+  id: BasicControlId;
 }) {
+  const help = basicControlHelp[id];
+
   return (
     <div className="flex flex-col gap-1.5">
-      <label className="text-sm font-medium text-slate-800 dark:text-slate-200" htmlFor={id}>
-        {label}
-      </label>
+      <span className="inline-flex items-center gap-1.5">
+        <label className="text-sm font-medium text-slate-800 dark:text-slate-200" htmlFor={id}>
+          {help.label}
+        </label>
+        <InfoTooltip ariaLabel={`About ${help.label}`}>{help.description}</InfoTooltip>
+      </span>
       {children}
       {chip === undefined ? null : <DerivedChip>{chip}</DerivedChip>}
       {error === undefined ? null : (
@@ -665,8 +654,7 @@ function parsePercentagePatch(
 }
 
 function renderNumberField(
-  field: keyof BasicFormDraft,
-  label: string,
+  field: BasicControlId,
   draft: BasicFormDraft,
   errors: BasicFormErrors,
   handleInputChange: (field: keyof BasicFormDraft) => (event: ChangeEvent<HTMLInputElement>) => void,
@@ -675,7 +663,7 @@ function renderNumberField(
   const error = errors[field];
 
   return (
-    <Field chip={chip} error={error} id={field} key={field} label={label}>
+    <Field chip={chip} error={error} id={field} key={field}>
       <input
         aria-describedby={error ? `${field}-error` : undefined}
         aria-invalid={error ? 'true' : undefined}
@@ -691,8 +679,7 @@ function renderNumberField(
 }
 
 function renderCheckboxField(
-  field: keyof BasicFormDraft,
-  label: string,
+  field: BasicControlId,
   draft: BasicFormDraft,
   errors: BasicFormErrors,
   handleCheckboxChange: (field: keyof BasicFormDraft) => (event: ChangeEvent<HTMLInputElement>) => void,
@@ -700,7 +687,7 @@ function renderCheckboxField(
   const error = errors[field];
 
   return (
-    <Field error={error} id={field} key={field} label={label}>
+    <Field error={error} id={field} key={field}>
       <input
         aria-describedby={error ? `${field}-error` : undefined}
         aria-invalid={error ? 'true' : undefined}

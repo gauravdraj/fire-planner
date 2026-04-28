@@ -61,6 +61,8 @@ describe('App', () => {
   it('renders the shell in disclaimer, header, main, footer order when tax data is fresh', () => {
     const { container } = render(<App />);
     const shell = container.firstElementChild;
+    const headerShell = container.querySelector('header > div');
+    const main = container.querySelector('main');
 
     expect(shell?.children).toHaveLength(4);
     expect(shell?.children[0]).toHaveTextContent(DISCLAIMER_TEXT);
@@ -70,6 +72,10 @@ describe('App', () => {
     expect(screen.getByText(DISCLAIMER_TEXT)).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Fire Planner' })).toBeInTheDocument();
     expect(screen.getByText('All inputs stay on your device.')).toBeInTheDocument();
+    expect(screen.getByText(DISCLAIMER_TEXT)).toHaveClass('lg:max-w-6xl', 'xl:max-w-7xl');
+    expect(headerShell).toHaveClass('lg:max-w-6xl', 'xl:max-w-7xl');
+    expect(main).toHaveClass('lg:max-w-6xl', 'xl:max-w-7xl');
+    expect(screen.getByText('All inputs stay on your device.')).toHaveClass('lg:max-w-6xl', 'xl:max-w-7xl');
   });
 
   it('persists mode changes and renders only the advanced Gate 4 shell', () => {
@@ -163,6 +169,7 @@ describe('App', () => {
     render(<App />);
 
     expect(screen.getByText(CUSTOM_LAW_BANNER_TEXT)).toBeInTheDocument();
+    expect(screen.getByText(CUSTOM_LAW_BANNER_TEXT)).toHaveClass('lg:max-w-6xl', 'xl:max-w-7xl');
     expect(screen.getByRole('heading', { name: 'Basic planner' })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Advanced' }));
@@ -194,16 +201,21 @@ describe('App', () => {
     render(<App />);
 
     const controls = screen.getByRole('group', { name: 'Planner controls' });
+    const themeSelect = within(controls).getByRole('combobox', { name: 'Theme' });
+    const shareButton = within(controls).getByRole('button', { name: 'Share' });
 
-    expect(controls).toHaveClass('flex-wrap');
+    expect(controls).toHaveClass('flex-wrap', 'items-center');
     expect(within(controls).getByRole('group', { name: 'Planner mode' })).toHaveClass('flex-wrap');
     expect(within(controls).getByRole('group', { name: 'Display dollars' })).toHaveClass('flex-wrap');
-    expect(within(controls).getByLabelText('Theme')).toHaveValue('system');
+    expect(themeSelect).toHaveAttribute('aria-label', 'Theme');
+    expect(themeSelect).toHaveClass('h-10');
+    expect(themeSelect.closest('label')).toBeNull();
+    expect(themeSelect).toHaveValue('system');
     expect(within(controls).getByRole('button', { name: 'Real dollars' })).toHaveAttribute('aria-pressed', 'true');
-    expect(within(controls).getByRole('button', { name: 'Share' })).toBeInTheDocument();
+    expect(shareButton).toHaveClass('h-10');
 
     fireEvent.click(within(controls).getByRole('button', { name: 'Nominal dollars' }));
-    fireEvent.click(within(controls).getByRole('button', { name: 'Share' }));
+    fireEvent.click(shareButton);
 
     expect(useUiStore.getState().displayUnit).toBe('nominal');
     expect(screen.getByRole('dialog', { name: /share-link privacy/i })).toBeInTheDocument();
