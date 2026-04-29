@@ -133,6 +133,10 @@ export type Scenario = Readonly<{
   startYear: number;
   filingStatus: FilingStatus;
   w2Income: readonly W2ScheduleEntry[];
+  annualContributionTraditional: number;
+  annualContributionRoth: number;
+  annualContributionHsa: number;
+  annualContributionBrokerage: number;
   consultingIncome: readonly ConsultingScheduleEntry[];
   healthcare: readonly HealthcarePhase[];
   socialSecurity?: SocialSecurityClaimAssumptions;
@@ -237,6 +241,15 @@ type BrokerageHarvestAllocation = Readonly<{
   realizedGain: number;
   basisAfterHarvest: number;
   unharvestedGain: number;
+}>;
+
+type AnnualContributions = Readonly<{
+  traditional: number;
+  roth: number;
+  hsa: number;
+  taxableBrokerage: number;
+  total: number;
+  pretax: number;
 }>;
 
 type YearComputation = Readonly<{
@@ -389,6 +402,7 @@ export function runProjection(scenario: Scenario, plan: WithdrawalPlan): YearBre
   let balances = copyBalances(scenario.balances);
   let taxableBrokerageBasis = roundToCents(Math.max(0, scenario.basis.taxableBrokerage));
   const magiHistory: MagiYear[] = [...(scenario.magiHistory ?? [])];
+  const contributionRetirementYear = inferContributionRetirementYear(scenario, plan);
 
   for (let year = scenario.startYear; year <= plan.endYear; year += 1) {
     let withdrawalTarget = Math.max(0, computeCashNeedBeforeTax(scenario, plan, year));
@@ -401,6 +415,7 @@ export function runProjection(scenario: Scenario, plan: WithdrawalPlan): YearBre
       taxableBrokerageBasis,
       magiHistory,
       withdrawalTarget,
+      contributionRetirementYear,
     );
 
     for (let attempt = 0; attempt < 5; attempt += 1) {
@@ -426,6 +441,7 @@ export function runProjection(scenario: Scenario, plan: WithdrawalPlan): YearBre
         taxableBrokerageBasis,
         magiHistory,
         withdrawalTarget,
+        contributionRetirementYear,
       );
     }
 
@@ -447,9 +463,11 @@ function computeProjectionYear(
   openingBrokerageBasis: number,
   magiHistory: readonly MagiYear[],
   withdrawalTarget: number,
+  contributionRetirementYear: number,
 ): YearComputation {
   const spending = nonnegative(sumAnnualAmounts(plan.annualSpending, year)) + mortgagePAndIBeforePayoff(scenario, year);
   const warnings: string[] = [];
+  const contributions = contributionsForYear(scenario, year, contributionRetirementYear);
   const autoDepleteWithdrawal = autoDepleteBrokerageWithdrawal(scenario, year);
   const allocation = allocateWithdrawals(openingBalances, openingBrokerageBasis, withdrawalTarget, autoDepleteWithdrawal);
   const plannedBrokerageHarvest = nonnegative(sumAnnualAmounts(plan.brokerageHarvests ?? [], year));
@@ -470,6 +488,13 @@ function computeProjectionYear(
     traditional: roundToCents(allocation.balancesAfterWithdrawals.traditional - conversion),
     roth: roundToCents(allocation.balancesAfterWithdrawals.roth + conversion),
   };
+  const balancesAfterContributions: AccountBalances = {
+    cash: balancesAfterConversion.cash,
+    hsa: roundToCents(balancesAfterConversion.hsa + contributions.hsa),
+    taxableBrokerage: roundToCents(balancesAfterConversion.taxableBrokerage + contributions.taxableBrokerage),
+    traditional: roundToCents(balancesAfterConversion.traditional + contributions.traditional),
+    roth: roundToCents(balancesAfterConversion.roth + contributions.roth),
+  };
 
   if (allocation.remainingNeed > 0) {
     warnings.push(`Withdrawal need exceeded available account balances by ${formatDollars(allocation.remainingNeed)}.`);
@@ -484,6 +509,7 @@ function computeProjectionYear(
   }
 
   const wages = sumAnnualAmounts(scenario.w2Income, year);
+  const taxableWages = roundToCents(Math.max(0, wages - contributions.pretax));
   const consultingEntries = entriesForYear(scenario.consultingIncome, year);
   const consultingIncome = consultingEntries.reduce((sum, entry) => sum + entry.amount, 0);
   const hasSstbConsulting = consultingEntries.some((entry) => entry.amount > 0 && entry.sstb);
@@ -522,7 +548,7 @@ function computeProjectionYear(
       filingStatus: scenario.filingStatus,
       grossSocialSecurityBenefits: nonnegative(socialSecurityBenefits),
       otherIncomeBeforeSocialSecurity:
-        wages +
+        taxableWages +
         consultingIncome +
         pensionIncome +
         annuityIncome +
@@ -549,7 +575,7 @@ function computeProjectionYear(
     });
 
     const agi = computeAgi({
-      wages,
+      wages: taxableWages,
       netSelfEmploymentIncome: consultingIncome,
       pensions: pensionIncome + annuityIncome,
       taxableSocialSecurity,
@@ -738,19 +764,20 @@ function computeProjectionYear(
       sumBalanceAmounts(allocation.withdrawals) -
       spending -
       taxComputation.healthcarePremiumOutflow -
-      spendableCashTax,
+      spendableCashTax -
+      contributions.total,
   );
 
   if (afterTaxCashFlow < -0.01) {
     warnings.push(`After-tax cash flow is short by ${formatDollars(Math.abs(afterTaxCashFlow))}.`);
   }
 
-  const returns = applyExpectedReturns(balancesAfterConversion, scenario.expectedReturns, warnings, {
-    ...balancesAfterConversion,
-    hsa: openingBalances.hsa,
+  const returns = applyExpectedReturns(balancesAfterContributions, scenario.expectedReturns, warnings, {
+    ...balancesAfterContributions,
+    hsa: roundToCents(openingBalances.hsa + contributions.hsa),
   });
   const closingBrokerageBasis = roundToCents(
-    brokerageHarvest.basisAfterHarvest + afterTaxGeneratedDividendReinvestment,
+    brokerageHarvest.basisAfterHarvest + contributions.taxableBrokerage + afterTaxGeneratedDividendReinvestment,
   );
   const closingBalances = {
     ...returns.closingBalances,
@@ -824,6 +851,53 @@ function computeCashNeedBeforeTax(scenario: Scenario, plan: WithdrawalPlan, year
     sumAnnualAmounts(scenario.otherIncome ?? [], year);
 
   return nonnegative(sumAnnualAmounts(plan.annualSpending, year)) + mortgagePAndIBeforePayoff(scenario, year) - cashIncome;
+}
+
+function inferContributionRetirementYear(scenario: Scenario, plan: WithdrawalPlan): number {
+  const configuredRetirementYear = scenario.autoDepleteBrokerage?.retirementYear;
+  if (typeof configuredRetirementYear === 'number' && Number.isFinite(configuredRetirementYear)) {
+    return Math.trunc(configuredRetirementYear);
+  }
+
+  const activeIncomeYears = [
+    ...positiveAnnualYears(scenario.w2Income),
+    ...positiveAnnualYears(scenario.consultingIncome),
+  ].filter((activeYear) => activeYear >= scenario.startYear && activeYear <= plan.endYear);
+
+  if (activeIncomeYears.length > 0) {
+    return Math.max(...activeIncomeYears) + 1;
+  }
+
+  return firstPositiveAnnualYear([...scenario.pensionIncome, ...scenario.annuityIncome]) ?? scenario.startYear;
+}
+
+function contributionsForYear(scenario: Scenario, year: number, retirementYear: number): AnnualContributions {
+  if (year >= retirementYear) {
+    return {
+      traditional: 0,
+      roth: 0,
+      hsa: 0,
+      taxableBrokerage: 0,
+      total: 0,
+      pretax: 0,
+    };
+  }
+
+  const traditional = roundToCents(nonnegative(scenario.annualContributionTraditional));
+  const roth = roundToCents(nonnegative(scenario.annualContributionRoth));
+  const hsa = roundToCents(nonnegative(scenario.annualContributionHsa));
+  const taxableBrokerage = roundToCents(nonnegative(scenario.annualContributionBrokerage));
+  const total = roundToCents(traditional + roth + hsa + taxableBrokerage);
+  const pretax = roundToCents(traditional + hsa);
+
+  return {
+    traditional,
+    roth,
+    hsa,
+    taxableBrokerage,
+    total,
+    pretax,
+  };
 }
 
 function mortgagePAndIBeforePayoff(scenario: Scenario, year: number): number {
@@ -1033,6 +1107,14 @@ function getHealthcarePhase(phases: readonly HealthcarePhase[], year: number): H
 
 function entriesForYear<TEntry extends AnnualAmount>(entries: readonly TEntry[], year: number): TEntry[] {
   return entries.filter((entry) => entry.year === year);
+}
+
+function positiveAnnualYears(entries: readonly AnnualAmount[]): number[] {
+  return entries.filter((entry) => entry.amount > 0).map((entry) => entry.year);
+}
+
+function firstPositiveAnnualYear(entries: readonly AnnualAmount[]): number | undefined {
+  return positiveAnnualYears(entries).sort((left, right) => left - right)[0];
 }
 
 function sumAnnualAmounts(entries: readonly AnnualAmount[], year: number): number {

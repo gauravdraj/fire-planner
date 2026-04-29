@@ -3,6 +3,48 @@ import { describe, expect, it } from 'vitest';
 import { runProjection } from '@/core/projection';
 import { BASIC_FORM_MAPPING_DEFAULTS, mapBasicFormToProjectionInputs, type BasicFormValues } from '@/lib/basicFormMapping';
 
+function minimalFormValues(overrides: Partial<BasicFormValues> = {}): BasicFormValues {
+  return {
+    currentYear: 2026,
+    filingStatus: 'single',
+    stateCode: 'FL',
+    primaryAge: 60,
+    partnerAge: 60,
+    retirementYear: 2030,
+    planEndAge: 61,
+    annualSpendingToday: 0,
+    inflationRate: BASIC_FORM_MAPPING_DEFAULTS.inflationRate,
+    annualMortgagePAndI: 0,
+    mortgagePayoffYear: 0,
+    annualW2Income: 0,
+    annualContributionTraditional: 0,
+    annualContributionRoth: 0,
+    annualContributionHsa: 0,
+    annualContributionBrokerage: 0,
+    annualConsultingIncome: 0,
+    annualRentalIncome: 0,
+    annualSocialSecurityBenefit: 0,
+    socialSecurityClaimAge: 67,
+    annualPensionOrAnnuityIncome: 0,
+    brokerageAndCashBalance: 0,
+    taxableBrokerageBasis: 0,
+    hsaBalance: 0,
+    traditionalBalance: 0,
+    rothBalance: 0,
+    autoDepleteBrokerageEnabled: false,
+    autoDepleteBrokerageYears: 10,
+    autoDepleteBrokerageAnnualScaleUpFactor: 0.02,
+    expectedReturnTraditional: BASIC_FORM_MAPPING_DEFAULTS.expectedReturns.traditional,
+    expectedReturnRoth: BASIC_FORM_MAPPING_DEFAULTS.expectedReturns.roth,
+    expectedReturnBrokerage: BASIC_FORM_MAPPING_DEFAULTS.expectedReturns.taxableBrokerage,
+    expectedReturnHsa: BASIC_FORM_MAPPING_DEFAULTS.expectedReturns.hsa,
+    brokerageDividendYield: 0,
+    brokerageQdiPercentage: BASIC_FORM_MAPPING_DEFAULTS.brokerageQdiPercentage,
+    healthcarePhase: 'none',
+    ...overrides,
+  };
+}
+
 function entryForYear<TEntry extends { year: number }>(entries: readonly TEntry[], year: number): TEntry {
   const entry = entries.find((candidate) => candidate.year === year);
 
@@ -28,6 +70,10 @@ describe('basic form projection mapping', () => {
       annualMortgagePAndI: 18_000,
       mortgagePayoffYear: 2030,
       annualW2Income: 190_000,
+      annualContributionTraditional: 19_000,
+      annualContributionRoth: 7_000,
+      annualContributionHsa: 4_150,
+      annualContributionBrokerage: 12_000,
       annualConsultingIncome: 15_000,
       annualRentalIncome: 12_000,
       annualSocialSecurityBenefit: 48_000,
@@ -72,6 +118,10 @@ describe('basic form projection mapping', () => {
     expect(entryForYear(scenario.w2Income, 2027).amount).toBe(190_000);
     expect(entryForYear(scenario.w2Income, 2028).amount).toBe(0);
     expect(entryForYear(scenario.w2Income, 2033).amount).toBe(0);
+    expect(scenario.annualContributionTraditional).toBe(19_000);
+    expect(scenario.annualContributionRoth).toBe(7_000);
+    expect(scenario.annualContributionHsa).toBe(4_150);
+    expect(scenario.annualContributionBrokerage).toBe(12_000);
 
     expect(entryForYear(scenario.consultingIncome, 2026)).toMatchObject({
       amount: 15_000,
@@ -140,6 +190,24 @@ describe('basic form projection mapping', () => {
     expect(results.at(-1)?.closingBalances.hsa).toBeGreaterThanOrEqual(0);
   });
 
+  it('maps annual contribution inputs as flat scenario values', () => {
+    const formValues = minimalFormValues({
+      currentYear: 2028,
+      retirementYear: 2028,
+      annualContributionTraditional: 22_500,
+      annualContributionRoth: 7_500,
+      annualContributionHsa: 4_300,
+      annualContributionBrokerage: 18_000,
+    });
+
+    const { scenario } = mapBasicFormToProjectionInputs(formValues);
+
+    expect(scenario.annualContributionTraditional).toBe(22_500);
+    expect(scenario.annualContributionRoth).toBe(7_500);
+    expect(scenario.annualContributionHsa).toBe(4_300);
+    expect(scenario.annualContributionBrokerage).toBe(18_000);
+  });
+
   it('applies the visible traditional expected return to projection growth', () => {
     const formValues: BasicFormValues = {
       currentYear: 2026,
@@ -154,6 +222,10 @@ describe('basic form projection mapping', () => {
       annualMortgagePAndI: 0,
       mortgagePayoffYear: 0,
       annualW2Income: 0,
+      annualContributionTraditional: 0,
+      annualContributionRoth: 0,
+      annualContributionHsa: 0,
+      annualContributionBrokerage: 0,
       annualConsultingIncome: 0,
       annualRentalIncome: 0,
       annualSocialSecurityBenefit: 0,

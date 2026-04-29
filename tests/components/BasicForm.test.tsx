@@ -29,6 +29,13 @@ function expectTooltip(trigger: HTMLElement, text: string) {
   expect(tooltip).toHaveTextContent(text);
 }
 
+const CONTRIBUTION_HELP_EXPECTATIONS = [
+  ['About Traditional annual contribution', basicControlHelp.annualContributionTraditional.description],
+  ['About Roth annual contribution', basicControlHelp.annualContributionRoth.description],
+  ['About HSA annual contribution', basicControlHelp.annualContributionHsa.description],
+  ['About Brokerage annual contribution', basicControlHelp.annualContributionBrokerage.description],
+] as const;
+
 describe('BasicForm', () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -65,6 +72,16 @@ describe('BasicForm', () => {
     expect(screen.getByLabelText('Brokerage depletion years')).toHaveValue('10');
     expect(screen.getByLabelText('Brokerage annual scale-up factor')).toHaveValue('0.02');
     expect(screen.getByLabelText('W-2 income')).toBeInTheDocument();
+    expect(screen.getByText('Pre-retirement contributions')).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Traditional and HSA contributions are pre-tax; Roth and brokerage contributions are post-tax. Contributions stop at retirement.',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText('Traditional annual contribution')).toHaveValue('0');
+    expect(screen.getByLabelText('Roth annual contribution')).toHaveValue('0');
+    expect(screen.getByLabelText('HSA annual contribution')).toHaveValue('0');
+    expect(screen.getByLabelText('Brokerage annual contribution')).toHaveValue('0');
     expect(screen.getByLabelText('Net consulting income')).toBeInTheDocument();
     expect(screen.getByLabelText('Net rental income')).toBeInTheDocument();
     expect(screen.getByLabelText('Social Security annual benefit')).toBeInTheDocument();
@@ -160,6 +177,11 @@ describe('BasicForm', () => {
 
     const income = screen.getByRole('group', { name: /income/i });
     expect(within(income).getByLabelText('W-2 income')).toBeInTheDocument();
+    expect(within(income).getByText('Pre-retirement contributions')).toBeInTheDocument();
+    expect(within(income).getByLabelText('Traditional annual contribution')).toBeInTheDocument();
+    expect(within(income).getByLabelText('Roth annual contribution')).toBeInTheDocument();
+    expect(within(income).getByLabelText('HSA annual contribution')).toBeInTheDocument();
+    expect(within(income).getByLabelText('Brokerage annual contribution')).toBeInTheDocument();
     expect(within(income).getByLabelText('Net consulting income')).toBeInTheDocument();
     expect(within(income).getByLabelText('Net rental income')).toBeInTheDocument();
     expect(within(income).getByLabelText('Social Security annual benefit')).toBeInTheDocument();
@@ -242,6 +264,9 @@ describe('BasicForm', () => {
       screen.getByRole('button', { name: 'About Auto-deplete brokerage' }),
       basicControlHelp.autoDepleteBrokerageEnabled.description,
     );
+    for (const [name, description] of CONTRIBUTION_HELP_EXPECTATIONS) {
+      expectTooltip(screen.getByRole('button', { name }), description);
+    }
   });
 
   it('renders derived chips and updates them after valid debounced edits', () => {
@@ -334,6 +359,10 @@ describe('BasicForm', () => {
     changeField('Weighted-average taxable basis', '200000');
     changeField('HSA balance', '45000');
     changeField('W-2 income', '180000');
+    changeField('Traditional annual contribution', '19000');
+    changeField('Roth annual contribution', '7000');
+    changeField('HSA annual contribution', '4150');
+    changeField('Brokerage annual contribution', '12000');
     changeField('Net consulting income', '25000');
     changeField('Net rental income', '12000');
     changeField('Social Security annual benefit', '40000');
@@ -365,6 +394,10 @@ describe('BasicForm', () => {
       annualMortgagePAndI: 18_000,
       mortgagePayoffYear: 2031,
       annualW2Income: 180_000,
+      annualContributionTraditional: 19_000,
+      annualContributionRoth: 7_000,
+      annualContributionHsa: 4_150,
+      annualContributionBrokerage: 12_000,
       annualConsultingIncome: 25_000,
       annualRentalIncome: 12_000,
       annualSocialSecurityBenefit: 40_000,
@@ -420,6 +453,19 @@ describe('BasicForm', () => {
 
     expect(screen.getByText('Annual spending is required.')).toBeInTheDocument();
     expect(useScenarioStore.getState().formValues.annualSpendingToday).toBe(220_000);
+    expect(useScenarioStore.getState().formValues.annualW2Income).toBe(12_345);
+  });
+
+  it('keeps invalid contribution edits local without blocking unrelated valid updates', () => {
+    render(<BasicForm />);
+
+    changeField('Traditional annual contribution', '-1');
+    changeField('W-2 income', '12345');
+    advanceLiveDebounce();
+
+    expect(screen.getByLabelText('Traditional annual contribution')).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByText('Traditional annual contribution must be zero or greater.')).toBeInTheDocument();
+    expect(useScenarioStore.getState().formValues.annualContributionTraditional).toBe(0);
     expect(useScenarioStore.getState().formValues.annualW2Income).toBe(12_345);
   });
 });

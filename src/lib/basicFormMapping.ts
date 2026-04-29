@@ -31,6 +31,10 @@ export type BasicFormValues = Readonly<{
   annualMortgagePAndI: number;
   mortgagePayoffYear: number;
   annualW2Income: number;
+  annualContributionTraditional: number;
+  annualContributionRoth: number;
+  annualContributionHsa: number;
+  annualContributionBrokerage: number;
   annualConsultingIncome: number;
   annualRentalIncome: number;
   annualSocialSecurityBenefit: number;
@@ -98,6 +102,7 @@ const STATE_LAWS = Object.freeze({
  * - mortgage principal and interest maps to scenario mortgage assumptions; the
  *   engine adds it separately as fixed nominal spending through payoff year.
  * - W-2 and consulting income run through the year before retirement, then zero.
+ * - Pre-retirement contributions map as flat annual scenario contract values.
  * - consulting defaults to non-SSTB with zero W-2 wages and UBIA.
  * - rental income is treated as materially participating because the engine uses
  *   that boolean to classify rental NIIT treatment.
@@ -123,6 +128,10 @@ export function mapBasicFormToProjectionInputs(values: BasicFormValues): Project
     startYear,
     filingStatus: values.filingStatus,
     w2Income: buildW2Income(values, years),
+    annualContributionTraditional: values.annualContributionTraditional,
+    annualContributionRoth: values.annualContributionRoth,
+    annualContributionHsa: values.annualContributionHsa,
+    annualContributionBrokerage: values.annualContributionBrokerage,
     consultingIncome: buildConsultingIncome(values, years),
     healthcare: buildHealthcareSchedule(values, years),
     pensionIncome: buildRetirementIncomeSchedule(years, values.retirementYear, values.annualPensionOrAnnuityIncome),

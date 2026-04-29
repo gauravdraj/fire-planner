@@ -23,6 +23,10 @@ export const basicControlIds = [
   'brokerageAndCashBalance',
   'taxableBrokerageBasis',
   'hsaBalance',
+  'annualContributionTraditional',
+  'annualContributionRoth',
+  'annualContributionHsa',
+  'annualContributionBrokerage',
   'expectedReturnTraditional',
   'expectedReturnRoth',
   'expectedReturnBrokerage',
@@ -114,6 +118,22 @@ export const basicControlHelp = {
   hsaBalance: {
     label: 'HSA balance',
     description: 'Starting HSA balance available for qualified medical withdrawals before taxable account draws.',
+  },
+  annualContributionTraditional: {
+    label: 'Traditional annual contribution',
+    description: 'Pre-tax annual contribution before retirement; reduces W-2 AGI in the simplified model.',
+  },
+  annualContributionRoth: {
+    label: 'Roth annual contribution',
+    description: 'Post-tax annual contribution before retirement; does not reduce AGI or taxes.',
+  },
+  annualContributionHsa: {
+    label: 'HSA annual contribution',
+    description: 'Pre-tax annual HSA contribution before retirement; reduces W-2 AGI in the simplified model.',
+  },
+  annualContributionBrokerage: {
+    label: 'Brokerage annual contribution',
+    description: 'Post-tax annual contribution to taxable brokerage before retirement; does not reduce AGI or taxes.',
   },
   expectedReturnTraditional: {
     label: 'Traditional expected return',

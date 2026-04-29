@@ -12,6 +12,10 @@ function makeScenario(overrides: Partial<Scenario> = {}): Scenario {
     startYear: 2026,
     filingStatus: 'single',
     w2Income: [],
+    annualContributionTraditional: 0,
+    annualContributionRoth: 0,
+    annualContributionHsa: 0,
+    annualContributionBrokerage: 0,
     consultingIncome: [],
     healthcare: [],
     pensionIncome: [],
@@ -265,6 +269,104 @@ describe('Gate 2 multi-year projection engine', () => {
     expect(year?.acaMagi).toBe(0);
     expect(year?.irmaaMagi).toBe(0);
     expect(year?.totalTax).toBe(0);
+  });
+
+  it('applies traditional and HSA contributions before retirement as pre-tax account deposits', () => {
+    const baseScenario = makeScenario({
+      w2Income: [{ year: 2026, amount: 100_000 }],
+    });
+    const [baseline] = runProjection(baseScenario, makePlan());
+    const [year] = runProjection(
+      {
+        ...baseScenario,
+        annualContributionTraditional: 10_000,
+        annualContributionHsa: 4_000,
+      },
+      makePlan(),
+    );
+
+    expect(year?.agi).toBe(86_000);
+    expect(year?.acaMagi).toBe(86_000);
+    expect(year?.irmaaMagi).toBe(86_000);
+    expect(year?.federalTax).toBeLessThan(baseline?.federalTax ?? 0);
+    expect(year?.seTax).toBe(baseline?.seTax);
+    expect(year?.closingBalances.traditional).toBe(10_000);
+    expect(year?.closingBalances.hsa).toBe(4_000);
+  });
+
+  it('applies Roth and brokerage contributions before retirement without reducing taxes', () => {
+    const baseScenario = makeScenario({
+      w2Income: [{ year: 2026, amount: 100_000 }],
+    });
+    const [baseline] = runProjection(baseScenario, makePlan());
+    const [year] = runProjection(
+      {
+        ...baseScenario,
+        annualContributionRoth: 7_000,
+        annualContributionBrokerage: 12_000,
+      },
+      makePlan(),
+    );
+
+    expect(year?.agi).toBe(baseline?.agi);
+    expect(year?.acaMagi).toBe(baseline?.acaMagi);
+    expect(year?.irmaaMagi).toBe(baseline?.irmaaMagi);
+    expect(year?.federalTax).toBe(baseline?.federalTax);
+    expect(year?.seTax).toBe(baseline?.seTax);
+    expect(year?.closingBalances.roth).toBe(7_000);
+    expect(year?.closingBalances.taxableBrokerage).toBe(12_000);
+    expect(year?.brokerageBasis.closing).toBe(12_000);
+    expect(year?.afterTaxCashFlow).toBeCloseTo((baseline?.afterTaxCashFlow ?? 0) - 19_000, 2);
+    expect(year?.closingBalances.cash).toBeCloseTo((baseline?.closingBalances.cash ?? 0) - 19_000, 2);
+  });
+
+  it('stops all contribution types in the inferred retirement year', () => {
+    const results = runProjection(
+      makeScenario({
+        w2Income: [
+          { year: 2026, amount: 80_000 },
+          { year: 2027, amount: 0 },
+          { year: 2028, amount: 0 },
+        ],
+        annualContributionTraditional: 10_000,
+        annualContributionRoth: 7_000,
+        annualContributionHsa: 4_000,
+        annualContributionBrokerage: 12_000,
+      }),
+      makePlan({ endYear: 2028 }),
+    );
+
+    expect(results.map((year) => year.closingBalances.traditional)).toEqual([10_000, 10_000, 10_000]);
+    expect(results.map((year) => year.closingBalances.roth)).toEqual([7_000, 7_000, 7_000]);
+    expect(results.map((year) => year.closingBalances.hsa)).toEqual([4_000, 4_000, 4_000]);
+    expect(results.map((year) => year.closingBalances.taxableBrokerage)).toEqual([12_000, 12_000, 12_000]);
+    expect(results[1]?.agi).toBe(0);
+    expect(results[2]?.agi).toBe(0);
+  });
+
+  it('counts contribution outflows once and allows negative cash flow when they exceed available cash', () => {
+    const baseScenario = makeScenario({
+      w2Income: [{ year: 2026, amount: 50_000 }],
+    });
+    const plan = makePlan({
+      annualSpending: [{ year: 2026, amount: 45_000 }],
+    });
+    const [baseline] = runProjection(baseScenario, plan);
+    const [year] = runProjection(
+      {
+        ...baseScenario,
+        annualContributionRoth: 60_000,
+      },
+      plan,
+    );
+
+    expect(year?.agi).toBe(baseline?.agi);
+    expect(year?.federalTax).toBe(baseline?.federalTax);
+    expect(year?.withdrawals).toEqual(baseline?.withdrawals);
+    expect(year?.closingBalances.roth).toBe(60_000);
+    expect(year?.afterTaxCashFlow).toBeCloseTo((baseline?.afterTaxCashFlow ?? 0) - 60_000, 2);
+    expect(year?.afterTaxCashFlow).toBeLessThan(0);
+    expect(year?.warnings.join(' ')).toContain('After-tax cash flow is short');
   });
 
   it('adds mortgage P&I as fixed spending through payoff year without inflating it', () => {

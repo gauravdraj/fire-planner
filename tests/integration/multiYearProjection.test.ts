@@ -8,6 +8,10 @@ const scenario: Scenario = {
   startYear: 2026,
   filingStatus: 'mfj',
   w2Income: [],
+  annualContributionTraditional: 0,
+  annualContributionRoth: 0,
+  annualContributionHsa: 0,
+  annualContributionBrokerage: 0,
   consultingIncome: [],
   healthcare: [
     {

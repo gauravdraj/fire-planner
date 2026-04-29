@@ -18,6 +18,10 @@ const BASIC_FORM_VALUES: BasicFormValues = {
   annualMortgagePAndI: 0,
   mortgagePayoffYear: 0,
   annualW2Income: 220_000,
+  annualContributionTraditional: 0,
+  annualContributionRoth: 0,
+  annualContributionHsa: 0,
+  annualContributionBrokerage: 0,
   annualConsultingIncome: 25_000,
   annualRentalIncome: 18_000,
   annualSocialSecurityBenefit: 52_000,
@@ -82,6 +86,9 @@ describe('URL hash scenario codec', () => {
     expect(encoded.startsWith('v1:')).toBe(true);
     expect(decodeScenario(encoded)).toEqual({ scenario, plan: advancedPlan, customLawActive: false });
     expect(decodeScenario(`#${encoded}`)).toEqual({ scenario, plan: advancedPlan, customLawActive: false });
+    expect((decodeRawPayload(encoded) as { scenario: Record<string, unknown> }).scenario).not.toHaveProperty(
+      'annualContributionTraditional',
+    );
     expect(Object.keys(decodeRawPayload(encoded) as Record<string, unknown>).sort()).toEqual([
       'customLawActive',
       'plan',
@@ -113,6 +120,24 @@ describe('URL hash scenario codec', () => {
     expect(Object.keys(rawPayload).sort()).toEqual(['customLaw', 'customLawActive', 'plan', 'scenario']);
     expect(rawPayload).not.toHaveProperty('namedScenarioId');
     expect(rawPayload).not.toHaveProperty('activeScenarioIndex');
+  });
+
+  it('preserves non-zero contribution fields while compacting zero defaults', () => {
+    const { scenario, plan } = mapBasicFormToProjectionInputs({
+      ...BASIC_FORM_VALUES,
+      annualContributionTraditional: 10_000,
+      annualContributionRoth: 7_000,
+      annualContributionHsa: 4_000,
+      annualContributionBrokerage: 0,
+    });
+    const encoded = encodeScenario({ scenario, plan });
+    const rawScenario = (decodeRawPayload(encoded) as { scenario: Record<string, unknown> }).scenario;
+
+    expect(rawScenario.annualContributionTraditional).toBe(10_000);
+    expect(rawScenario.annualContributionRoth).toBe(7_000);
+    expect(rawScenario.annualContributionHsa).toBe(4_000);
+    expect(rawScenario).not.toHaveProperty('annualContributionBrokerage');
+    expect(decodeScenario(encoded)?.scenario).toEqual(scenario);
   });
 
   it('hydrates legacy Gate 3 hashes that only contain scenario plus plan', () => {

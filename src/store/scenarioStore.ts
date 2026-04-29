@@ -38,6 +38,10 @@ export const DEFAULT_BASIC_FORM_VALUES = Object.freeze({
   annualMortgagePAndI: 0,
   mortgagePayoffYear: 0,
   annualW2Income: 550_000,
+  annualContributionTraditional: 0,
+  annualContributionRoth: 0,
+  annualContributionHsa: 0,
+  annualContributionBrokerage: 0,
   annualConsultingIncome: 0,
   annualRentalIncome: 0,
   annualSocialSecurityBenefit: 80_000,
@@ -242,6 +246,22 @@ function inferBasicFormValuesFromHashPayload(payload: ScenarioHashPayload): Basi
       2300,
     ),
     annualW2Income: annualAmountForYear(payload.scenario.w2Income, startYear) ?? DEFAULT_BASIC_FORM_VALUES.annualW2Income,
+    annualContributionTraditional: nonnegativeNumber(
+      payload.scenario.annualContributionTraditional,
+      DEFAULT_BASIC_FORM_VALUES.annualContributionTraditional,
+    ),
+    annualContributionRoth: nonnegativeNumber(
+      payload.scenario.annualContributionRoth,
+      DEFAULT_BASIC_FORM_VALUES.annualContributionRoth,
+    ),
+    annualContributionHsa: nonnegativeNumber(
+      payload.scenario.annualContributionHsa,
+      DEFAULT_BASIC_FORM_VALUES.annualContributionHsa,
+    ),
+    annualContributionBrokerage: nonnegativeNumber(
+      payload.scenario.annualContributionBrokerage,
+      DEFAULT_BASIC_FORM_VALUES.annualContributionBrokerage,
+    ),
     annualConsultingIncome:
       annualAmountForYear(payload.scenario.consultingIncome, startYear) ??
       DEFAULT_BASIC_FORM_VALUES.annualConsultingIncome,
@@ -485,6 +505,10 @@ function normalizeScenario(scenario: Scenario, inflationRate: number): Scenario 
 
   return {
     ...scenarioWithoutMortgage,
+    annualContributionTraditional: nonnegativeNumber(scenario.annualContributionTraditional, 0),
+    annualContributionRoth: nonnegativeNumber(scenario.annualContributionRoth, 0),
+    annualContributionHsa: nonnegativeNumber(scenario.annualContributionHsa, 0),
+    annualContributionBrokerage: nonnegativeNumber(scenario.annualContributionBrokerage, 0),
     inflationRate,
     balances: {
       cash: nonnegativeNumber(scenario.balances?.cash, 0),
@@ -564,6 +588,22 @@ function sanitizeBasicFormValues(value: unknown): BasicFormValues {
     ),
     mortgagePayoffYear: boundedInteger(candidate.mortgagePayoffYear, DEFAULT_BASIC_FORM_VALUES.mortgagePayoffYear, 0, 2300),
     annualW2Income: nonnegativeNumber(candidate.annualW2Income, DEFAULT_BASIC_FORM_VALUES.annualW2Income),
+    annualContributionTraditional: nonnegativeNumber(
+      candidate.annualContributionTraditional,
+      DEFAULT_BASIC_FORM_VALUES.annualContributionTraditional,
+    ),
+    annualContributionRoth: nonnegativeNumber(
+      candidate.annualContributionRoth,
+      DEFAULT_BASIC_FORM_VALUES.annualContributionRoth,
+    ),
+    annualContributionHsa: nonnegativeNumber(
+      candidate.annualContributionHsa,
+      DEFAULT_BASIC_FORM_VALUES.annualContributionHsa,
+    ),
+    annualContributionBrokerage: nonnegativeNumber(
+      candidate.annualContributionBrokerage,
+      DEFAULT_BASIC_FORM_VALUES.annualContributionBrokerage,
+    ),
     annualConsultingIncome: nonnegativeNumber(
       candidate.annualConsultingIncome,
       DEFAULT_BASIC_FORM_VALUES.annualConsultingIncome,

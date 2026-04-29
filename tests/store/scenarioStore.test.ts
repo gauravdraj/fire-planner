@@ -20,6 +20,10 @@ const STORED_FORM_VALUES: BasicFormValues = {
   annualMortgagePAndI: 0,
   mortgagePayoffYear: 0,
   annualW2Income: 140_000,
+  annualContributionTraditional: 0,
+  annualContributionRoth: 0,
+  annualContributionHsa: 0,
+  annualContributionBrokerage: 0,
   annualConsultingIncome: 0,
   annualRentalIncome: 0,
   annualSocialSecurityBenefit: 25_000,
@@ -55,6 +59,10 @@ const HASH_FORM_VALUES: BasicFormValues = {
   annualMortgagePAndI: 24_000,
   mortgagePayoffYear: 2036,
   annualW2Income: 220_000,
+  annualContributionTraditional: 10_000,
+  annualContributionRoth: 7_000,
+  annualContributionHsa: 4_000,
+  annualContributionBrokerage: 12_000,
   annualConsultingIncome: 20_000,
   annualRentalIncome: 12_000,
   annualSocialSecurityBenefit: 55_000,
@@ -103,6 +111,10 @@ describe('scenarioStore', () => {
     expect(state.formValues.inflationRate).toBe(0.025);
     expect(state.formValues.stateCode).toBe('CA');
     expect(state.formValues.annualW2Income).toBe(550_000);
+    expect(state.formValues.annualContributionTraditional).toBe(0);
+    expect(state.formValues.annualContributionRoth).toBe(0);
+    expect(state.formValues.annualContributionHsa).toBe(0);
+    expect(state.formValues.annualContributionBrokerage).toBe(0);
     expect(state.formValues.brokerageAndCashBalance).toBe(1_000_000);
     expect(state.selectedStarterStateLaw.stateCode).toBe('CA');
     expect(state.scenario.state.incomeTaxLaw.stateCode).toBe('CA');
@@ -155,14 +167,28 @@ describe('scenarioStore', () => {
     expect(reloadedState).not.toHaveProperty('hasRunProjection');
   });
 
-  it('hydrates legacy persisted basic form values without inflation at the compatibility default', async () => {
+  it('hydrates legacy persisted basic form values without inflation or contributions at compatibility defaults', async () => {
     const { scenario, plan } = mapBasicFormToProjectionInputs({ ...STORED_FORM_VALUES, inflationRate: 0.03 });
-    const { inflationRate: _ignoredInflationRate, ...legacyFormValues } = STORED_FORM_VALUES;
+    const {
+      annualContributionTraditional: _ignoredScenarioTraditionalContribution,
+      annualContributionRoth: _ignoredScenarioRothContribution,
+      annualContributionHsa: _ignoredScenarioHsaContribution,
+      annualContributionBrokerage: _ignoredScenarioBrokerageContribution,
+      ...legacyScenario
+    } = scenario;
+    const {
+      inflationRate: _ignoredInflationRate,
+      annualContributionTraditional: _ignoredTraditionalContribution,
+      annualContributionRoth: _ignoredRothContribution,
+      annualContributionHsa: _ignoredHsaContribution,
+      annualContributionBrokerage: _ignoredBrokerageContribution,
+      ...legacyFormValues
+    } = STORED_FORM_VALUES;
     window.localStorage.setItem(
       'fire-planner.scenario.v1',
       JSON.stringify({
         formValues: legacyFormValues,
-        scenario,
+        scenario: legacyScenario,
         plan,
         customLawActive: false,
       }),
@@ -172,7 +198,15 @@ describe('scenarioStore', () => {
     const state = useScenarioStore.getState();
 
     expect(state.formValues.inflationRate).toBe(0.025);
+    expect(state.formValues.annualContributionTraditional).toBe(0);
+    expect(state.formValues.annualContributionRoth).toBe(0);
+    expect(state.formValues.annualContributionHsa).toBe(0);
+    expect(state.formValues.annualContributionBrokerage).toBe(0);
     expect(state.scenario.inflationRate).toBe(0.025);
+    expect(state.scenario.annualContributionTraditional).toBe(0);
+    expect(state.scenario.annualContributionRoth).toBe(0);
+    expect(state.scenario.annualContributionHsa).toBe(0);
+    expect(state.scenario.annualContributionBrokerage).toBe(0);
 
     useScenarioStore.getState().setFormValues({ annualSpendingToday: 81_000 });
 
@@ -181,7 +215,15 @@ describe('scenarioStore', () => {
       scenario?: Record<string, unknown>;
     };
     expect(persisted.formValues?.inflationRate).toBe(0.025);
+    expect(persisted.formValues?.annualContributionTraditional).toBe(0);
+    expect(persisted.formValues?.annualContributionRoth).toBe(0);
+    expect(persisted.formValues?.annualContributionHsa).toBe(0);
+    expect(persisted.formValues?.annualContributionBrokerage).toBe(0);
     expect(persisted.scenario?.inflationRate).toBe(0.025);
+    expect(persisted.scenario?.annualContributionTraditional).toBe(0);
+    expect(persisted.scenario?.annualContributionRoth).toBe(0);
+    expect(persisted.scenario?.annualContributionHsa).toBe(0);
+    expect(persisted.scenario?.annualContributionBrokerage).toBe(0);
   });
 
   it('applies a valid URL hash before localStorage and uses the mapped projection inputs', async () => {
@@ -209,6 +251,10 @@ describe('scenarioStore', () => {
     expect(state.formValues.annualSpendingToday).toBe(HASH_FORM_VALUES.annualSpendingToday);
     expect(state.formValues.inflationRate).toBe(HASH_FORM_VALUES.inflationRate);
     expect(state.formValues.annualW2Income).toBe(HASH_FORM_VALUES.annualW2Income);
+    expect(state.formValues.annualContributionTraditional).toBe(HASH_FORM_VALUES.annualContributionTraditional);
+    expect(state.formValues.annualContributionRoth).toBe(HASH_FORM_VALUES.annualContributionRoth);
+    expect(state.formValues.annualContributionHsa).toBe(HASH_FORM_VALUES.annualContributionHsa);
+    expect(state.formValues.annualContributionBrokerage).toBe(HASH_FORM_VALUES.annualContributionBrokerage);
     expect(state.formValues.hsaBalance).toBe(HASH_FORM_VALUES.hsaBalance);
     expect(state.formValues.annualMortgagePAndI).toBe(HASH_FORM_VALUES.annualMortgagePAndI);
     expect(state.formValues.expectedReturnTraditional).toBe(HASH_FORM_VALUES.expectedReturnTraditional);
@@ -225,6 +271,10 @@ describe('scenarioStore', () => {
     expect(state.plan).toEqual(sharedPlan);
     expect(state.scenario.state.incomeTaxLaw.stateCode).toBe('PA');
     expect(state.scenario.inflationRate).toBe(HASH_FORM_VALUES.inflationRate);
+    expect(state.scenario.annualContributionTraditional).toBe(HASH_FORM_VALUES.annualContributionTraditional);
+    expect(state.scenario.annualContributionRoth).toBe(HASH_FORM_VALUES.annualContributionRoth);
+    expect(state.scenario.annualContributionHsa).toBe(HASH_FORM_VALUES.annualContributionHsa);
+    expect(state.scenario.annualContributionBrokerage).toBe(HASH_FORM_VALUES.annualContributionBrokerage);
     expect(state.scenario.mortgage).toEqual({ annualPI: 24_000, payoffYear: 2036 });
     expect(state.scenario.expectedReturns).toEqual({
       cash: 0,
@@ -254,6 +304,10 @@ describe('scenarioStore', () => {
     expect(persisted.formValues?.inflationRate).toBe(HASH_FORM_VALUES.inflationRate);
     expect(persisted.formValues?.hsaBalance).toBe(HASH_FORM_VALUES.hsaBalance);
     expect(persisted.formValues?.annualMortgagePAndI).toBe(HASH_FORM_VALUES.annualMortgagePAndI);
+    expect(persisted.formValues?.annualContributionTraditional).toBe(HASH_FORM_VALUES.annualContributionTraditional);
+    expect(persisted.formValues?.annualContributionRoth).toBe(HASH_FORM_VALUES.annualContributionRoth);
+    expect(persisted.formValues?.annualContributionHsa).toBe(HASH_FORM_VALUES.annualContributionHsa);
+    expect(persisted.formValues?.annualContributionBrokerage).toBe(HASH_FORM_VALUES.annualContributionBrokerage);
     expect(persisted.formValues?.expectedReturnTraditional).toBe(HASH_FORM_VALUES.expectedReturnTraditional);
     expect(persisted.formValues?.autoDepleteBrokerageEnabled).toBe(true);
     expect(persisted.formValues?.autoDepleteBrokerageYears).toBe(HASH_FORM_VALUES.autoDepleteBrokerageYears);
@@ -304,19 +358,38 @@ describe('scenarioStore', () => {
     expect(state.scenario.customLaw).toBeUndefined();
   });
 
-  it('hydrates URL hashes that omit inflation with the compatibility default and re-shares it', async () => {
+  it('hydrates URL hashes that omit inflation and contributions with compatibility defaults and re-shares them', async () => {
     const { scenario, plan } = mapBasicFormToProjectionInputs(HASH_FORM_VALUES);
-    const { inflationRate: _ignoredInflationRate, ...legacyScenario } = scenario;
+    const {
+      inflationRate: _ignoredInflationRate,
+      annualContributionTraditional: _ignoredTraditionalContribution,
+      annualContributionRoth: _ignoredRothContribution,
+      annualContributionHsa: _ignoredHsaContribution,
+      annualContributionBrokerage: _ignoredBrokerageContribution,
+      ...legacyScenario
+    } = scenario;
     window.location.hash = `v1:${compressToEncodedURIComponent(JSON.stringify({ scenario: legacyScenario, plan }))}`;
 
     const { useScenarioStore } = await import('@/store/scenarioStore');
     const state = useScenarioStore.getState();
 
     expect(state.formValues.inflationRate).toBe(0.025);
+    expect(state.formValues.annualContributionTraditional).toBe(0);
+    expect(state.formValues.annualContributionRoth).toBe(0);
+    expect(state.formValues.annualContributionHsa).toBe(0);
+    expect(state.formValues.annualContributionBrokerage).toBe(0);
     expect(state.scenario.inflationRate).toBe(0.025);
+    expect(state.scenario.annualContributionTraditional).toBe(0);
+    expect(state.scenario.annualContributionRoth).toBe(0);
+    expect(state.scenario.annualContributionHsa).toBe(0);
+    expect(state.scenario.annualContributionBrokerage).toBe(0);
 
     const reshared = decodeScenario(encodeScenario({ scenario: state.scenario, plan: state.plan }));
     expect(reshared?.scenario.inflationRate).toBe(0.025);
+    expect(reshared?.scenario.annualContributionTraditional).toBe(0);
+    expect(reshared?.scenario.annualContributionRoth).toBe(0);
+    expect(reshared?.scenario.annualContributionHsa).toBe(0);
+    expect(reshared?.scenario.annualContributionBrokerage).toBe(0);
   });
 
   it('does not activate the custom-law banner without non-empty decoded overrides', async () => {

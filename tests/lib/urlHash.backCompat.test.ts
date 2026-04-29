@@ -69,6 +69,16 @@ function decodedPayloadFromHash(hash: string): ScenarioHashPayload {
   return decoded;
 }
 
+function withContributionDefaults(scenario: ScenarioHashPayload['scenario']): ScenarioHashPayload['scenario'] {
+  return {
+    ...scenario,
+    annualContributionTraditional: scenario.annualContributionTraditional ?? 0,
+    annualContributionRoth: scenario.annualContributionRoth ?? 0,
+    annualContributionHsa: scenario.annualContributionHsa ?? 0,
+    annualContributionBrokerage: scenario.annualContributionBrokerage ?? 0,
+  };
+}
+
 describe('production v1 URL hash back compatibility', () => {
   it('keeps captured fixture metadata tied to the production v1 payload contract', () => {
     expect(productionUrlHashFixtures.fixtureSet).toBe('urlHash.production.v1');
@@ -92,8 +102,12 @@ describe('production v1 URL hash back compatibility', () => {
     const rawPayload = rawPayloadFromHash(fixture.hash);
     const decoded = decodedPayloadFromHash(fixture.hash);
 
-    expect(decoded.scenario).toEqual(rawPayload.scenario);
+    expect(decoded.scenario).toEqual(withContributionDefaults(rawPayload.scenario));
     expect(decoded.scenario.startYear).toBe(2026);
+    expect(decoded.scenario.annualContributionTraditional).toBe(0);
+    expect(decoded.scenario.annualContributionRoth).toBe(0);
+    expect(decoded.scenario.annualContributionHsa).toBe(0);
+    expect(decoded.scenario.annualContributionBrokerage).toBe(0);
     expect(decoded.scenario.balances.taxableBrokerage).toBe(650_000);
     expect(decodeScenario(encodeScenario(decoded))).toEqual(decoded);
   });
@@ -105,6 +119,7 @@ describe('production v1 URL hash back compatibility', () => {
 
     expect(decoded.customLaw).toEqual(rawPayload.customLaw);
     expect(decoded.customLawActive).toBe(true);
+    expect(decoded.scenario).toEqual(withContributionDefaults(rawPayload.scenario));
     expect(decoded.scenario.customLaw).toEqual(rawPayload.customLaw);
     expect(decodeScenario(encodeScenario(decoded))).toEqual(decoded);
   });

@@ -29,6 +29,13 @@ function expectTooltip(trigger: HTMLElement, text: string) {
   expect(tooltip).toHaveTextContent(text);
 }
 
+const CONTRIBUTION_HELP_EXPECTATIONS = [
+  ['About Traditional annual contribution', basicControlHelp.annualContributionTraditional.description],
+  ['About Roth annual contribution', basicControlHelp.annualContributionRoth.description],
+  ['About HSA annual contribution', basicControlHelp.annualContributionHsa.description],
+  ['About Brokerage annual contribution', basicControlHelp.annualContributionBrokerage.description],
+] as const;
+
 describe('BasicForm verdict layout', () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -67,8 +74,9 @@ describe('BasicForm verdict layout', () => {
     expect(screen.queryByLabelText('Plan-end age')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Current year')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Inflation rate')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Traditional annual contribution')).not.toBeInTheDocument();
 
-    for (const name of ['Portfolio mix', 'Other income', 'Withdrawal settings']) {
+    for (const name of ['Pre-retirement contributions', 'Portfolio mix', 'Other income', 'Withdrawal settings']) {
       const button = screen.getByRole('button', { name });
 
       expect(button).toHaveAttribute('aria-expanded', 'false');
@@ -76,6 +84,59 @@ describe('BasicForm verdict layout', () => {
       expect(button).toHaveClass('focus-visible:outline');
     }
     expect(screen.queryByRole('region', { name: /portfolio mix/i })).not.toBeInTheDocument();
+  });
+
+  it('shows contribution controls in a dedicated disclosure only before retirement', () => {
+    renderVerdictForm();
+
+    const contributionsButton = screen.getByRole('button', { name: 'Pre-retirement contributions' });
+
+    expect(contributionsButton).toHaveAttribute('aria-expanded', 'false');
+    expect(
+      screen.getByText(
+        'Traditional and HSA contributions are pre-tax; Roth and brokerage contributions are post-tax. Contributions stop at retirement.',
+      ),
+    ).toBeInTheDocument();
+
+    fireEvent.click(contributionsButton);
+    const contributionsRegion = screen.getByRole('region', { name: 'Pre-retirement contributions' });
+
+    expect(contributionsButton).toHaveAttribute('aria-expanded', 'true');
+    expect(within(contributionsRegion).getByLabelText('Traditional annual contribution')).toHaveValue('0');
+    expect(within(contributionsRegion).getByLabelText('Roth annual contribution')).toHaveValue('0');
+    expect(within(contributionsRegion).getByLabelText('HSA annual contribution')).toHaveValue('0');
+    expect(within(contributionsRegion).getByLabelText('Brokerage annual contribution')).toHaveValue('0');
+    for (const [name, description] of CONTRIBUTION_HELP_EXPECTATIONS) {
+      expectTooltip(within(contributionsRegion).getByRole('button', { name }), description);
+    }
+  });
+
+  it.each([2029, 2030])('hides the contribution disclosure when current year is %i', (currentYear) => {
+    useScenarioStore.getState().setFormValues({ currentYear, retirementYear: 2029 });
+
+    renderVerdictForm();
+
+    expect(screen.queryByRole('button', { name: 'Pre-retirement contributions' })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Traditional annual contribution')).not.toBeInTheDocument();
+  });
+
+  it('keeps invalid contribution edits local in the verdict disclosure', () => {
+    renderVerdictForm();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Pre-retirement contributions' }));
+    const contributionsRegion = screen.getByRole('region', { name: 'Pre-retirement contributions' });
+    const brokerageContributionInput = within(contributionsRegion).getByLabelText('Brokerage annual contribution');
+
+    fireEvent.change(brokerageContributionInput, { target: { value: '-1' } });
+    fireEvent.change(screen.getByLabelText('W-2 income'), { target: { value: '12345' } });
+    advanceLiveDebounce();
+
+    expect(brokerageContributionInput).toHaveAttribute('aria-invalid', 'true');
+    expect(
+      within(contributionsRegion).getByText('Brokerage annual contribution must be zero or greater.'),
+    ).toBeInTheDocument();
+    expect(useScenarioStore.getState().formValues.annualContributionBrokerage).toBe(0);
+    expect(useScenarioStore.getState().formValues.annualW2Income).toBe(12_345);
   });
 
   it('reveals grouped controls with labelled regions and expanded toggle state', () => {

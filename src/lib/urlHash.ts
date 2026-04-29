@@ -3,6 +3,12 @@ import type { Scenario, WithdrawalPlan } from '@/core/projection';
 import { compressToEncodedURIComponent, decompressFromEncodedURIComponent } from 'lz-string';
 
 const HASH_VERSION_PREFIX = 'v1:';
+const SCENARIO_CONTRIBUTION_KEYS = [
+  'annualContributionTraditional',
+  'annualContributionRoth',
+  'annualContributionHsa',
+  'annualContributionBrokerage',
+] as const satisfies ReadonlyArray<keyof Scenario>;
 
 export type ScenarioHashPayload = Readonly<{
   scenario: Scenario;
@@ -21,7 +27,9 @@ export type ScenarioHashInput = Readonly<{
 export function encodeScenario(payload: ScenarioHashInput): string {
   const customLaw = payload.customLaw ?? payload.scenario.customLaw;
   const customLawActive = payload.customLawActive === true && isCustomLawActive(customLaw);
-  const scenario = scenarioWithCustomLawState(payload.scenario, customLaw, customLawActive);
+  const scenario = compactScenarioZeroContributions(
+    scenarioWithCustomLawState(normalizeScenarioContributionDefaults(payload.scenario), customLaw, customLawActive),
+  );
   const shareablePayload =
     customLaw === undefined
       ? {
@@ -68,7 +76,9 @@ export function decodeScenario(hash: string): ScenarioHashPayload | null {
     const customLaw = customLawFromPayload(parsed, parsed.scenario);
     const customLawActive = parsed.customLawActive === true && isCustomLawActive(customLaw);
     const payload = {
-      scenario: scenarioWithCustomLawState(parsed.scenario as Scenario, customLaw, customLawActive),
+      scenario: normalizeScenarioContributionDefaults(
+        scenarioWithCustomLawState(parsed.scenario as Scenario, customLaw, customLawActive),
+      ),
       plan: parsed.plan as WithdrawalPlan,
       customLawActive,
     };
@@ -77,6 +87,32 @@ export function decodeScenario(hash: string): ScenarioHashPayload | null {
   } catch {
     return null;
   }
+}
+
+function normalizeScenarioContributionDefaults(scenario: Scenario): Scenario {
+  return {
+    ...scenario,
+    annualContributionTraditional: nonnegativeNumber(scenario.annualContributionTraditional),
+    annualContributionRoth: nonnegativeNumber(scenario.annualContributionRoth),
+    annualContributionHsa: nonnegativeNumber(scenario.annualContributionHsa),
+    annualContributionBrokerage: nonnegativeNumber(scenario.annualContributionBrokerage),
+  };
+}
+
+function compactScenarioZeroContributions(scenario: Scenario): Scenario {
+  const compacted = { ...scenario } as Record<string, unknown>;
+
+  for (const key of SCENARIO_CONTRIBUTION_KEYS) {
+    if (scenario[key] === 0) {
+      delete compacted[key];
+    }
+  }
+
+  return compacted as Scenario;
+}
+
+function nonnegativeNumber(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value) ? Math.max(0, value) : 0;
 }
 
 function customLawFromPayload(payload: Record<string, unknown>, scenario: Record<string, unknown>): CustomLaw | undefined {

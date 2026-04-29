@@ -56,6 +56,10 @@ const MONEY_FIELDS = [
   'taxableBrokerageBasis',
   'hsaBalance',
   'annualW2Income',
+  'annualContributionTraditional',
+  'annualContributionRoth',
+  'annualContributionHsa',
+  'annualContributionBrokerage',
   'annualConsultingIncome',
   'annualRentalIncome',
   'annualSocialSecurityBenefit',
@@ -75,6 +79,8 @@ const PERCENT_FIELDS = [
 
 const LIVE_UPDATE_DELAY_MS = 150;
 const PLAN_END_AFTER_PRIMARY_AGE_ERROR = 'Plan-end age must be greater than primary age.';
+const CONTRIBUTION_HELP_TEXT =
+  'Traditional and HSA contributions are pre-tax; Roth and brokerage contributions are post-tax. Contributions stop at retirement.';
 
 type BasicFormLayout = 'classic' | 'verdict';
 
@@ -242,6 +248,8 @@ export function BasicForm({ layout = 'classic' }: { layout?: BasicFormLayout } =
 
         <SectionFieldset sectionId="income">
           {renderNumberField('annualW2Income', draft, errors, handleInputChange, chips.w2Income)}
+          <ContributionHelpText className="sm:col-span-2" />
+          {renderContributionFields()}
           {renderNumberField('annualConsultingIncome', draft, errors, handleInputChange)}
           {renderNumberField('annualRentalIncome', draft, errors, handleInputChange)}
           {renderNumberField(
@@ -294,6 +302,16 @@ export function BasicForm({ layout = 'classic' }: { layout?: BasicFormLayout } =
             {renderHealthcarePhaseField()}
           </div>
         </fieldset>
+
+        {isBeforeRetirement(draft.currentYear, draft.retirementYear) ? (
+          <VerdictDisclosureGroup
+            description={CONTRIBUTION_HELP_TEXT}
+            id="pre-retirement-contributions"
+            title="Pre-retirement contributions"
+          >
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{renderContributionFields()}</div>
+          </VerdictDisclosureGroup>
+        ) : null}
 
         <VerdictDisclosureGroup
           description="Edit account buckets, taxable basis, expected returns, and taxable brokerage dividend assumptions."
@@ -416,6 +434,17 @@ export function BasicForm({ layout = 'classic' }: { layout?: BasicFormLayout } =
     );
   }
 
+  function renderContributionFields() {
+    return (
+      <>
+        {renderNumberField('annualContributionTraditional', draft, errors, handleInputChange)}
+        {renderNumberField('annualContributionRoth', draft, errors, handleInputChange)}
+        {renderNumberField('annualContributionHsa', draft, errors, handleInputChange)}
+        {renderNumberField('annualContributionBrokerage', draft, errors, handleInputChange)}
+      </>
+    );
+  }
+
   function clearPendingField(field: keyof BasicFormDraft, errors: BasicFormErrors) {
     const { [field]: _ignoredField, ...withoutField } = pendingPatchRef.current;
 
@@ -525,6 +554,10 @@ export function validateBasicFormDraft(draft: BasicFormDraft): ValidationResult 
       annualMortgagePAndI: moneyValues.annualMortgagePAndI ?? 0,
       mortgagePayoffYear: mortgagePayoffYear ?? 0,
       annualW2Income: moneyValues.annualW2Income ?? 0,
+      annualContributionTraditional: moneyValues.annualContributionTraditional ?? 0,
+      annualContributionRoth: moneyValues.annualContributionRoth ?? 0,
+      annualContributionHsa: moneyValues.annualContributionHsa ?? 0,
+      annualContributionBrokerage: moneyValues.annualContributionBrokerage ?? 0,
       annualConsultingIncome: moneyValues.annualConsultingIncome ?? 0,
       annualRentalIncome: moneyValues.annualRentalIncome ?? 0,
       annualSocialSecurityBenefit: moneyValues.annualSocialSecurityBenefit ?? 0,
@@ -586,7 +619,7 @@ function VerdictDisclosureGroup({
 }: {
   children: ReactNode;
   description: string;
-  id: 'portfolio-mix' | 'other-income' | 'withdrawal-control';
+  id: 'portfolio-mix' | 'other-income' | 'withdrawal-control' | 'pre-retirement-contributions';
   title: string;
 }) {
   const [open, setOpen] = useState(false);
@@ -622,6 +655,20 @@ function VerdictDisclosureGroup({
   );
 }
 
+function ContributionHelpText({ className }: { className?: string | undefined }) {
+  return (
+    <div
+      className={classNames(
+        'rounded-lg border border-indigo-100 bg-indigo-50/70 p-3 dark:border-indigo-900/60 dark:bg-indigo-950/30',
+        className,
+      )}
+    >
+      <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">Pre-retirement contributions</h3>
+      <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-400">{CONTRIBUTION_HELP_TEXT}</p>
+    </div>
+  );
+}
+
 function Field({
   children,
   chip,
@@ -652,6 +699,13 @@ function Field({
       )}
     </div>
   );
+}
+
+function isBeforeRetirement(currentYearRaw: string, retirementYearRaw: string): boolean {
+  const currentYear = Number(currentYearRaw);
+  const retirementYear = Number(retirementYearRaw);
+
+  return Number.isInteger(currentYear) && Number.isInteger(retirementYear) && currentYear < retirementYear;
 }
 
 function renderTotalPortfolioField(draft: BasicFormDraft) {
@@ -769,6 +823,10 @@ function createValidPatch(
     case 'taxableBrokerageBasis':
     case 'hsaBalance':
     case 'annualW2Income':
+    case 'annualContributionTraditional':
+    case 'annualContributionRoth':
+    case 'annualContributionHsa':
+    case 'annualContributionBrokerage':
     case 'annualConsultingIncome':
     case 'annualRentalIncome':
     case 'annualSocialSecurityBenefit':
@@ -1036,6 +1094,14 @@ function moneyFieldLabel(field: (typeof MONEY_FIELDS)[number]): string {
       return 'HSA balance';
     case 'annualW2Income':
       return 'W-2 income';
+    case 'annualContributionTraditional':
+      return 'Traditional annual contribution';
+    case 'annualContributionRoth':
+      return 'Roth annual contribution';
+    case 'annualContributionHsa':
+      return 'HSA annual contribution';
+    case 'annualContributionBrokerage':
+      return 'Brokerage annual contribution';
     case 'annualConsultingIncome':
       return 'Net consulting income';
     case 'annualRentalIncome':
@@ -1082,6 +1148,10 @@ function createDraft(values: BasicFormValues): BasicFormDraft {
     annualMortgagePAndI: String(values.annualMortgagePAndI),
     mortgagePayoffYear: String(values.mortgagePayoffYear),
     annualW2Income: String(values.annualW2Income),
+    annualContributionTraditional: String(values.annualContributionTraditional),
+    annualContributionRoth: String(values.annualContributionRoth),
+    annualContributionHsa: String(values.annualContributionHsa),
+    annualContributionBrokerage: String(values.annualContributionBrokerage),
     annualConsultingIncome: String(values.annualConsultingIncome),
     annualRentalIncome: String(values.annualRentalIncome),
     annualSocialSecurityBenefit: String(values.annualSocialSecurityBenefit),

@@ -271,7 +271,7 @@ export const basicFormSectionExplanations = {
   },
   income: {
     label: 'Income',
-    description: 'Recurring work, rental, Social Security, pension, and annuity income assumptions.',
+    description: 'Recurring work, contribution, rental, Social Security, pension, and annuity income assumptions.',
   },
   healthcare: {
     label: 'Healthcare',
