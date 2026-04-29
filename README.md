@@ -37,7 +37,7 @@ New browsers now open to the answer-first Verdict layout. The Classic/Verdict to
 
 ## Deployment
 
-Pushes to `main` trigger `.github/workflows/deploy.yml`, which runs the test suite, builds the site, and deploys `dist/` to GitHub Pages. The site is served from a custom domain via the `public/CNAME` file.
+Deploy as a static client-only Vite app on Cloudflare Pages. Configure the Pages project to install dependencies, run `npm run build`, and publish the generated `dist/` directory. No server runtime, backend, auth service, or database is required.
 
 ## License
 

@@ -7,6 +7,7 @@ export type MetricCellProps = Readonly<{
   displayText: string;
   rawNumeric: number | null;
   bandType: MetricCellBandType;
+  metricBand?: FplBand | WithdrawalRateBand;
   pulseKey?: string | number;
   label?: string;
   className?: string;
@@ -25,11 +26,12 @@ const WITHDRAWAL_RATE_BAND_CLASSES: Record<WithdrawalRateBand, string> = {
   caution: 'bg-amber-100 text-amber-900 dark:bg-amber-950/55 dark:text-amber-200',
   danger: 'bg-rose-100 text-rose-800 dark:bg-rose-950/55 dark:text-rose-200',
   catastrophic: 'bg-rose-200 text-rose-950 font-bold dark:bg-rose-900/70 dark:text-rose-100',
+  'plan-end': 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200',
 };
 
-export function MetricCell({ displayText, rawNumeric, bandType, pulseKey, label, className }: MetricCellProps) {
+export function MetricCell({ displayText, rawNumeric, bandType, metricBand, pulseKey, label, className }: MetricCellProps) {
   const isPulsing = useChangePulse(pulseKey ?? 'metric-cell-no-pulse');
-  const bandClassName = metricBandClassName(rawNumeric, bandType);
+  const bandClassName = metricBandClassName(rawNumeric, bandType, metricBand);
   const visibleBandClassName = isPulsing
     ? classNames(withoutBackgroundClass(bandClassName), 'bg-yellow-100 dark:bg-yellow-900/40')
     : bandClassName;
@@ -44,16 +46,20 @@ export function MetricCell({ displayText, rawNumeric, bandType, pulseKey, label,
   );
 }
 
-function metricBandClassName(rawNumeric: number | null, bandType: MetricCellBandType): string {
+function metricBandClassName(
+  rawNumeric: number | null,
+  bandType: MetricCellBandType,
+  metricBand: FplBand | WithdrawalRateBand | undefined,
+): string {
   if (rawNumeric === null) {
     return '';
   }
 
   switch (bandType) {
     case 'fpl':
-      return FPL_BAND_CLASSES[computeFplBand(rawNumeric)];
+      return FPL_BAND_CLASSES[(metricBand as FplBand | undefined) ?? computeFplBand(rawNumeric)];
     case 'wdRate':
-      return WITHDRAWAL_RATE_BAND_CLASSES[computeWithdrawalRateBand(rawNumeric)];
+      return WITHDRAWAL_RATE_BAND_CLASSES[(metricBand as WithdrawalRateBand | undefined) ?? computeWithdrawalRateBand(rawNumeric)];
     case 'cashflow':
       return rawNumeric < 0 ? 'text-rose-700 font-semibold dark:text-rose-300' : '';
     case 'none':

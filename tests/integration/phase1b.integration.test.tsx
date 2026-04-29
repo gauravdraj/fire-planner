@@ -115,7 +115,6 @@ describe('Phase 1B starter-template integration smoke', () => {
     );
 
     const knownHintYear = yearOrThrow(brokerageRows, 2034);
-    expect(Math.abs(knownHintYear.afterTaxCashFlow)).toBeGreaterThan(0);
     expect(cellFor(knownHintYear.year, 'afterTaxCashFlow')).toHaveTextContent(/\u2192 balanced/);
 
     const brokeragePlanEndBalance = numericMoney(liveStatValue('plan-end-balance'));

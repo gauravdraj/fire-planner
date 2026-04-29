@@ -24,6 +24,7 @@ describe('basic form projection mapping', () => {
       retirementYear: 2028,
       planEndAge: 67,
       annualSpendingToday: 100_000,
+      inflationRate: BASIC_FORM_MAPPING_DEFAULTS.inflationRate,
       annualMortgagePAndI: 18_000,
       mortgagePayoffYear: 2030,
       annualW2Income: 190_000,
@@ -61,8 +62,11 @@ describe('basic form projection mapping', () => {
     expect(scenario.partnerAge65Plus).toBe(true);
 
     expect(entryForYear(plan.annualSpending, 2026).amount).toBe(100_000);
-    expect(entryForYear(plan.annualSpending, 2028).amount).toBe(106_090);
-    expect(entryForYear(plan.annualSpending, 2033).amount).toBeCloseTo(122_987.39, 2);
+    expect(entryForYear(plan.annualSpending, 2028).amount).toBeCloseTo(
+      formValues.annualSpendingToday * (1 + formValues.inflationRate) ** 2,
+      2,
+    );
+    expect(entryForYear(plan.annualSpending, 2033).amount).toBeCloseTo(118_868.58, 2);
     expect(scenario.mortgage).toEqual({ annualPI: 18_000, payoffYear: 2030 });
 
     expect(entryForYear(scenario.w2Income, 2027).amount).toBe(190_000);
@@ -121,8 +125,7 @@ describe('basic form projection mapping', () => {
       annualBenchmarkPremium: 0,
     });
 
-    // Defaults for non-form values stay visible and boring until Gate 4 exposes controls.
-    expect(scenario.inflationRate).toBe(BASIC_FORM_MAPPING_DEFAULTS.inflationRate);
+    expect(scenario.inflationRate).toBe(formValues.inflationRate);
     expect(formValues.brokerageQdiPercentage).toBe(BASIC_FORM_MAPPING_DEFAULTS.brokerageQdiPercentage);
     expect(scenario.magiHistory).toEqual(BASIC_FORM_MAPPING_DEFAULTS.magiHistory);
 
@@ -131,8 +134,8 @@ describe('basic form projection mapping', () => {
     expect(results).toHaveLength(8);
     expect(results.map((year) => year.year)).toEqual([2026, 2027, 2028, 2029, 2030, 2031, 2032, 2033]);
     expect(results[0]?.spending).toBe(118_000);
-    expect(results[4]?.spending).toBeCloseTo(112_550.88 + 18_000, 2);
-    expect(results[5]?.spending).toBeCloseTo(115_927.41, 2);
+    expect(results[4]?.spending).toBeCloseTo(110_381.29 + 18_000, 2);
+    expect(results[5]?.spending).toBeCloseTo(113_140.82, 2);
     expect(results[0]?.openingBalances.hsa).toBe(25_000);
     expect(results.at(-1)?.closingBalances.hsa).toBeGreaterThanOrEqual(0);
   });
@@ -147,6 +150,7 @@ describe('basic form projection mapping', () => {
       retirementYear: 2027,
       planEndAge: 60,
       annualSpendingToday: 0,
+      inflationRate: BASIC_FORM_MAPPING_DEFAULTS.inflationRate,
       annualMortgagePAndI: 0,
       mortgagePayoffYear: 0,
       annualW2Income: 0,

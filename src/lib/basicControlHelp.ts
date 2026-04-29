@@ -15,6 +15,7 @@ export const basicControlIds = [
   'planEndAge',
   'socialSecurityClaimAge',
   'annualSpendingToday',
+  'inflationRate',
   'annualMortgagePAndI',
   'mortgagePayoffYear',
   'traditionalBalance',
@@ -81,6 +82,10 @@ export const basicControlHelp = {
   annualSpendingToday: {
     label: 'Annual spending',
     description: 'Entered in today\'s dollars and inflated each projection year before taxes and withdrawals.',
+  },
+  inflationRate: {
+    label: 'Inflation rate',
+    description: 'Single annual rate used for spending growth, federal bracket indexing after 2026, and FPL indexing.',
   },
   annualMortgagePAndI: {
     label: 'Annual mortgage P&I',

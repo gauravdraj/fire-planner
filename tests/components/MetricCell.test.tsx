@@ -32,6 +32,15 @@ describe('MetricCell', () => {
     expect(screen.getByText(`${rawNumeric * 100}%`)).toHaveClass(...expectedClassName.split(' '));
   });
 
+  it('uses neutral withdrawal-rate styling for plan-end depletion', () => {
+    render(<MetricCell bandType="wdRate" displayText="24.4%" metricBand="plan-end" rawNumeric={0.244} />);
+
+    const cell = screen.getByText('24.4%');
+
+    expect(cell).toHaveClass('bg-slate-100', 'text-slate-700');
+    expect(cell).not.toHaveClass('bg-rose-200', 'text-rose-950', 'font-bold');
+  });
+
   it('emphasizes negative cashflow and leaves non-negative cashflow neutral', () => {
     render(
       <div>

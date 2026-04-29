@@ -3,7 +3,7 @@ import { compressToEncodedURIComponent } from 'lz-string';
 
 import type { CustomLaw } from '@/core/constants/customLaw';
 import { mapBasicFormToProjectionInputs, type BasicFormValues } from '@/lib/basicFormMapping';
-import { encodeScenario } from '@/lib/urlHash';
+import { decodeScenario, encodeScenario } from '@/lib/urlHash';
 
 import { installMemoryLocalStorage } from './memoryStorage';
 
@@ -16,6 +16,7 @@ const STORED_FORM_VALUES: BasicFormValues = {
   retirementYear: 2030,
   planEndAge: 80,
   annualSpendingToday: 80_000,
+  inflationRate: 0.025,
   annualMortgagePAndI: 0,
   mortgagePayoffYear: 0,
   annualW2Income: 140_000,
@@ -50,6 +51,7 @@ const HASH_FORM_VALUES: BasicFormValues = {
   retirementYear: 2029,
   planEndAge: 92,
   annualSpendingToday: 135_000,
+  inflationRate: 0.04,
   annualMortgagePAndI: 24_000,
   mortgagePayoffYear: 2036,
   annualW2Income: 220_000,
@@ -98,11 +100,13 @@ describe('scenarioStore', () => {
     const state = useScenarioStore.getState();
 
     expect(state.formValues).toEqual(DEFAULT_BASIC_FORM_VALUES);
+    expect(state.formValues.inflationRate).toBe(0.025);
     expect(state.formValues.stateCode).toBe('CA');
     expect(state.formValues.annualW2Income).toBe(550_000);
     expect(state.formValues.brokerageAndCashBalance).toBe(1_000_000);
     expect(state.selectedStarterStateLaw.stateCode).toBe('CA');
     expect(state.scenario.state.incomeTaxLaw.stateCode).toBe('CA');
+    expect(state.scenario.inflationRate).toBe(0.025);
     expect(state.plan.endYear).toBe(2066);
     expect(state.customLaw).toBeUndefined();
     expect(state.customLawActive).toBe(false);
@@ -151,6 +155,35 @@ describe('scenarioStore', () => {
     expect(reloadedState).not.toHaveProperty('hasRunProjection');
   });
 
+  it('hydrates legacy persisted basic form values without inflation at the compatibility default', async () => {
+    const { scenario, plan } = mapBasicFormToProjectionInputs({ ...STORED_FORM_VALUES, inflationRate: 0.03 });
+    const { inflationRate: _ignoredInflationRate, ...legacyFormValues } = STORED_FORM_VALUES;
+    window.localStorage.setItem(
+      'fire-planner.scenario.v1',
+      JSON.stringify({
+        formValues: legacyFormValues,
+        scenario,
+        plan,
+        customLawActive: false,
+      }),
+    );
+
+    const { SCENARIO_STORAGE_KEY, useScenarioStore } = await import('@/store/scenarioStore');
+    const state = useScenarioStore.getState();
+
+    expect(state.formValues.inflationRate).toBe(0.025);
+    expect(state.scenario.inflationRate).toBe(0.025);
+
+    useScenarioStore.getState().setFormValues({ annualSpendingToday: 81_000 });
+
+    const persisted = JSON.parse(window.localStorage.getItem(SCENARIO_STORAGE_KEY) ?? '{}') as {
+      formValues?: Record<string, unknown>;
+      scenario?: Record<string, unknown>;
+    };
+    expect(persisted.formValues?.inflationRate).toBe(0.025);
+    expect(persisted.scenario?.inflationRate).toBe(0.025);
+  });
+
   it('applies a valid URL hash before localStorage and uses the mapped projection inputs', async () => {
     const { scenario, plan } = mapBasicFormToProjectionInputs(HASH_FORM_VALUES);
     const sharedPlan = {
@@ -174,6 +207,7 @@ describe('scenarioStore', () => {
 
     expect(state.formValues.stateCode).toBe('PA');
     expect(state.formValues.annualSpendingToday).toBe(HASH_FORM_VALUES.annualSpendingToday);
+    expect(state.formValues.inflationRate).toBe(HASH_FORM_VALUES.inflationRate);
     expect(state.formValues.annualW2Income).toBe(HASH_FORM_VALUES.annualW2Income);
     expect(state.formValues.hsaBalance).toBe(HASH_FORM_VALUES.hsaBalance);
     expect(state.formValues.annualMortgagePAndI).toBe(HASH_FORM_VALUES.annualMortgagePAndI);
@@ -190,6 +224,7 @@ describe('scenarioStore', () => {
     expect(state.formValues.brokerageQdiPercentage).toBe(HASH_FORM_VALUES.brokerageQdiPercentage);
     expect(state.plan).toEqual(sharedPlan);
     expect(state.scenario.state.incomeTaxLaw.stateCode).toBe('PA');
+    expect(state.scenario.inflationRate).toBe(HASH_FORM_VALUES.inflationRate);
     expect(state.scenario.mortgage).toEqual({ annualPI: 24_000, payoffYear: 2036 });
     expect(state.scenario.expectedReturns).toEqual({
       cash: 0,
@@ -216,6 +251,7 @@ describe('scenarioStore', () => {
       formValues?: Record<string, unknown>;
     };
     expect(persisted.formValues?.stateCode).toBe('PA');
+    expect(persisted.formValues?.inflationRate).toBe(HASH_FORM_VALUES.inflationRate);
     expect(persisted.formValues?.hsaBalance).toBe(HASH_FORM_VALUES.hsaBalance);
     expect(persisted.formValues?.annualMortgagePAndI).toBe(HASH_FORM_VALUES.annualMortgagePAndI);
     expect(persisted.formValues?.expectedReturnTraditional).toBe(HASH_FORM_VALUES.expectedReturnTraditional);
@@ -266,6 +302,21 @@ describe('scenarioStore', () => {
     expect(state.customLawActive).toBe(false);
     expect(state.customLaw).toBeUndefined();
     expect(state.scenario.customLaw).toBeUndefined();
+  });
+
+  it('hydrates URL hashes that omit inflation with the compatibility default and re-shares it', async () => {
+    const { scenario, plan } = mapBasicFormToProjectionInputs(HASH_FORM_VALUES);
+    const { inflationRate: _ignoredInflationRate, ...legacyScenario } = scenario;
+    window.location.hash = `v1:${compressToEncodedURIComponent(JSON.stringify({ scenario: legacyScenario, plan }))}`;
+
+    const { useScenarioStore } = await import('@/store/scenarioStore');
+    const state = useScenarioStore.getState();
+
+    expect(state.formValues.inflationRate).toBe(0.025);
+    expect(state.scenario.inflationRate).toBe(0.025);
+
+    const reshared = decodeScenario(encodeScenario({ scenario: state.scenario, plan: state.plan }));
+    expect(reshared?.scenario.inflationRate).toBe(0.025);
   });
 
   it('does not activate the custom-law banner without non-empty decoded overrides', async () => {

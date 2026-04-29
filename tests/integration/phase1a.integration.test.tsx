@@ -176,9 +176,9 @@ describe('Phase 1A basic-form integration smoke', () => {
     expect(screen.getByRole('table')).toBeInTheDocument();
     expect(within(screen.getByRole('table')).getByRole('columnheader', { name: 'Spending' })).toBeInTheDocument();
 
-    expect(retirementYear.spending).toBeCloseTo(40_000 * 1.03 ** 3 + 12_000, 2);
-    expect(payoffYear.spending).toBeCloseTo(40_000 * 1.03 ** 4 + 12_000, 2);
-    expect(postPayoffYear.spending).toBeCloseTo(40_000 * 1.03 ** 5, 2);
+    expect(retirementYear.spending).toBeCloseTo(40_000 * (1 + scenario.inflationRate) ** 3 + 12_000, 2);
+    expect(payoffYear.spending).toBeCloseTo(40_000 * (1 + scenario.inflationRate) ** 4 + 12_000, 2);
+    expect(postPayoffYear.spending).toBeCloseTo(40_000 * (1 + scenario.inflationRate) ** 5, 2);
     expect(cellFor(2029, 'spending')).toHaveTextContent(formatMoney(retirementYear.spending));
     expect(cellFor(2030, 'spending')).toHaveTextContent(formatMoney(payoffYear.spending));
     expect(cellFor(2031, 'spending')).toHaveTextContent(formatMoney(postPayoffYear.spending));
@@ -211,7 +211,7 @@ describe('Phase 1A basic-form integration smoke', () => {
     expect(cellFor(2029, 'brokerageWithdrawals')).toHaveTextContent(formatMoney(firstAutoDepleteDraw));
 
     const cumulativeBridgeTax = roundToCents(retirementYear.totalTax + payoffYear.totalTax);
-    expect(cumulativeBridgeTax).toBe(17_171.59);
+    expect(cumulativeBridgeTax).toBe(17_459.29);
     expect(liveStatValue('total-bridge-tax')).toBe(formatMoney(cumulativeBridgeTax));
   }, SLOW_UI_INTEGRATION_TIMEOUT_MS);
 });

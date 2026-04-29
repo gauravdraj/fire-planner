@@ -16,6 +16,7 @@ import type { FilingStatus, MagiYear } from '@/core/types';
 
 export type BasicStarterStateCode = 'CA' | 'FL' | 'PA';
 export type BasicHealthcarePhase = 'none' | 'aca' | 'medicare';
+export const DEFAULT_BASIC_INFLATION_RATE = 0.025;
 
 export type BasicFormValues = Readonly<{
   currentYear: number;
@@ -26,6 +27,7 @@ export type BasicFormValues = Readonly<{
   retirementYear: number;
   planEndAge: number;
   annualSpendingToday: number;
+  inflationRate: number;
   annualMortgagePAndI: number;
   mortgagePayoffYear: number;
   annualW2Income: number;
@@ -57,7 +59,7 @@ export type ProjectionInputs = Readonly<{
 }>;
 
 export const BASIC_FORM_MAPPING_DEFAULTS = Object.freeze({
-  inflationRate: 0.03,
+  inflationRate: DEFAULT_BASIC_INFLATION_RATE,
   expectedReturns: Object.freeze({
     cash: 0,
     hsa: 0.05,
@@ -115,7 +117,7 @@ export function mapBasicFormToProjectionInputs(values: BasicFormValues): Project
   const endYear = values.currentYear + (values.planEndAge - values.primaryAge);
   const years = buildYearRange(startYear, endYear);
   const socialSecurityClaimYear = values.currentYear + (values.socialSecurityClaimAge - values.primaryAge);
-  const inflationRate = BASIC_FORM_MAPPING_DEFAULTS.inflationRate;
+  const inflationRate = values.inflationRate;
 
   const scenario: Scenario = {
     startYear,

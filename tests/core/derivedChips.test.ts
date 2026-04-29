@@ -8,6 +8,7 @@ import {
 } from '@/core/derivedChips';
 import { FLORIDA_STATE_TAX } from '@/core/constants/states/florida';
 import type { AccountBalances, Scenario, YearBreakdown } from '@/core/projection';
+import { DEFAULT_BASIC_INFLATION_RATE } from '@/lib/basicFormMapping';
 
 type ChipFormValues = DerivedInputChipInput['formValues'];
 
@@ -19,10 +20,11 @@ describe('derived input chips', () => {
       retirementYear: 2031,
       planEndAge: 70,
       annualSpendingToday: 80_000,
+      inflationRate: DEFAULT_BASIC_INFLATION_RATE,
       socialSecurityClaimAge: 67,
     });
     const scenario = makeScenario({
-      inflationRate: 0.03,
+      inflationRate: DEFAULT_BASIC_INFLATION_RATE,
       socialSecurity: {
         claimYear: 2033,
         annualBenefit: 30_000,
@@ -50,7 +52,7 @@ describe('derived input chips', () => {
       }),
     ).toEqual({
       retirementTarget: 'Age 65 in 5 yrs',
-      annualSpending: 'Year 1 $80,000 -> 2036 $107,513',
+      annualSpending: 'Year 1 $80,000 -> 2036 $102,407 nominal',
       mortgagePAndI: 'No mortgage modeled',
       brokeragePlusCash: 'Lasts ~3 yrs (through 2033)',
       w2Income: 'Stops in 2031',
@@ -66,6 +68,7 @@ describe('derived input chips', () => {
       retirementYear: 2026,
       planEndAge: 62,
       annualSpendingToday: 50_000,
+      inflationRate: 0,
     });
     const projectionResults = [
       makeBreakdown({ year: 2026, acaPremiumCredit: makeAcaPremiumCredit(1.38), closingBalances: makeBalances({ cash: 10_000 }) }),
@@ -81,7 +84,7 @@ describe('derived input chips', () => {
       }),
     ).toMatchObject({
       retirementTarget: 'Age 60 this year',
-      annualSpending: 'Year 1 $50,000 -> 2028 $50,000',
+      annualSpending: 'Year 1 $50,000 -> 2028 $50,000 nominal',
       mortgagePAndI: 'No mortgage modeled',
       brokeragePlusCash: 'Lasts ~3 yrs (through 2028)',
       healthcare: 'Subsidy band: 138-200% FPL',
@@ -90,19 +93,35 @@ describe('derived input chips', () => {
 
   it('handles missing projection results without throwing', () => {
     const chips = deriveInputChips({
-      formValues: makeFormValues(),
-      scenario: makeScenario({ inflationRate: 0.02 }),
+      formValues: makeFormValues({ inflationRate: 0.02 }),
+      scenario: makeScenario(),
       projectionResults: null,
     });
 
     expect(chips).toMatchObject({
-      annualSpending: 'Year 1 $60,000 -> 2036 $73,140',
+      annualSpending: 'Year 1 $60,000 -> 2036 $73,140 nominal',
       mortgagePAndI: 'No mortgage modeled',
       brokeragePlusCash: 'Years funded unavailable',
       healthcare: 'Subsidy band unavailable',
     });
     expect(deriveBrokeragePlusCashChip(makeFormValues(), [])).toBe('Years funded unavailable');
     expect(deriveAcaHealthcareChip(makeFormValues(), makeScenario(), undefined)).toBe('Subsidy band unavailable');
+  });
+
+  it('derives annual spending from the live form inflation rate', () => {
+    const chips = deriveInputChips({
+      formValues: makeFormValues({
+        currentYear: 2026,
+        primaryAge: 60,
+        planEndAge: 62,
+        annualSpendingToday: 100_000,
+        inflationRate: 0.04,
+      }),
+      scenario: makeScenario({ inflationRate: 0 }),
+      projectionResults: null,
+    });
+
+    expect(chips.annualSpending).toBe('Year 1 $100,000 -> 2028 $108,160 nominal');
   });
 
   it('uses past-retirement wording and starts brokerage funding from the current projection year', () => {
@@ -204,6 +223,7 @@ function makeFormValues(overrides: Partial<ChipFormValues> = {}): ChipFormValues
     retirementYear: 2028,
     planEndAge: 70,
     annualSpendingToday: 60_000,
+    inflationRate: 0,
     annualMortgagePAndI: 0,
     mortgagePayoffYear: 0,
     brokerageAndCashBalance: 0,

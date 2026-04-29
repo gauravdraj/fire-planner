@@ -28,12 +28,12 @@ describe('StarterTemplateChooser', () => {
     vi.useRealTimers();
   });
 
-  it('renders all five starter template buttons and compact sample explanation', () => {
+  it('renders all six starter template buttons and compact sample explanation', () => {
     render(<StarterTemplateChooser />);
 
     expect(screen.getByRole('heading', { name: /sample scenarios/i })).toBeInTheDocument();
-    expect(STARTER_TEMPLATES).toHaveLength(5);
-    expect(screen.getAllByRole('button')).toHaveLength(5);
+    expect(STARTER_TEMPLATES).toHaveLength(6);
+    expect(screen.getAllByRole('button')).toHaveLength(6);
 
     for (const template of STARTER_TEMPLATES) {
       const button = screen.getByRole('button', { name: new RegExp(escapeRegExp(template.label), 'i') });

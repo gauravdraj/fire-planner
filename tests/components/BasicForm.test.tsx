@@ -53,6 +53,7 @@ describe('BasicForm', () => {
     expect(screen.getByLabelText('Retirement target year')).toBeInTheDocument();
     expect(screen.getByLabelText('Plan-end age')).toBeInTheDocument();
     expect(screen.getByLabelText('Annual spending')).toBeInTheDocument();
+    expect(screen.getByLabelText('Inflation rate')).toHaveValue('0.025');
     expect(screen.getByLabelText('Annual mortgage P&I')).toBeInTheDocument();
     expect(screen.getByLabelText('Mortgage payoff year')).toBeInTheDocument();
     expect(screen.getByLabelText('Traditional balance')).toBeInTheDocument();
@@ -140,10 +141,12 @@ describe('BasicForm', () => {
 
     const spending = screen.getByRole('group', { name: /spending & debt/i });
     expect(within(spending).getByLabelText('Annual spending')).toBeInTheDocument();
+    expect(within(spending).getByLabelText('Inflation rate')).toBeInTheDocument();
     expect(within(spending).getByLabelText('Annual mortgage P&I')).toBeInTheDocument();
     expect(within(spending).getByLabelText('Mortgage payoff year')).toBeInTheDocument();
 
     const withdrawalStrategy = screen.getByRole('group', { name: /withdrawal strategy/i });
+    expect(within(withdrawalStrategy).queryByLabelText('Inflation rate')).not.toBeInTheDocument();
     expect(within(withdrawalStrategy).getByLabelText('Auto-deplete brokerage')).toBeInTheDocument();
     expect(within(withdrawalStrategy).getByLabelText('Brokerage depletion years')).toBeInTheDocument();
     expect(within(withdrawalStrategy).getByLabelText('Brokerage annual scale-up factor')).toBeInTheDocument();
@@ -250,7 +253,7 @@ describe('BasicForm', () => {
       'tracking-wide',
       'text-slate-500',
     );
-    expect(screen.getByText(/→ Year 1 \$220,000 -> 2066 \$/)).toBeInTheDocument();
+    expect(screen.getByText('→ Year 1 $220,000 -> 2066 $590,714 nominal')).toBeInTheDocument();
     expect(screen.getByText('→ Stops in 2029')).toBeInTheDocument();
     expect(screen.getByText('→ No mortgage modeled')).toBeInTheDocument();
     expect(screen.getByText('→ Claims in 2041 at age 70')).toBeInTheDocument();
@@ -258,6 +261,7 @@ describe('BasicForm', () => {
 
     changeField('Retirement target year', '2030');
     changeField('Annual spending', '90000');
+    changeField('Inflation rate', '0.02');
     changeField('Annual mortgage P&I', '24000');
     changeField('Mortgage payoff year', '2030');
     changeField('Social Security claim age', '68');
@@ -265,7 +269,7 @@ describe('BasicForm', () => {
     advanceLiveDebounce();
 
     expect(screen.getByText('→ Age 59 in 4 yrs')).toBeInTheDocument();
-    expect(screen.getByText(/→ Year 1 \$90,000 -> 2066 \$/)).toBeInTheDocument();
+    expect(screen.getByText('→ Year 1 $90,000 -> 2066 $198,724 nominal')).toBeInTheDocument();
     expect(screen.getByText('→ 5 yrs of payments through 2030')).toBeInTheDocument();
     expect(screen.getByText('→ Stops in 2030')).toBeInTheDocument();
     expect(screen.getByText('→ Claims in 2039 at age 68')).toBeInTheDocument();
@@ -275,7 +279,7 @@ describe('BasicForm', () => {
     advanceLiveDebounce();
 
     expect(screen.getByText('Annual spending is required.')).toBeInTheDocument();
-    expect(screen.getByText(/→ Year 1 \$90,000 -> 2066 \$/)).toBeInTheDocument();
+    expect(screen.getByText('→ Year 1 $90,000 -> 2066 $198,724 nominal')).toBeInTheDocument();
     expect(screen.getByText('→ 5 yrs of payments through 2030')).toBeInTheDocument();
   });
 
@@ -318,6 +322,7 @@ describe('BasicForm', () => {
     changeField('Retirement target year', '2027');
     changeField('Plan-end age', '70');
     changeField('Annual spending', '90000');
+    changeField('Inflation rate', '0.02');
     changeField('Annual mortgage P&I', '18000');
     changeField('Mortgage payoff year', '2031');
     changeField('Traditional balance', '500000');
@@ -356,6 +361,7 @@ describe('BasicForm', () => {
       retirementYear: 2027,
       planEndAge: 70,
       annualSpendingToday: 90_000,
+      inflationRate: 0.02,
       annualMortgagePAndI: 18_000,
       mortgagePayoffYear: 2031,
       annualW2Income: 180_000,
@@ -384,6 +390,7 @@ describe('BasicForm', () => {
     expect(state.scenario.partnerAge65Plus).toBe(true);
     expect(state.scenario.socialSecurity).toMatchObject({ claimYear: 2029, annualBenefit: 40_000 });
     expect(state.scenario.mortgage).toEqual({ annualPI: 18_000, payoffYear: 2031 });
+    expect(state.scenario.inflationRate).toBe(0.02);
     expect(state.scenario.expectedReturns).toEqual({
       cash: 0,
       hsa: 0.03,

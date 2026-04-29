@@ -254,7 +254,7 @@ export const basicFormSectionExplanations = {
   spending: {
     label: 'Spending & debt',
     description:
-      'Annual living-spending target plus fixed mortgage principal and interest that the projection tries to fund.',
+      'Annual living-spending target, inflation assumption, and fixed mortgage principal and interest that the projection tries to fund.',
   },
   balances: {
     label: 'Accounts',

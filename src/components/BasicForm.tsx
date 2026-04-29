@@ -63,6 +63,7 @@ const MONEY_FIELDS = [
 ] as const;
 
 const PERCENT_FIELDS = [
+  'inflationRate',
   'autoDepleteBrokerageAnnualScaleUpFactor',
   'expectedReturnTraditional',
   'expectedReturnRoth',
@@ -179,6 +180,7 @@ export function BasicForm({ layout = 'classic' }: { layout?: BasicFormLayout } =
             handleInputChange,
             chips.annualSpending,
           )}
+          {renderNumberField('inflationRate', draft, errors, handleInputChange)}
           {renderNumberField(
             'annualMortgagePAndI',
             draft,
@@ -341,6 +343,7 @@ export function BasicForm({ layout = 'classic' }: { layout?: BasicFormLayout } =
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {renderNumberField('currentYear', draft, errors, handleInputChange)}
             {renderNumberField('planEndAge', draft, errors, handleInputChange)}
+            {renderNumberField('inflationRate', draft, errors, handleInputChange)}
             {renderCheckboxField('autoDepleteBrokerageEnabled', draft, errors, handleCheckboxChange)}
             {renderNumberField('autoDepleteBrokerageYears', draft, errors, handleInputChange)}
             {renderNumberField('autoDepleteBrokerageAnnualScaleUpFactor', draft, errors, handleInputChange)}
@@ -518,6 +521,7 @@ export function validateBasicFormDraft(draft: BasicFormDraft): ValidationResult 
       retirementYear: retirementYear ?? 0,
       planEndAge: planEndAge ?? 0,
       annualSpendingToday: moneyValues.annualSpendingToday ?? 0,
+      inflationRate: percentValues.inflationRate ?? 0,
       annualMortgagePAndI: moneyValues.annualMortgagePAndI ?? 0,
       mortgagePayoffYear: mortgagePayoffYear ?? 0,
       annualW2Income: moneyValues.annualW2Income ?? 0,
@@ -770,6 +774,7 @@ function createValidPatch(
     case 'annualSocialSecurityBenefit':
     case 'annualPensionOrAnnuityIncome':
       return parseMoneyPatch(draft, field);
+    case 'inflationRate':
     case 'autoDepleteBrokerageAnnualScaleUpFactor':
     case 'expectedReturnTraditional':
     case 'expectedReturnRoth':
@@ -1044,6 +1049,8 @@ function moneyFieldLabel(field: (typeof MONEY_FIELDS)[number]): string {
 
 function percentageFieldLabel(field: (typeof PERCENT_FIELDS)[number]): string {
   switch (field) {
+    case 'inflationRate':
+      return 'Inflation rate';
     case 'autoDepleteBrokerageAnnualScaleUpFactor':
       return 'Brokerage annual scale-up factor';
     case 'expectedReturnTraditional':
@@ -1071,6 +1078,7 @@ function createDraft(values: BasicFormValues): BasicFormDraft {
     retirementYear: String(values.retirementYear),
     planEndAge: String(values.planEndAge),
     annualSpendingToday: String(values.annualSpendingToday),
+    inflationRate: String(values.inflationRate),
     annualMortgagePAndI: String(values.annualMortgagePAndI),
     mortgagePayoffYear: String(values.mortgagePayoffYear),
     annualW2Income: String(values.annualW2Income),

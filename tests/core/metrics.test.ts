@@ -13,6 +13,7 @@ import {
   computeTotalBridgeTax,
   computeWithdrawalRate,
   computeWithdrawalRateBand,
+  computeWithdrawalRateBandForYear,
   computeYearDisplayMetrics,
   computeYearsFundedFromRetirement,
   pAndIBeforePayoff,
@@ -361,6 +362,32 @@ describe('projection metric helpers', () => {
     expect(computeWithdrawalRateBand(0.05)).toBe('danger');
     expect(computeWithdrawalRateBand(0.1)).toBe('danger');
     expect(computeWithdrawalRateBand(0.1001)).toBe('catastrophic');
+  });
+
+  it('classifies the plan-end withdrawal row separately from threshold bands', () => {
+    expect(computeWithdrawalRateBandForYear(0.1001, { planEndYear: 2035, year: 2034 })).toBe('catastrophic');
+    expect(computeWithdrawalRateBandForYear(0.1001, { planEndYear: 2035, year: 2035 })).toBe('plan-end');
+    expect(computeWithdrawalRateBandForYear(0.0399, { planEndYear: 2035, year: 2034 })).toBe('safe');
+  });
+
+  it('derives plan-end withdrawal-rate bands from display metric context', () => {
+    const priorYear = makeBreakdown({ year: 2034, closingBalances: makeBalances({ taxableBrokerage: 100_000 }) });
+    const row = makeBreakdown({
+      year: 2035,
+      withdrawals: makeBalances({ taxableBrokerage: 20_000 }),
+    });
+
+    expect(
+      computeYearDisplayMetrics(row, {
+        formValues: makeFormValues(),
+        planEndYear: 2035,
+        priorYear,
+        scenario: makeScenario(),
+      }),
+    ).toMatchObject({
+      withdrawalRate: 0.2,
+      withdrawalRateBand: 'plan-end',
+    });
   });
 
   it('computes federal bracket proximity at exact bracket edges', () => {

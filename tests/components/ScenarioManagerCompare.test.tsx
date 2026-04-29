@@ -19,6 +19,7 @@ const BASE_FORM_VALUES: BasicFormValues = {
   retirementYear: 2030,
   planEndAge: 70,
   annualSpendingToday: 80_000,
+  inflationRate: 0.025,
   annualMortgagePAndI: 0,
   mortgagePayoffYear: 0,
   annualW2Income: 150_000,

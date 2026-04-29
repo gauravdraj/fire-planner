@@ -10,7 +10,7 @@ export function Header() {
 
   return (
     <header className="border-b border-slate-200/80 bg-white/90 px-3 py-5 shadow-sm shadow-slate-900/5 dark:border-slate-800 dark:bg-slate-950/90 dark:shadow-none sm:px-4">
-      <div className="mx-auto flex max-w-5xl flex-col gap-4 lg:max-w-6xl xl:max-w-7xl sm:flex-row sm:items-center sm:justify-between">
+      <div className="mx-auto flex max-w-5xl flex-col gap-4 lg:max-w-6xl xl:max-w-7xl 2xl:max-w-screen-2xl sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
           <p className="text-sm font-medium text-indigo-700 dark:text-indigo-300">Private retirement planner</p>
           <h1 className="text-2xl font-semibold tracking-tight text-slate-950 dark:text-slate-50">Fire Planner</h1>

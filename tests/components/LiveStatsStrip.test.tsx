@@ -161,7 +161,9 @@ describe('LiveStatsStrip', () => {
       useUiStore.getState().setDisplayUnit('real');
     });
 
-    const expectedRealRetirementBalance = DOLLAR_FORMATTER.format(toReal(165_375, 2028, 2026, 0.03));
+    const expectedRealRetirementBalance = DOLLAR_FORMATTER.format(
+      toReal(165_375, 2028, 2026, useScenarioStore.getState().scenario.inflationRate),
+    );
 
     expect(within(statCell('net-worth-at-retirement')).getByText(expectedRealRetirementBalance)).toBeInTheDocument();
     expect(statCell('net-worth-at-retirement')).not.toHaveClass('bg-yellow-100');

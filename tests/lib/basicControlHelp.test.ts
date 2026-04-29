@@ -12,6 +12,7 @@ const EXPECTED_BASIC_CONTROL_IDS = [
   'planEndAge',
   'socialSecurityClaimAge',
   'annualSpendingToday',
+  'inflationRate',
   'annualMortgagePAndI',
   'mortgagePayoffYear',
   'traditionalBalance',
@@ -62,5 +63,11 @@ describe('basicControlHelp', () => {
     expect(basicControlHelp.stateCode).toBeDefined();
     expect(basicControlHelp.healthcarePhase).toBeDefined();
     expect(basicControlHelp.autoDepleteBrokerageEnabled).toBeDefined();
+  });
+
+  it('names the indexed assumptions controlled by the basic inflation rate', () => {
+    expect(basicControlHelp.inflationRate.description).toContain('spending growth');
+    expect(basicControlHelp.inflationRate.description).toContain('federal bracket indexing after 2026');
+    expect(basicControlHelp.inflationRate.description).toContain('FPL indexing');
   });
 });

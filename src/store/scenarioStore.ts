@@ -8,6 +8,7 @@ import { runProjection, type Scenario, type WithdrawalPlan, type YearBreakdown }
 import type { StateIncomeTaxLaw } from '@/core/tax/state';
 import type { FilingStatus } from '@/core/types';
 import {
+  DEFAULT_BASIC_INFLATION_RATE,
   mapBasicFormToProjectionInputs,
   type BasicFormValues,
   type BasicHealthcarePhase,
@@ -33,6 +34,7 @@ export const DEFAULT_BASIC_FORM_VALUES = Object.freeze({
   retirementYear: 2029,
   planEndAge: 95,
   annualSpendingToday: 220_000,
+  inflationRate: DEFAULT_BASIC_INFLATION_RATE,
   annualMortgagePAndI: 0,
   mortgagePayoffYear: 0,
   annualW2Income: 550_000,
@@ -166,7 +168,7 @@ function buildScenarioState(values: unknown, projectionInputs?: ProjectionInputS
   const formValues = sanitizeBasicFormValues(values);
   const mappedInputs = projectionInputs === undefined
     ? mapBasicFormToProjectionInputs(formValues)
-    : normalizeProjectionInputState(projectionInputs);
+    : normalizeProjectionInputState(projectionInputs, formValues.inflationRate);
   const customLaw = projectionInputs?.customLaw ?? projectionInputs?.scenario.customLaw;
   const customLawActive = projectionInputs?.customLawActive === true && isCustomLawActive(customLaw);
   const scenario =
@@ -228,6 +230,7 @@ function inferBasicFormValuesFromHashPayload(payload: ScenarioHashPayload): Basi
     planEndAge: primaryAge + (endYear - startYear),
     annualSpendingToday:
       annualAmountForYear(payload.plan.annualSpending, startYear) ?? DEFAULT_BASIC_FORM_VALUES.annualSpendingToday,
+    inflationRate: percentageNumber(payload.scenario.inflationRate, DEFAULT_BASIC_FORM_VALUES.inflationRate),
     annualMortgagePAndI: nonnegativeNumber(
       payload.scenario.mortgage?.annualPI,
       DEFAULT_BASIC_FORM_VALUES.annualMortgagePAndI,
@@ -460,8 +463,8 @@ function scenarioWithoutCustomLaw(scenario: Scenario): Scenario {
   return scenarioWithoutOverride;
 }
 
-function normalizeProjectionInputState(input: ProjectionInputState): ProjectionInputState {
-  const scenario = normalizeScenario(input.scenario);
+function normalizeProjectionInputState(input: ProjectionInputState, inflationRate: number): ProjectionInputState {
+  const scenario = normalizeScenario(input.scenario, inflationRate);
 
   return {
     ...input,
@@ -469,7 +472,7 @@ function normalizeProjectionInputState(input: ProjectionInputState): ProjectionI
   };
 }
 
-function normalizeScenario(scenario: Scenario): Scenario {
+function normalizeScenario(scenario: Scenario, inflationRate: number): Scenario {
   const mortgage = normalizedMortgage(scenario);
   const brokerageDividends = normalizedBrokerageDividends(scenario);
   const autoDepleteBrokerage = normalizedAutoDepleteBrokerage(scenario);
@@ -482,6 +485,7 @@ function normalizeScenario(scenario: Scenario): Scenario {
 
   return {
     ...scenarioWithoutMortgage,
+    inflationRate,
     balances: {
       cash: nonnegativeNumber(scenario.balances?.cash, 0),
       hsa: nonnegativeNumber(scenario.balances?.hsa, 0),
@@ -553,6 +557,7 @@ function sanitizeBasicFormValues(value: unknown): BasicFormValues {
     retirementYear: boundedInteger(candidate.retirementYear, DEFAULT_BASIC_FORM_VALUES.retirementYear, 1900, 2300),
     planEndAge,
     annualSpendingToday: nonnegativeNumber(candidate.annualSpendingToday, DEFAULT_BASIC_FORM_VALUES.annualSpendingToday),
+    inflationRate: percentageNumber(candidate.inflationRate, DEFAULT_BASIC_FORM_VALUES.inflationRate),
     annualMortgagePAndI: nonnegativeNumber(
       candidate.annualMortgagePAndI,
       DEFAULT_BASIC_FORM_VALUES.annualMortgagePAndI,

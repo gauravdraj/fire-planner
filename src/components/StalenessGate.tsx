@@ -46,7 +46,7 @@ export function StalenessGate({ now = new Date() }: StalenessGateProps) {
         }`}
         role="status"
       >
-        <div className="mx-auto max-w-5xl lg:max-w-6xl xl:max-w-7xl">
+        <div className="mx-auto max-w-5xl lg:max-w-6xl xl:max-w-7xl 2xl:max-w-screen-2xl">
           <p className="font-semibold">{bannerTitle}</p>
           <p>{bannerBody}</p>
         </div>

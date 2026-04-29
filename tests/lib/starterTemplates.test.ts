@@ -21,13 +21,14 @@ function templateById(id: (typeof STARTER_TEMPLATES)[number]['id']) {
 }
 
 describe('starter templates', () => {
-  it('exports exactly the five Phase 2 starter scenarios in order', () => {
+  it('exports exactly the six starter scenarios in order', () => {
     expect(STARTER_TEMPLATES.map((template) => template.id)).toEqual([
       'brokerage-bridge-72t',
       'roth-ladder',
       'ltcg-harvest',
       'aca-optimized',
       'conservative-no-customlaw',
+      'bay-area-early-retiree',
     ]);
   });
 
@@ -36,6 +37,7 @@ describe('starter templates', () => {
     const ltcgHarvest = templateById('ltcg-harvest');
     const acaOptimized = templateById('aca-optimized');
     const conservative = templateById('conservative-no-customlaw');
+    const bayArea = templateById('bay-area-early-retiree');
 
     expect(brokerageBridge?.longDescription).toMatch(/10-year auto-deplete taxable brokerage bridge/i);
     expect(brokerageBridge?.longDescription).toMatch(/does not introduce a separate 72\(t\) SEPP withdrawal stream/i);
@@ -45,6 +47,8 @@ describe('starter templates', () => {
     expect(acaOptimized.longDescription).toMatch(/200-400% FPL band/i);
     expect(conservative.longDescription).toMatch(/Single filer near Medicare-eligibility/i);
     expect(conservative.longDescription).toMatch(/no auto-deplete/i);
+    expect(bayArea.longDescription).toMatch(/Bay Area parity scenario/i);
+    expect(bayArea.longDescription).toMatch(/California taxes/i);
 
     for (const template of STARTER_TEMPLATES) {
       expect(template.longDescription).not.toMatch(/\$\d/);
@@ -60,6 +64,7 @@ describe('starter templates', () => {
       retirementYear: 2026,
       planEndAge: 95,
       annualSpendingToday: 80_000,
+      inflationRate: 0.025,
       annualMortgagePAndI: 0,
       mortgagePayoffYear: 0,
       annualSocialSecurityBenefit: 25_000,
@@ -89,6 +94,7 @@ describe('starter templates', () => {
       retirementYear: 2027,
       planEndAge: 90,
       annualSpendingToday: 60_000,
+      inflationRate: 0.025,
       annualMortgagePAndI: 0,
       mortgagePayoffYear: 0,
       annualSocialSecurityBenefit: 35_000,
@@ -118,6 +124,7 @@ describe('starter templates', () => {
       retirementYear: 2026,
       planEndAge: 95,
       annualSpendingToday: 55_000,
+      inflationRate: 0.025,
       annualMortgagePAndI: 12_000,
       mortgagePayoffYear: 2028,
       annualSocialSecurityBenefit: 40_000,
@@ -133,6 +140,41 @@ describe('starter templates', () => {
       expectedReturnBrokerage: 0.04,
       expectedReturnHsa: 0.04,
       brokerageDividendYield: 0.014,
+      brokerageQdiPercentage: 0.95,
+      healthcarePhase: 'aca',
+    });
+
+    expect(templateById('bay-area-early-retiree').formValues).toMatchObject({
+      currentYear: 2026,
+      filingStatus: 'mfj',
+      stateCode: 'CA',
+      primaryAge: 53,
+      partnerAge: 53,
+      retirementYear: 2028,
+      planEndAge: 95,
+      annualSpendingToday: 150_000,
+      inflationRate: 0.025,
+      annualMortgagePAndI: 0,
+      mortgagePayoffYear: 0,
+      annualW2Income: 450_000,
+      annualConsultingIncome: 0,
+      annualRentalIncome: 0,
+      annualSocialSecurityBenefit: 72_000,
+      socialSecurityClaimAge: 70,
+      annualPensionOrAnnuityIncome: 0,
+      brokerageAndCashBalance: 1_800_000,
+      taxableBrokerageBasis: 1_200_000,
+      hsaBalance: 100_000,
+      traditionalBalance: 1_600_000,
+      rothBalance: 850_000,
+      autoDepleteBrokerageEnabled: true,
+      autoDepleteBrokerageYears: 8,
+      autoDepleteBrokerageAnnualScaleUpFactor: 0.025,
+      expectedReturnTraditional: 0.05,
+      expectedReturnRoth: 0.05,
+      expectedReturnBrokerage: 0.045,
+      expectedReturnHsa: 0.05,
+      brokerageDividendYield: 0.012,
       brokerageQdiPercentage: 0.95,
       healthcarePhase: 'aca',
     });
@@ -160,7 +202,10 @@ describe('starter templates', () => {
       );
 
       expect(projection.length, template.id).toBeGreaterThan(0);
+      expect(projection.length, template.id).toBe(values.planEndAge - values.primaryAge + 1);
       expect(finalYear, template.id).toBeDefined();
+      expect(scenario.inflationRate, template.id).toBe(template.formValues.inflationRate);
+      expect(plan.annualSpending[0]?.amount, template.id).toBe(template.formValues.annualSpendingToday);
       expect(Number.isFinite(endingBalance), template.id).toBe(true);
 
       if (template.formValues.autoDepleteBrokerageEnabled) {
@@ -192,6 +237,11 @@ describe('starter templates', () => {
     });
     expect(templateById('conservative-no-customlaw').formValues).toMatchObject({
       autoDepleteBrokerageEnabled: false,
+    });
+    expect(templateById('bay-area-early-retiree').formValues).toMatchObject({
+      autoDepleteBrokerageEnabled: true,
+      autoDepleteBrokerageYears: 8,
+      autoDepleteBrokerageAnnualScaleUpFactor: 0.025,
     });
   });
 

@@ -29,6 +29,7 @@ const HIGH_MAGI_BRIDGE_VALUES: BasicFormValues = {
   retirementYear: 2030,
   planEndAge: 78,
   annualSpendingToday: 125_000,
+  inflationRate: 0.025,
   annualMortgagePAndI: 0,
   mortgagePayoffYear: 0,
   annualW2Income: 150_000,

@@ -9,6 +9,7 @@ type DerivedChipFormValues = Readonly<{
   retirementYear: number;
   planEndAge: number;
   annualSpendingToday: number;
+  inflationRate: number;
   annualMortgagePAndI: number;
   mortgagePayoffYear: number;
   brokerageAndCashBalance: number;
@@ -38,7 +39,7 @@ export type DerivedInputChipInput = Readonly<{
 export function deriveInputChips(input: DerivedInputChipInput): DerivedInputChips {
   return {
     retirementTarget: deriveRetirementTargetChip(input.formValues),
-    annualSpending: deriveAnnualSpendingChip(input.formValues, input.scenario),
+    annualSpending: deriveAnnualSpendingChip(input.formValues),
     mortgagePAndI: deriveMortgagePAndIChip(input.formValues, input.scenario),
     brokeragePlusCash: deriveBrokeragePlusCashChip(input.formValues, input.projectionResults),
     w2Income: deriveW2IncomeChip(input.formValues),
@@ -62,12 +63,14 @@ export function deriveRetirementTargetChip(formValues: DerivedChipFormValues): s
   return `Age ${retirementAge} in ${formatYears(yearsFromNow)}`;
 }
 
-export function deriveAnnualSpendingChip(formValues: DerivedChipFormValues, scenario: Scenario): string {
+export function deriveAnnualSpendingChip(formValues: DerivedChipFormValues): string {
   const planEndYear = computePlanEndYear(formValues);
   const planEndSpending =
-    formValues.annualSpendingToday * (1 + scenario.inflationRate) ** (planEndYear - formValues.currentYear);
+    formValues.annualSpendingToday * (1 + formValues.inflationRate) ** (planEndYear - formValues.currentYear);
 
-  return `Year 1 ${formatDollars(formValues.annualSpendingToday)} -> ${planEndYear} ${formatDollars(planEndSpending)}`;
+  return `Year 1 ${formatDollars(formValues.annualSpendingToday)} -> ${planEndYear} ${formatDollars(
+    planEndSpending,
+  )} nominal`;
 }
 
 export function deriveMortgagePAndIChip(formValues: DerivedChipFormValues, scenario: Scenario): string {

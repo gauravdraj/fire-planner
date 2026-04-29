@@ -43,7 +43,7 @@ export type BridgeWindow = Readonly<{
 
 export type FplBand = 'below-aca' | 'aca-low' | 'aca-mid' | 'aca-high' | 'above-cliff';
 
-export type WithdrawalRateBand = 'safe' | 'caution' | 'danger' | 'catastrophic';
+export type WithdrawalRateBand = 'safe' | 'caution' | 'danger' | 'catastrophic' | 'plan-end';
 
 export type FederalBracketProximity = Readonly<{
   marginalRate: number;
@@ -55,6 +55,7 @@ export type YearPhaseLabel = 'SS claimed' | 'Medicare-eligible' | 'Bridge' | 'Pr
 
 export type YearDisplayMetricContext = Readonly<{
   formValues: ProjectionMetricFormValues;
+  planEndYear?: number;
   priorYear?: YearBreakdown | null;
   scenario: Scenario;
 }>;
@@ -327,6 +328,17 @@ export function computeWithdrawalRateBand(withdrawalRate: number): WithdrawalRat
   return 'catastrophic';
 }
 
+export function computeWithdrawalRateBandForYear(
+  withdrawalRate: number,
+  context: Readonly<{ planEndYear: number; year: number }>,
+): WithdrawalRateBand {
+  if (context.year === context.planEndYear) {
+    return 'plan-end';
+  }
+
+  return computeWithdrawalRateBand(withdrawalRate);
+}
+
 export function computeFederalBracketProximity(
   taxableIncome: number,
   filingStatus: FilingStatus = 'single',
@@ -391,7 +403,15 @@ export function computeYearDisplayMetrics(
     fplPercentage,
     fplBand: fplPercentage === null ? null : computeFplBand(fplPercentage),
     withdrawalRate,
-    withdrawalRateBand: withdrawalRate === null ? null : computeWithdrawalRateBand(withdrawalRate),
+    withdrawalRateBand:
+      withdrawalRate === null
+        ? null
+        : context.planEndYear === undefined
+          ? computeWithdrawalRateBand(withdrawalRate)
+          : computeWithdrawalRateBandForYear(withdrawalRate, {
+              planEndYear: context.planEndYear,
+              year: breakdown.year,
+            }),
     irmaaTier: breakdown.irmaaPremium?.tier ?? null,
     ltcgRealized: breakdown.brokerageBasis.realizedGainOrLoss,
   };

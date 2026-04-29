@@ -180,6 +180,12 @@ export const modeledItems = [
       'Projects from the current year through the plan end year, tracking annual balances, spending, income, withdrawals, taxes, and healthcare threshold effects.',
   },
   {
+    id: 'inflation-indexing',
+    label: 'Inflation and indexed assumptions',
+    description:
+      'The basic inflation rate is a single annual assumption used for spending growth, post-2026 federal bracket indexing, and FPL indexing.',
+  },
+  {
     id: 'account-buckets',
     label: 'Supported account buckets',
     description:

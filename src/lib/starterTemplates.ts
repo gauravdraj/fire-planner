@@ -1,7 +1,13 @@
 import type { BasicFormValues } from '@/lib/basicFormMapping';
 
 export type StarterTemplate = Readonly<{
-  id: 'brokerage-bridge-72t' | 'roth-ladder' | 'ltcg-harvest' | 'aca-optimized' | 'conservative-no-customlaw';
+  id:
+    | 'brokerage-bridge-72t'
+    | 'roth-ladder'
+    | 'ltcg-harvest'
+    | 'aca-optimized'
+    | 'conservative-no-customlaw'
+    | 'bay-area-early-retiree';
   label: string;
   shortDescription: string;
   longDescription: string;
@@ -24,6 +30,7 @@ export const STARTER_TEMPLATES = [
       retirementYear: 2026,
       planEndAge: 95,
       annualSpendingToday: 90_000,
+      inflationRate: 0.025,
       annualMortgagePAndI: 0,
       mortgagePayoffYear: 0,
       annualW2Income: 0,
@@ -64,6 +71,7 @@ export const STARTER_TEMPLATES = [
       retirementYear: 2026,
       planEndAge: 95,
       annualSpendingToday: 82_000,
+      inflationRate: 0.025,
       annualMortgagePAndI: 18_000,
       mortgagePayoffYear: 2030,
       annualW2Income: 0,
@@ -104,6 +112,7 @@ export const STARTER_TEMPLATES = [
       retirementYear: 2026,
       planEndAge: 95,
       annualSpendingToday: 80_000,
+      inflationRate: 0.025,
       annualMortgagePAndI: 0,
       mortgagePayoffYear: 0,
       annualW2Income: 0,
@@ -144,6 +153,7 @@ export const STARTER_TEMPLATES = [
       retirementYear: 2027,
       planEndAge: 90,
       annualSpendingToday: 60_000,
+      inflationRate: 0.025,
       annualMortgagePAndI: 0,
       mortgagePayoffYear: 0,
       annualW2Income: 0,
@@ -184,6 +194,7 @@ export const STARTER_TEMPLATES = [
       retirementYear: 2026,
       planEndAge: 95,
       annualSpendingToday: 55_000,
+      inflationRate: 0.025,
       annualMortgagePAndI: 12_000,
       mortgagePayoffYear: 2028,
       annualW2Income: 0,
@@ -205,6 +216,47 @@ export const STARTER_TEMPLATES = [
       expectedReturnBrokerage: 0.04,
       expectedReturnHsa: 0.04,
       brokerageDividendYield: 0.014,
+      brokerageQdiPercentage: 0.95,
+      healthcarePhase: 'aca',
+    },
+  },
+  {
+    id: 'bay-area-early-retiree',
+    label: 'Bay Area early retiree',
+    shortDescription: 'A California MFJ household retiring in the mid-50s with higher local spending.',
+    longDescription:
+      'Bay Area parity scenario for an early-retiree household leaving W-2 income around age 55. It keeps the model in basic-form data while testing California taxes, ACA years, and a higher spending baseline.',
+    formValues: {
+      currentYear: 2026,
+      filingStatus: 'mfj',
+      stateCode: 'CA',
+      primaryAge: 53,
+      partnerAge: 53,
+      retirementYear: 2028,
+      planEndAge: 95,
+      annualSpendingToday: 150_000,
+      inflationRate: 0.025,
+      annualMortgagePAndI: 0,
+      mortgagePayoffYear: 0,
+      annualW2Income: 450_000,
+      annualConsultingIncome: 0,
+      annualRentalIncome: 0,
+      annualSocialSecurityBenefit: 72_000,
+      socialSecurityClaimAge: 70,
+      annualPensionOrAnnuityIncome: 0,
+      brokerageAndCashBalance: 1_800_000,
+      taxableBrokerageBasis: 1_200_000,
+      hsaBalance: 100_000,
+      traditionalBalance: 1_600_000,
+      rothBalance: 850_000,
+      autoDepleteBrokerageEnabled: true,
+      autoDepleteBrokerageYears: 8,
+      autoDepleteBrokerageAnnualScaleUpFactor: 0.025,
+      expectedReturnTraditional: 0.05,
+      expectedReturnRoth: 0.05,
+      expectedReturnBrokerage: 0.045,
+      expectedReturnHsa: 0.05,
+      brokerageDividendYield: 0.012,
       brokerageQdiPercentage: 0.95,
       healthcarePhase: 'aca',
     },

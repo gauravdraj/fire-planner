@@ -52,6 +52,7 @@ type CellModel = Readonly<{
   pulseValue: string | number;
   className?: string;
   metricBandType?: MetricCellBandType;
+  metricBand?: FplBand | WithdrawalRateBand;
   rawNumeric?: number | null;
   marker?: string;
   srText?: string;
@@ -159,8 +160,8 @@ export function YearByYearTable({ now = new Date() }: YearByYearTableProps) {
   const displayUnit = useUiStore((state) => state.displayUnit);
   const isStale = getStalenessLevel(CONSTANTS_2026.retrievedAt, now) !== 'fresh';
   const rows = useMemo(
-    () => buildDisplayRows({ formValues, projectionResults, scenario }),
-    [formValues, projectionResults, scenario],
+    () => buildDisplayRows({ formValues, planEndYear: plan.endYear, projectionResults, scenario }),
+    [formValues, plan.endYear, projectionResults, scenario],
   );
   const balanceHintTargets = useMemo(
     () => buildBalanceHintTargets(rows, formValues.retirementYear),
@@ -287,10 +288,12 @@ export function YearByYearTable({ now = new Date() }: YearByYearTableProps) {
 
 function buildDisplayRows({
   formValues,
+  planEndYear,
   projectionResults,
   scenario,
 }: {
   formValues: Parameters<typeof computeYearDisplayMetrics>[1]['formValues'];
+  planEndYear: number;
   projectionResults: readonly YearBreakdown[];
   scenario: Scenario;
 }): readonly DisplayRow[] {
@@ -299,6 +302,7 @@ function buildDisplayRows({
     isRetirementYear: breakdown.year === formValues.retirementYear,
     metrics: computeYearDisplayMetrics(breakdown, {
       formValues,
+      planEndYear,
       priorYear: projectionResults[index - 1] ?? null,
       scenario,
     }),
@@ -400,6 +404,7 @@ function TableCell({
           bandType={cell.metricBandType}
           className="inline-block rounded px-1"
           displayText={cell.value}
+          {...(cell.metricBand === undefined ? {} : { metricBand: cell.metricBand })}
           pulseKey={cell.pulseValue}
           rawNumeric={cell.rawNumeric ?? null}
         />
@@ -521,6 +526,7 @@ function fplCell(fplPercentage: number | null, fplBand: FplBand | null): CellMod
     value: PERCENT_FORMATTER.format(fplPercentage),
     pulseValue: fplPercentage,
     metricBandType: 'fpl',
+    metricBand: fplBand,
     rawNumeric: fplPercentage,
     srText: fplBandDescription(fplBand),
   };
@@ -538,6 +544,7 @@ function withdrawalRateCell(withdrawalRate: number | null, withdrawalRateBand: W
     value: PERCENT_FORMATTER.format(withdrawalRate),
     pulseValue: withdrawalRate,
     metricBandType: 'wdRate',
+    metricBand: withdrawalRateBand,
     rawNumeric: withdrawalRate,
     srText: withdrawalRateBandDescription(withdrawalRateBand),
   };
@@ -622,6 +629,8 @@ function withdrawalRateBandDescription(band: WithdrawalRateBand): string {
       return 'Withdrawal-rate band: between the 5% danger threshold and 10% catastrophic threshold.';
     case 'catastrophic':
       return 'Withdrawal-rate band: above the 10% catastrophic threshold.';
+    case 'plan-end':
+      return 'Withdrawal-rate band: plan-end depletion.';
   }
 }
 

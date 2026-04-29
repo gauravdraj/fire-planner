@@ -6,7 +6,7 @@ export function Footer() {
 
   return (
     <footer className="border-t border-slate-200/80 bg-slate-100 px-4 py-5 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-400">
-      <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-4 gap-y-2 lg:max-w-6xl xl:max-w-7xl">
+      <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-4 gap-y-2 lg:max-w-6xl xl:max-w-7xl 2xl:max-w-screen-2xl">
         <p>All inputs stay on your device.</p>
         {layout === 'verdict' ? (
           <a

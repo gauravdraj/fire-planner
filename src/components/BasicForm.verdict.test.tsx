@@ -2,6 +2,7 @@ import { act, cleanup, fireEvent, render, screen, within } from '@testing-librar
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { BasicForm } from '@/components/BasicForm';
+import { basicControlHelp } from '@/lib/basicControlHelp';
 import { useScenarioStore } from '@/store/scenarioStore';
 
 import { installMemoryLocalStorage } from '../../tests/store/memoryStorage';
@@ -14,6 +15,18 @@ function advanceLiveDebounce() {
   act(() => {
     vi.advanceTimersByTime(151);
   });
+}
+
+function expectTooltip(trigger: HTMLElement, text: string) {
+  const tooltipId = trigger.getAttribute('aria-describedby');
+  const tooltip = tooltipId === null ? null : document.getElementById(tooltipId);
+
+  if (tooltip === null) {
+    throw new Error(`Expected ${trigger.getAttribute('aria-label') ?? 'tooltip trigger'} to describe a tooltip.`);
+  }
+
+  expect(tooltip).toHaveAttribute('role', 'tooltip');
+  expect(tooltip).toHaveTextContent(text);
 }
 
 describe('BasicForm verdict layout', () => {
@@ -53,6 +66,7 @@ describe('BasicForm verdict layout', () => {
     expect(screen.queryByLabelText('Net consulting income')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Plan-end age')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Current year')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Inflation rate')).not.toBeInTheDocument();
 
     for (const name of ['Portfolio mix', 'Other income', 'Withdrawal settings']) {
       const button = screen.getByRole('button', { name });
@@ -103,9 +117,38 @@ describe('BasicForm verdict layout', () => {
     expect(withdrawalButton).toHaveAttribute('aria-expanded', 'true');
     expect(within(withdrawalRegion).getByLabelText('Current year')).toBeInTheDocument();
     expect(within(withdrawalRegion).getByLabelText('Plan-end age')).toBeInTheDocument();
+    expect(within(withdrawalRegion).getByLabelText('Inflation rate')).toHaveValue('0.025');
+    expectTooltip(
+      within(withdrawalRegion).getByRole('button', { name: 'About Inflation rate' }),
+      basicControlHelp.inflationRate.description,
+    );
     expect(within(withdrawalRegion).getByLabelText('Auto-deplete brokerage')).toBeInTheDocument();
     expect(within(withdrawalRegion).getByLabelText('Brokerage depletion years')).toBeInTheDocument();
     expect(within(withdrawalRegion).getByLabelText('Brokerage annual scale-up factor')).toBeInTheDocument();
+  });
+
+  it('keeps invalid withdrawal inflation edits local until a valid debounced value is entered', () => {
+    renderVerdictForm();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Withdrawal settings' }));
+    const withdrawalRegion = screen.getByRole('region', { name: 'Withdrawal settings' });
+    const inflationInput = within(withdrawalRegion).getByLabelText('Inflation rate');
+    const initialInflationRate = useScenarioStore.getState().formValues.inflationRate;
+
+    fireEvent.change(inflationInput, { target: { value: '1.5' } });
+    advanceLiveDebounce();
+
+    expect(inflationInput).toHaveAttribute('aria-invalid', 'true');
+    expect(within(withdrawalRegion).getByText('Inflation rate must be between 0 and 1.')).toBeInTheDocument();
+    expect(useScenarioStore.getState().formValues.inflationRate).toBe(initialInflationRate);
+
+    fireEvent.change(inflationInput, { target: { value: '0.03' } });
+    advanceLiveDebounce();
+
+    expect(inflationInput).not.toHaveAttribute('aria-invalid');
+    expect(within(withdrawalRegion).queryByText('Inflation rate must be between 0 and 1.')).not.toBeInTheDocument();
+    expect(useScenarioStore.getState().formValues.inflationRate).toBe(0.03);
+    expect(useScenarioStore.getState().scenario.inflationRate).toBe(0.03);
   });
 
   it('updates the read-only total portfolio from existing bucket balances without changing debounce behavior', () => {

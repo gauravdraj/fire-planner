@@ -471,6 +471,38 @@ describe('YearByYearTable', () => {
     );
   });
 
+  it('labels plan-end withdrawal-rate depletion without catastrophic styling', () => {
+    const current = useScenarioStore.getState();
+    useUiStore.getState().setDisplayUnit('nominal');
+    useScenarioStore.setState({
+      plan: {
+        ...current.plan,
+        endYear: 2028,
+      },
+      projectionResults: TABLE_FIXTURE.map((breakdown) =>
+        breakdown.year === 2028
+          ? {
+              ...breakdown,
+              withdrawals: {
+                ...ZERO_BALANCES,
+                taxableBrokerage: 25_000,
+                traditional: 25_000,
+              },
+            }
+          : breakdown,
+      ),
+    });
+
+    render(<YearByYearTable now={dateAtTaxDataAge(0)} />);
+
+    expect(within(cellFor(2027, 'withdrawalRate')).getByText('5%')).toHaveClass('bg-rose-100', 'text-rose-800');
+
+    const planEndRate = within(cellFor(2028, 'withdrawalRate')).getByText('24.4%');
+    expect(planEndRate).toHaveClass('bg-slate-100', 'text-slate-700');
+    expect(planEndRate).not.toHaveClass('bg-rose-200', 'text-rose-950', 'font-bold');
+    expect(cellFor(2028, 'withdrawalRate')).toHaveTextContent('Withdrawal-rate band: plan-end depletion.');
+  });
+
   it('renders passive balance hints after the debounce delay', () => {
     vi.useFakeTimers();
     useUiStore.getState().setDisplayUnit('nominal');
