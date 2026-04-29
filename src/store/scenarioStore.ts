@@ -52,6 +52,7 @@ export const DEFAULT_BASIC_FORM_VALUES = Object.freeze({
   hsaBalance: 100_000,
   traditionalBalance: 2_000_000,
   rothBalance: 1_000_000,
+  startingRothContributionBasis: 1_000_000,
   autoDepleteBrokerageEnabled: false,
   autoDepleteBrokerageYears: 10,
   autoDepleteBrokerageAnnualScaleUpFactor: 0.02,
@@ -292,6 +293,10 @@ function inferBasicFormValuesFromHashPayload(payload: ScenarioHashPayload): Basi
       DEFAULT_BASIC_FORM_VALUES.traditionalBalance,
     ),
     rothBalance: nonnegativeNumber(payload.scenario.balances?.roth, DEFAULT_BASIC_FORM_VALUES.rothBalance),
+    startingRothContributionBasis: nonnegativeNumber(
+      payload.scenario.rothBasis?.regularContributionBasis,
+      nonnegativeNumber(payload.scenario.balances?.roth, DEFAULT_BASIC_FORM_VALUES.startingRothContributionBasis),
+    ),
     autoDepleteBrokerageEnabled: payload.scenario.autoDepleteBrokerage?.enabled === true,
     autoDepleteBrokerageYears: boundedInteger(
       payload.scenario.autoDepleteBrokerage?.yearsToDeplete,
@@ -496,10 +501,12 @@ function normalizeScenario(scenario: Scenario, inflationRate: number): Scenario 
   const mortgage = normalizedMortgage(scenario);
   const brokerageDividends = normalizedBrokerageDividends(scenario);
   const autoDepleteBrokerage = normalizedAutoDepleteBrokerage(scenario);
+  const rothBasis = normalizedRothBasis(scenario);
   const {
     autoDepleteBrokerage: _ignoredAutoDepleteBrokerage,
     brokerageDividends: _ignoredBrokerageDividends,
     mortgage: _ignoredMortgage,
+    rothBasis: _ignoredRothBasis,
     ...scenarioWithoutMortgage
   } = scenario;
 
@@ -518,8 +525,34 @@ function normalizeScenario(scenario: Scenario, inflationRate: number): Scenario 
       roth: nonnegativeNumber(scenario.balances?.roth, 0),
     },
     ...(mortgage === undefined ? {} : { mortgage }),
+    rothBasis,
     ...(brokerageDividends === undefined ? {} : { brokerageDividends }),
     ...(autoDepleteBrokerage === undefined ? {} : { autoDepleteBrokerage }),
+  };
+}
+
+function normalizedRothBasis(scenario: Scenario): NonNullable<Scenario['rothBasis']> {
+  if (scenario.rothBasis !== undefined) {
+    return {
+      regularContributionBasis: nonnegativeNumber(
+        scenario.rothBasis.regularContributionBasis,
+        nonnegativeNumber(scenario.balances?.roth, 0),
+      ),
+      conversionLayers: (scenario.rothBasis.conversionLayers ?? []).map((layer) => ({
+        yearConverted: boundedInteger(layer.yearConverted, scenario.startYear, 1900, 2300),
+        taxableAmount: nonnegativeNumber(layer.taxableAmount, 0),
+        ...(layer.nontaxableAmount === undefined
+          ? {}
+          : { nontaxableAmount: nonnegativeNumber(layer.nontaxableAmount, 0) }),
+      })),
+      ...(scenario.rothBasis.legacyBasisAssumption === true ? { legacyBasisAssumption: true } : {}),
+    };
+  }
+
+  return {
+    regularContributionBasis: nonnegativeNumber(scenario.balances?.roth, 0),
+    conversionLayers: [],
+    legacyBasisAssumption: true,
   };
 }
 
@@ -634,6 +667,10 @@ function sanitizeBasicFormValues(value: unknown): BasicFormValues {
     hsaBalance: nonnegativeNumber(candidate.hsaBalance, DEFAULT_BASIC_FORM_VALUES.hsaBalance),
     traditionalBalance: nonnegativeNumber(candidate.traditionalBalance, DEFAULT_BASIC_FORM_VALUES.traditionalBalance),
     rothBalance: nonnegativeNumber(candidate.rothBalance, DEFAULT_BASIC_FORM_VALUES.rothBalance),
+    startingRothContributionBasis: nonnegativeNumber(
+      candidate.startingRothContributionBasis,
+      nonnegativeNumber(candidate.rothBalance, DEFAULT_BASIC_FORM_VALUES.startingRothContributionBasis),
+    ),
     autoDepleteBrokerageEnabled:
       typeof candidate.autoDepleteBrokerageEnabled === 'boolean'
         ? candidate.autoDepleteBrokerageEnabled

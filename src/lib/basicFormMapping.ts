@@ -45,6 +45,7 @@ export type BasicFormValues = Readonly<{
   hsaBalance: number;
   traditionalBalance: number;
   rothBalance: number;
+  startingRothContributionBasis?: number;
   autoDepleteBrokerageEnabled: boolean;
   autoDepleteBrokerageYears: number;
   autoDepleteBrokerageAnnualScaleUpFactor: number;
@@ -147,6 +148,10 @@ export function mapBasicFormToProjectionInputs(values: BasicFormValues): Project
       traditional: values.traditionalBalance,
       roth: values.rothBalance,
     },
+    rothBasis: {
+      regularContributionBasis: values.startingRothContributionBasis ?? values.rothBalance,
+      conversionLayers: [],
+    },
     basis: {
       taxableBrokerage: values.taxableBrokerageBasis,
     },
@@ -186,6 +191,7 @@ export function mapBasicFormToProjectionInputs(values: BasicFormValues): Project
         }
       : {}),
     magiHistory: BASIC_FORM_MAPPING_DEFAULTS.magiHistory,
+    ownerAgeAtStart: values.primaryAge,
     age65Plus: values.primaryAge >= 65,
     ...(values.filingStatus === 'mfj' ? { partnerAge65Plus: values.partnerAge >= 65 } : {}),
     ...(values.annualSocialSecurityBenefit > 0

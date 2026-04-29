@@ -53,6 +53,17 @@ const BASIC_FORM_VALUES: BasicFormValues = {
   healthcarePhase: 'aca',
 };
 
+function withCompactShareDefaults(scenario: ReturnType<typeof mapBasicFormToProjectionInputs>['scenario']) {
+  return {
+    ...scenario,
+    rothBasis: {
+      regularContributionBasis: scenario.balances.roth,
+      conversionLayers: [],
+      legacyBasisAssumption: true,
+    },
+  };
+}
+
 describe('Phase 2 export contracts', () => {
   it('uses concrete metadata sources without adding runtime dependencies', () => {
     expect(APP_VERSION).toBe(packageJson.version);
@@ -79,7 +90,7 @@ describe('Phase 2 export contracts', () => {
     expect(envelope.metadata.canonicalScenarioFormat).toBe('urlHash:v1');
     expect(envelope.canonicalScenarioHash).toMatch(/^v1:/);
     expect(envelope.payload).toEqual(decodeScenario(envelope.canonicalScenarioHash));
-    expect(envelope.payload).toEqual({ scenario, plan, customLawActive: false });
+    expect(envelope.payload).toEqual({ scenario: withCompactShareDefaults(scenario), plan, customLawActive: false });
   });
 
   it('defers balance sweep because current WithdrawalPlan fields cannot store manual brokerage withdrawals', () => {

@@ -198,6 +198,12 @@ export const modeledItems = [
       'Uses the existing projection withdrawal order and supports current plan fields for annual spending overrides, Roth conversions, brokerage LTCG harvests, and auto-deplete brokerage schedules.',
   },
   {
+    id: 'roth-ordering',
+    label: 'Roth basis and conversion ordering',
+    description:
+      'Uses a bounded IRS Pub. 590-B / Form 5329 model: regular Roth contribution basis is drawn first, planned conversions create taxable conversion layers, and taxable conversion dollars withdrawn within years 0-4 of their conversion year can trigger a 10% additional tax.',
+  },
+  {
     id: 'federal-tax',
     label: 'Federal tax stack',
     description:
@@ -240,7 +246,7 @@ export const notModeledItems = [
     id: 'backdoor-mega-backdoor-roth',
     label: 'Backdoor and mega-backdoor Roth flows',
     designText: 'Backdoor / mega-backdoor Roth flows',
-    note: 'The app can model explicit Roth conversions, but it does not model contribution mechanics or mega-backdoor plan rules.',
+    note: 'The app can model explicit Roth conversions and bounded conversion-layer recapture rules, but it does not model contribution-limit mechanics, after-tax traditional IRA basis, or mega-backdoor plan rules.',
   },
   {
     id: 'inheritance-gifting-step-up',

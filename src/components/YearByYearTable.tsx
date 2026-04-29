@@ -134,6 +134,8 @@ const TABLE_CELL_RENDERERS = {
   ltcgTax: (row, context) => moneyCell(row.breakdown.ltcgTax, row.breakdown.year, context),
   niit: (row, context) => moneyCell(row.breakdown.niit, row.breakdown.year, context),
   seTax: (row, context) => moneyCell(row.breakdown.seTax, row.breakdown.year, context),
+  rothConversionRecaptureTax: (row, context) =>
+    optionalMoneyCell(row.breakdown.rothConversionRecaptureTax ?? 0, row.breakdown.year, context),
   totalTax: (row, context) => moneyCell(row.breakdown.totalTax, row.breakdown.year, context),
   acaMagi: (row, context) => moneyCell(row.breakdown.acaMagi, row.breakdown.year, context),
   fplPercentage: (row) => fplCell(row.metrics.fplPercentage, row.metrics.fplBand),

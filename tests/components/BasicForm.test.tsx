@@ -236,11 +236,11 @@ describe('BasicForm', () => {
 
     expectTooltip(
       screen.getByRole('button', { name: 'About Accounts' }),
-      'Starting supported account balances, including HSA, and taxable basis used by the withdrawal display layer.',
+      'Starting supported account balances, HSA, taxable basis, and Roth basis assumptions used by the withdrawal display layer.',
     );
     expect(
       screen.getAllByText(
-        'Starting supported account balances, including HSA, and taxable basis used by the withdrawal display layer.',
+        'Starting supported account balances, HSA, taxable basis, and Roth basis assumptions used by the withdrawal display layer.',
       ),
     ).toHaveLength(2);
   });

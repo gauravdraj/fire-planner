@@ -62,6 +62,8 @@ const CSV_CELL_GETTERS = {
   ltcgTax: (row, context) => formatMoney(row.breakdown.ltcgTax, row.breakdown.year, context),
   niit: (row, context) => formatMoney(row.breakdown.niit, row.breakdown.year, context),
   seTax: (row, context) => formatMoney(row.breakdown.seTax, row.breakdown.year, context),
+  rothConversionRecaptureTax: (row, context) =>
+    formatOptionalMoney(row.breakdown.rothConversionRecaptureTax ?? 0, row.breakdown.year, context),
   totalTax: (row, context) => formatMoney(row.breakdown.totalTax, row.breakdown.year, context),
   acaMagi: (row, context) => formatMoney(row.breakdown.acaMagi, row.breakdown.year, context),
   fplPercentage: (row) => formatPercentage(row.metrics.fplPercentage),

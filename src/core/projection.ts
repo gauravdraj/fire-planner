@@ -36,6 +36,12 @@ import {
   type PremiumTaxCreditResult,
 } from './tax/aca';
 import { computeIrmaa, type IrmaaResult } from './tax/irmaa';
+import {
+  addRegularRothBasis,
+  addRothConversionLayer,
+  allocateRothDistribution,
+  type RothBasisState,
+} from './rothOrdering';
 import type { BracketTable, FilingStatus, LtcgBracketTable, MagiYear } from './types';
 
 const BASE_INDEX_YEAR = 2026;
@@ -148,6 +154,7 @@ export type Scenario = Readonly<{
     taxableIncomeSource?: 'federalTaxableIncome' | 'agi';
   }>;
   balances: AccountBalances;
+  rothBasis?: RothBasisState;
   basis: Readonly<{
     taxableBrokerage: number;
   }>;
@@ -162,6 +169,7 @@ export type Scenario = Readonly<{
   taxExemptInterest?: readonly AnnualAmount[];
   foreignEarnedIncomeExclusion?: readonly AnnualAmount[];
   otherIncome?: readonly AnnualAmount[];
+  ownerAgeAtStart?: number;
   age65Plus?: boolean;
   partnerAge65Plus?: boolean;
   customLaw?: CustomLaw;
@@ -221,6 +229,7 @@ export type YearBreakdown = Readonly<{
   acaPremiumCredit: PremiumTaxCreditResult | null;
   aptcReconciliation: AptcReconciliationResult | null;
   irmaaPremium: IrmaaResult | null;
+  rothConversionRecaptureTax?: number;
   totalTax: number;
   afterTaxCashFlow: number;
   warnings: readonly string[];
@@ -258,6 +267,7 @@ type YearComputation = Readonly<{
   cashIncomeBeforeWithdrawals: number;
   healthcarePremiumOutflow: number;
   spendableCashTax: number;
+  nextRothBasisState: RothBasisState;
 }>;
 
 type YearTaxComputation = Readonly<{
@@ -274,6 +284,7 @@ type YearTaxComputation = Readonly<{
   acaPremiumCredit: PremiumTaxCreditResult | null;
   aptcReconciliation: AptcReconciliationResult | null;
   irmaaPremium: IrmaaResult | null;
+  rothConversionRecaptureTax: number;
   healthcarePremiumOutflow: number;
   totalTax: number;
 }>;
@@ -401,6 +412,7 @@ export function runProjection(scenario: Scenario, plan: WithdrawalPlan): YearBre
   const results: YearBreakdown[] = [];
   let balances = copyBalances(scenario.balances);
   let taxableBrokerageBasis = roundToCents(Math.max(0, scenario.basis.taxableBrokerage));
+  let rothBasisState = initialRothBasisState(scenario);
   const magiHistory: MagiYear[] = [...(scenario.magiHistory ?? [])];
   const contributionRetirementYear = inferContributionRetirementYear(scenario, plan);
 
@@ -413,6 +425,7 @@ export function runProjection(scenario: Scenario, plan: WithdrawalPlan): YearBre
       year,
       balances,
       taxableBrokerageBasis,
+      rothBasisState,
       magiHistory,
       withdrawalTarget,
       contributionRetirementYear,
@@ -439,6 +452,7 @@ export function runProjection(scenario: Scenario, plan: WithdrawalPlan): YearBre
         year,
         balances,
         taxableBrokerageBasis,
+        rothBasisState,
         magiHistory,
         withdrawalTarget,
         contributionRetirementYear,
@@ -448,6 +462,7 @@ export function runProjection(scenario: Scenario, plan: WithdrawalPlan): YearBre
     results.push(computation.breakdown);
     balances = computation.breakdown.closingBalances;
     taxableBrokerageBasis = computation.closingBrokerageBasis;
+    rothBasisState = computation.nextRothBasisState;
     magiHistory.push({ year, magi: computation.breakdown.irmaaMagi });
   }
 
@@ -461,6 +476,7 @@ function computeProjectionYear(
   year: number,
   openingBalances: AccountBalances,
   openingBrokerageBasis: number,
+  rothBasisState: RothBasisState,
   magiHistory: readonly MagiYear[],
   withdrawalTarget: number,
   contributionRetirementYear: number,
@@ -470,6 +486,12 @@ function computeProjectionYear(
   const contributions = contributionsForYear(scenario, year, contributionRetirementYear);
   const autoDepleteWithdrawal = autoDepleteBrokerageWithdrawal(scenario, year);
   const allocation = allocateWithdrawals(openingBalances, openingBrokerageBasis, withdrawalTarget, autoDepleteWithdrawal);
+  const rothDistribution = allocateRothDistribution({
+    amount: allocation.withdrawals.roth,
+    ownerAge: ownerAgeForYear(scenario, year),
+    state: rothBasisState,
+    taxYear: year,
+  });
   const plannedBrokerageHarvest = nonnegative(sumAnnualAmounts(plan.brokerageHarvests ?? [], year));
   const brokerageHarvest = allocateBrokerageHarvest(
     allocation.balancesAfterWithdrawals.taxableBrokerage,
@@ -481,6 +503,10 @@ function computeProjectionYear(
   );
   const plannedConversion = nonnegative(sumAnnualAmounts(plan.rothConversions ?? [], year));
   const conversion = Math.min(plannedConversion, allocation.balancesAfterWithdrawals.traditional);
+  const rothBasisAfterConversion = addRothConversionLayer(rothDistribution.remainingState, {
+    yearConverted: year,
+    taxableAmount: conversion,
+  });
   const balancesAfterConversion: AccountBalances = {
     cash: allocation.balancesAfterWithdrawals.cash,
     hsa: allocation.balancesAfterWithdrawals.hsa,
@@ -495,9 +521,17 @@ function computeProjectionYear(
     traditional: roundToCents(balancesAfterConversion.traditional + contributions.traditional),
     roth: roundToCents(balancesAfterConversion.roth + contributions.roth),
   };
+  const nextRothBasisState = addRegularRothBasis(rothBasisAfterConversion, contributions.roth);
 
   if (allocation.remainingNeed > 0) {
     warnings.push(`Withdrawal need exceeded available account balances by ${formatDollars(allocation.remainingNeed)}.`);
+  }
+  if (rothDistribution.earningsTapped) {
+    warnings.push(
+      rothBasisState.legacyBasisAssumption === true
+        ? 'Roth withdrawal exceeded legacy-defaulted Roth basis; verify Roth basis records/Form 8606 because Roth earnings taxation is not modeled.'
+        : 'Roth withdrawal exceeded tracked contribution and conversion basis; Roth earnings taxation is not modeled.',
+    );
   }
   if (plannedConversion > conversion) {
     warnings.push(`Planned Roth conversion exceeded remaining traditional balance by ${formatDollars(plannedConversion - conversion)}.`);
@@ -699,7 +733,8 @@ function computeProjectionYear(
         niit +
         stateTax -
         (aptcReconciliation?.netPremiumTaxCredit ?? 0) +
-        (aptcReconciliation?.repaymentAmount ?? 0),
+        (aptcReconciliation?.repaymentAmount ?? 0) +
+        rothDistribution.recaptureAdditionalTax,
     );
 
     return {
@@ -716,6 +751,7 @@ function computeProjectionYear(
       acaPremiumCredit,
       aptcReconciliation,
       irmaaPremium,
+      rothConversionRecaptureTax: rothDistribution.recaptureAdditionalTax,
       healthcarePremiumOutflow,
       totalTax,
     };
@@ -821,6 +857,7 @@ function computeProjectionYear(
       acaPremiumCredit: taxComputation.acaPremiumCredit,
       aptcReconciliation: taxComputation.aptcReconciliation,
       irmaaPremium: taxComputation.irmaaPremium,
+      rothConversionRecaptureTax: taxComputation.rothConversionRecaptureTax,
       totalTax: taxComputation.totalTax,
       afterTaxCashFlow,
       warnings,
@@ -830,6 +867,7 @@ function computeProjectionYear(
     cashIncomeBeforeWithdrawals: roundToCents(cashIncomeBeforeWithdrawals),
     healthcarePremiumOutflow: taxComputation.healthcarePremiumOutflow,
     spendableCashTax,
+    nextRothBasisState,
   };
 }
 
@@ -851,6 +889,34 @@ function computeCashNeedBeforeTax(scenario: Scenario, plan: WithdrawalPlan, year
     sumAnnualAmounts(scenario.otherIncome ?? [], year);
 
   return nonnegative(sumAnnualAmounts(plan.annualSpending, year)) + mortgagePAndIBeforePayoff(scenario, year) - cashIncome;
+}
+
+function initialRothBasisState(scenario: Scenario): RothBasisState {
+  if (scenario.rothBasis !== undefined) {
+    return {
+      regularContributionBasis: nonnegative(scenario.rothBasis.regularContributionBasis),
+      conversionLayers: scenario.rothBasis.conversionLayers.map((layer) => ({
+        yearConverted: Math.trunc(layer.yearConverted),
+        taxableAmount: nonnegative(layer.taxableAmount),
+        ...(layer.nontaxableAmount === undefined ? {} : { nontaxableAmount: nonnegative(layer.nontaxableAmount) }),
+      })),
+      ...(scenario.rothBasis.legacyBasisAssumption === true ? { legacyBasisAssumption: true } : {}),
+    };
+  }
+
+  return {
+    regularContributionBasis: nonnegative(scenario.balances.roth),
+    conversionLayers: [],
+    legacyBasisAssumption: true,
+  };
+}
+
+function ownerAgeForYear(scenario: Scenario, year: number): number | null {
+  if (scenario.ownerAgeAtStart === undefined || !Number.isFinite(scenario.ownerAgeAtStart)) {
+    return null;
+  }
+
+  return Math.trunc(scenario.ownerAgeAtStart + (year - scenario.startYear));
 }
 
 function inferContributionRetirementYear(scenario: Scenario, plan: WithdrawalPlan): number {

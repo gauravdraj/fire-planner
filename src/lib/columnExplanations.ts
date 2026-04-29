@@ -32,6 +32,7 @@ export const tableColumnIds = [
   'ltcgTax',
   'niit',
   'seTax',
+  'rothConversionRecaptureTax',
   'acaPremiumCredit',
   'irmaaPremium',
   'totalTax',
@@ -181,6 +182,11 @@ export const columnExplanations = {
     label: 'SE tax',
     description: 'Self-employment tax estimated from net consulting income.',
   },
+  rothConversionRecaptureTax: {
+    label: 'Roth 5-year tax',
+    description:
+      '10% additional tax on Roth conversion dollars withdrawn inside their separate five-year recapture period.',
+  },
   acaPremiumCredit: {
     label: 'ACA PTC',
     description: 'ACA premium tax credit for marketplace coverage, shown as a tax offset when eligible.',
@@ -258,7 +264,7 @@ export const basicFormSectionExplanations = {
   },
   balances: {
     label: 'Accounts',
-    description: 'Starting supported account balances, including HSA, and taxable basis used by the withdrawal display layer.',
+    description: 'Starting supported account balances, HSA, taxable basis, and Roth basis assumptions used by the withdrawal display layer.',
   },
   growthDividends: {
     label: 'Growth & dividends',

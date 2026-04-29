@@ -12,7 +12,7 @@ import { InfoTooltip } from './InfoTooltip';
 import { checkboxControlClassName, classNames, formControlClassName } from './ui/controlStyles';
 
 type BasicFormDraft = {
-  [Field in keyof BasicFormValues]: string;
+  [Field in keyof Required<BasicFormValues>]: string;
 };
 
 type BasicFormErrors = Partial<Record<keyof BasicFormDraft, string>>;
@@ -52,6 +52,7 @@ const MONEY_FIELDS = [
   'annualMortgagePAndI',
   'traditionalBalance',
   'rothBalance',
+  'startingRothContributionBasis',
   'brokerageAndCashBalance',
   'taxableBrokerageBasis',
   'hsaBalance',
@@ -200,6 +201,7 @@ export function BasicForm({ layout = 'classic' }: { layout?: BasicFormLayout } =
         <SectionFieldset sectionId="balances">
           {renderNumberField('traditionalBalance', draft, errors, handleInputChange)}
           {renderNumberField('rothBalance', draft, errors, handleInputChange)}
+          {renderNumberField('startingRothContributionBasis', draft, errors, handleInputChange)}
           {renderNumberField(
             'brokerageAndCashBalance',
             draft,
@@ -321,6 +323,7 @@ export function BasicForm({ layout = 'classic' }: { layout?: BasicFormLayout } =
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {renderNumberField('traditionalBalance', draft, errors, handleInputChange)}
             {renderNumberField('rothBalance', draft, errors, handleInputChange)}
+            {renderNumberField('startingRothContributionBasis', draft, errors, handleInputChange)}
             {renderNumberField(
               'brokerageAndCashBalance',
               draft,
@@ -568,6 +571,7 @@ export function validateBasicFormDraft(draft: BasicFormDraft): ValidationResult 
       hsaBalance: moneyValues.hsaBalance ?? 0,
       traditionalBalance: moneyValues.traditionalBalance ?? 0,
       rothBalance: moneyValues.rothBalance ?? 0,
+      startingRothContributionBasis: moneyValues.startingRothContributionBasis ?? 0,
       autoDepleteBrokerageEnabled: autoDepleteBrokerageEnabled ?? false,
       autoDepleteBrokerageYears: autoDepleteBrokerageYears ?? 0,
       autoDepleteBrokerageAnnualScaleUpFactor: percentValues.autoDepleteBrokerageAnnualScaleUpFactor ?? 0,
@@ -819,6 +823,7 @@ function createValidPatch(
     case 'annualMortgagePAndI':
     case 'traditionalBalance':
     case 'rothBalance':
+    case 'startingRothContributionBasis':
     case 'brokerageAndCashBalance':
     case 'taxableBrokerageBasis':
     case 'hsaBalance':
@@ -1086,6 +1091,8 @@ function moneyFieldLabel(field: (typeof MONEY_FIELDS)[number]): string {
       return 'Traditional balance';
     case 'rothBalance':
       return 'Roth balance';
+    case 'startingRothContributionBasis':
+      return 'Starting Roth contribution basis';
     case 'brokerageAndCashBalance':
       return 'Brokerage plus cash balance';
     case 'taxableBrokerageBasis':
@@ -1162,6 +1169,7 @@ function createDraft(values: BasicFormValues): BasicFormDraft {
     hsaBalance: String(values.hsaBalance),
     traditionalBalance: String(values.traditionalBalance),
     rothBalance: String(values.rothBalance),
+    startingRothContributionBasis: String(values.startingRothContributionBasis),
     autoDepleteBrokerageEnabled: String(values.autoDepleteBrokerageEnabled),
     autoDepleteBrokerageYears: String(values.autoDepleteBrokerageYears),
     autoDepleteBrokerageAnnualScaleUpFactor: String(values.autoDepleteBrokerageAnnualScaleUpFactor),

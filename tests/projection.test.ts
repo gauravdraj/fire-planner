@@ -369,6 +369,89 @@ describe('Gate 2 multi-year projection engine', () => {
     expect(year?.warnings.join(' ')).toContain('After-tax cash flow is short');
   });
 
+  it('draws Roth contribution basis before recent conversion layers without recapture tax', () => {
+    const [year] = runProjection(
+      makeScenario({
+        ownerAgeAtStart: 45,
+        balances: { cash: 0, hsa: 0, taxableBrokerage: 0, traditional: 0, roth: 20_000 },
+        rothBasis: {
+          regularContributionBasis: 8_000,
+          conversionLayers: [{ yearConverted: 2026, taxableAmount: 12_000 }],
+        },
+      }),
+      makePlan({ annualSpending: [{ year: 2026, amount: 5_000 }] }),
+    );
+
+    expect(year?.withdrawals.roth).toBe(5_000);
+    expect(year?.rothConversionRecaptureTax).toBe(0);
+    expect(year?.totalTax).toBe(0);
+  });
+
+  it('adds Roth conversion recapture tax for recent taxable conversion withdrawals under age 59.5', () => {
+    const [year] = runProjection(
+      makeScenario({
+        startYear: 2028,
+        ownerAgeAtStart: 45,
+        balances: { cash: 0, hsa: 0, taxableBrokerage: 0, traditional: 0, roth: 20_000 },
+        rothBasis: {
+          regularContributionBasis: 0,
+          conversionLayers: [{ yearConverted: 2026, taxableAmount: 20_000 }],
+        },
+      }),
+      makePlan({ endYear: 2028, annualSpending: [{ year: 2028, amount: 5_000 }] }),
+    );
+
+    expect(year?.withdrawals.roth).toBeGreaterThan(5_000);
+    expect(year?.rothConversionRecaptureTax).toBeGreaterThan(500);
+    expect(year?.totalTax).toBe(year?.rothConversionRecaptureTax);
+  });
+
+  it('does not add Roth recapture tax after the conversion five-year period or at age 60', () => {
+    const [agedLayer] = runProjection(
+      makeScenario({
+        startYear: 2031,
+        ownerAgeAtStart: 45,
+        balances: { cash: 0, hsa: 0, taxableBrokerage: 0, traditional: 0, roth: 20_000 },
+        rothBasis: {
+          regularContributionBasis: 0,
+          conversionLayers: [{ yearConverted: 2026, taxableAmount: 20_000 }],
+        },
+      }),
+      makePlan({ endYear: 2031, annualSpending: [{ year: 2031, amount: 5_000 }] }),
+    );
+    const [olderOwner] = runProjection(
+      makeScenario({
+        startYear: 2028,
+        ownerAgeAtStart: 60,
+        balances: { cash: 0, hsa: 0, taxableBrokerage: 0, traditional: 0, roth: 20_000 },
+        rothBasis: {
+          regularContributionBasis: 0,
+          conversionLayers: [{ yearConverted: 2026, taxableAmount: 20_000 }],
+        },
+      }),
+      makePlan({ endYear: 2028, annualSpending: [{ year: 2028, amount: 5_000 }] }),
+    );
+
+    expect(agedLayer?.rothConversionRecaptureTax).toBe(0);
+    expect(olderOwner?.rothConversionRecaptureTax).toBe(0);
+  });
+
+  it('warns when Roth withdrawals exceed tracked basis and conversion layers', () => {
+    const [year] = runProjection(
+      makeScenario({
+        ownerAgeAtStart: 45,
+        balances: { cash: 0, hsa: 0, taxableBrokerage: 0, traditional: 0, roth: 20_000 },
+        rothBasis: {
+          regularContributionBasis: 1_000,
+          conversionLayers: [],
+        },
+      }),
+      makePlan({ annualSpending: [{ year: 2026, amount: 5_000 }] }),
+    );
+
+    expect(year?.warnings.join(' ')).toContain('Roth withdrawal exceeded tracked contribution and conversion basis');
+  });
+
   it('adds mortgage P&I as fixed spending through payoff year without inflating it', () => {
     const results = runProjection(
       makeScenario({

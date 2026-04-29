@@ -28,7 +28,7 @@ export function encodeScenario(payload: ScenarioHashInput): string {
   const customLaw = payload.customLaw ?? payload.scenario.customLaw;
   const customLawActive = payload.customLawActive === true && isCustomLawActive(customLaw);
   const scenario = compactScenarioZeroContributions(
-    scenarioWithCustomLawState(normalizeScenarioContributionDefaults(payload.scenario), customLaw, customLawActive),
+    scenarioWithCustomLawState(normalizeScenarioDefaults(payload.scenario), customLaw, customLawActive),
   );
   const shareablePayload =
     customLaw === undefined
@@ -76,7 +76,7 @@ export function decodeScenario(hash: string): ScenarioHashPayload | null {
     const customLaw = customLawFromPayload(parsed, parsed.scenario);
     const customLawActive = parsed.customLawActive === true && isCustomLawActive(customLaw);
     const payload = {
-      scenario: normalizeScenarioContributionDefaults(
+      scenario: normalizeScenarioDefaults(
         scenarioWithCustomLawState(parsed.scenario as Scenario, customLaw, customLawActive),
       ),
       plan: parsed.plan as WithdrawalPlan,
@@ -89,13 +89,33 @@ export function decodeScenario(hash: string): ScenarioHashPayload | null {
   }
 }
 
-function normalizeScenarioContributionDefaults(scenario: Scenario): Scenario {
+function normalizeScenarioDefaults(scenario: Scenario): Scenario {
+  const rothBalance = nonnegativeNumber(scenario.balances?.roth);
+
   return {
     ...scenario,
     annualContributionTraditional: nonnegativeNumber(scenario.annualContributionTraditional),
     annualContributionRoth: nonnegativeNumber(scenario.annualContributionRoth),
     annualContributionHsa: nonnegativeNumber(scenario.annualContributionHsa),
     annualContributionBrokerage: nonnegativeNumber(scenario.annualContributionBrokerage),
+    rothBasis:
+      scenario.rothBasis === undefined
+        ? {
+            regularContributionBasis: rothBalance,
+            conversionLayers: [],
+            legacyBasisAssumption: true,
+          }
+        : {
+            regularContributionBasis: nonnegativeNumber(scenario.rothBasis.regularContributionBasis),
+            conversionLayers: (scenario.rothBasis.conversionLayers ?? []).map((layer) => ({
+              yearConverted: Math.trunc(layer.yearConverted),
+              taxableAmount: nonnegativeNumber(layer.taxableAmount),
+              ...(layer.nontaxableAmount === undefined
+                ? {}
+                : { nontaxableAmount: nonnegativeNumber(layer.nontaxableAmount) }),
+            })),
+            ...(scenario.rothBasis.legacyBasisAssumption === true ? { legacyBasisAssumption: true } : {}),
+          },
   };
 }
 
@@ -106,6 +126,13 @@ function compactScenarioZeroContributions(scenario: Scenario): Scenario {
     if (scenario[key] === 0) {
       delete compacted[key];
     }
+  }
+  if (
+    scenario.rothBasis !== undefined &&
+    scenario.rothBasis.conversionLayers.length === 0 &&
+    scenario.rothBasis.regularContributionBasis === nonnegativeNumber(scenario.balances?.roth)
+  ) {
+    delete compacted.rothBasis;
   }
 
   return compacted as Scenario;

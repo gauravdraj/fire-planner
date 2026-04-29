@@ -20,6 +20,7 @@ export const basicControlIds = [
   'mortgagePayoffYear',
   'traditionalBalance',
   'rothBalance',
+  'startingRothContributionBasis',
   'brokerageAndCashBalance',
   'taxableBrokerageBasis',
   'hsaBalance',
@@ -105,7 +106,11 @@ export const basicControlHelp = {
   },
   rothBalance: {
     label: 'Roth balance',
-    description: 'Starting Roth balance treated as tax-free in the default account order.',
+    description: 'Starting Roth balance. Tax-free withdrawal treatment now depends on the Roth basis fields below.',
+  },
+  startingRothContributionBasis: {
+    label: 'Starting Roth contribution basis',
+    description: 'Estimated Roth contribution basis available before conversion layers; verify against records or Form 8606.',
   },
   brokerageAndCashBalance: {
     label: 'Brokerage plus cash balance',

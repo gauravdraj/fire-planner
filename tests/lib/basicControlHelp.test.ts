@@ -17,6 +17,7 @@ const EXPECTED_BASIC_CONTROL_IDS = [
   'mortgagePayoffYear',
   'traditionalBalance',
   'rothBalance',
+  'startingRothContributionBasis',
   'brokerageAndCashBalance',
   'taxableBrokerageBasis',
   'hsaBalance',

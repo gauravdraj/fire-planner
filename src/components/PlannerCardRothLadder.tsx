@@ -103,9 +103,12 @@ function buildRothCardSummary({
   });
   const actionableYear = result.years.find((year) => year.conversionAmount > 0) ?? null;
   const funding = computeYearsFundedFromRetirement(projectionResults, retirementYear);
+  const recaptureYear = projectionResults.find((year) => (year.rothConversionRecaptureTax ?? 0) > 0)?.year ?? null;
   const bindingLine = `Limit: ${formatConstraint(constraint)}.`;
   const fundingLine =
-    funding.depletedYear === null
+    recaptureYear !== null
+      ? `Warning: projected Roth withdrawals trigger 5-year conversion recapture tax in ${recaptureYear}.`
+      : funding.depletedYear === null
       ? `Plan is funded through ${funding.fundedThroughYear ?? plan.endYear}.`
       : `Plan depletes in ${funding.depletedYear}; review spending runway before applying conversions.`;
 

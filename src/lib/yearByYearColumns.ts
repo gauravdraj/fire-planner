@@ -39,6 +39,7 @@ export const yearByYearColumns = [
   { id: 'ltcgTax', band: 'Tax', label: 'LTCG' },
   { id: 'niit', band: 'Tax', label: 'NIIT' },
   { id: 'seTax', band: 'Tax', label: 'SE' },
+  { id: 'rothConversionRecaptureTax', band: 'Tax', label: 'Roth 5yr' },
   { id: 'totalTax', band: 'Tax', label: 'Total tax' },
   { id: 'acaMagi', band: 'KPIs', label: 'ACA MAGI', dividerBefore: true },
   { id: 'fplPercentage', band: 'KPIs', label: 'FPL %' },

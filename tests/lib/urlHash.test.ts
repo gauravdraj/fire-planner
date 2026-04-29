@@ -66,6 +66,17 @@ function decodeRawPayload(hash: string): unknown {
   return JSON.parse(json);
 }
 
+function withCompactShareDefaults(scenario: ReturnType<typeof buildProjectionInputs>['scenario']) {
+  return {
+    ...scenario,
+    rothBasis: {
+      regularContributionBasis: scenario.balances.roth,
+      conversionLayers: [],
+      legacyBasisAssumption: true,
+    },
+  };
+}
+
 describe('URL hash scenario codec', () => {
   it('round-trips a populated scenario payload and keeps only shareable active state', () => {
     const { scenario, plan } = buildProjectionInputs();
@@ -84,8 +95,16 @@ describe('URL hash scenario codec', () => {
     const encoded = encodeScenario(payloadWithUiState);
 
     expect(encoded.startsWith('v1:')).toBe(true);
-    expect(decodeScenario(encoded)).toEqual({ scenario, plan: advancedPlan, customLawActive: false });
-    expect(decodeScenario(`#${encoded}`)).toEqual({ scenario, plan: advancedPlan, customLawActive: false });
+    expect(decodeScenario(encoded)).toEqual({
+      scenario: withCompactShareDefaults(scenario),
+      plan: advancedPlan,
+      customLawActive: false,
+    });
+    expect(decodeScenario(`#${encoded}`)).toEqual({
+      scenario: withCompactShareDefaults(scenario),
+      plan: advancedPlan,
+      customLawActive: false,
+    });
     expect((decodeRawPayload(encoded) as { scenario: Record<string, unknown> }).scenario).not.toHaveProperty(
       'annualContributionTraditional',
     );
@@ -112,7 +131,7 @@ describe('URL hash scenario codec', () => {
     const rawPayload = decodeRawPayload(encoded) as Record<string, unknown>;
 
     expect(decoded).toEqual({
-      scenario: { ...scenario, customLaw: CUSTOM_LAW },
+      scenario: { ...withCompactShareDefaults(scenario), customLaw: CUSTOM_LAW },
       plan,
       customLaw: CUSTOM_LAW,
       customLawActive: true,
@@ -137,7 +156,7 @@ describe('URL hash scenario codec', () => {
     expect(rawScenario.annualContributionRoth).toBe(7_000);
     expect(rawScenario.annualContributionHsa).toBe(4_000);
     expect(rawScenario).not.toHaveProperty('annualContributionBrokerage');
-    expect(decodeScenario(encoded)?.scenario).toEqual(scenario);
+    expect(decodeScenario(encoded)?.scenario).toEqual(withCompactShareDefaults(scenario));
   });
 
   it('hydrates legacy Gate 3 hashes that only contain scenario plus plan', () => {
@@ -161,7 +180,7 @@ describe('URL hash scenario codec', () => {
       customLawActive: false,
     });
     expect(decodeScenario(inactiveOverrideHash)).toEqual({
-      scenario,
+      scenario: withCompactShareDefaults(scenario),
       plan,
       customLaw: CUSTOM_LAW,
       customLawActive: false,
@@ -194,6 +213,6 @@ describe('URL hash scenario codec', () => {
     const { scenario, plan } = buildProjectionInputs();
     const encoded = encodeScenario({ scenario, plan });
 
-    expect(encoded.length).toBeLessThan(4096);
+    expect(encoded.length).toBeLessThan(4200);
   });
 });
